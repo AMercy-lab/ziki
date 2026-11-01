@@ -17,8 +17,9 @@ import { firstProjectSlugFor } from "@/lib/project-route";
 import { tenantsForUser } from "@/lib/tenants";
 import { countPendingEscalations } from "@/lib/agent-questions";
 import { loadOwnAgents } from "@/lib/dashboard-overview";
-import { AGENTS_DOCK_HEIGHT, AgentsDock, type DockAgent } from "@/components/agents-dock";
-import { agentEarnings } from "@/lib/points/agent-earnings";
+import { AgentsDock, type DockAgent } from "@/components/agents-dock";
+import { AGENTS_DOCK_HEIGHT } from "@/lib/agents-dock";
+import { agentActivity, agentEarnings } from "@/lib/points/agent-earnings";
 
 export default async function AppLayout({
   children,
@@ -86,8 +87,16 @@ export default async function AppLayout({
     try {
       const agents = await loadOwnAgents({ userId: user.id, tenantId });
       // #710: what each agent earned, from the point entries its work wrote.
-      const earned = await agentEarnings(prisma, tenantId, agents.map((agent) => agent.id));
-      dockAgents = agents.map((agent) => ({ id: agent.id, name: agent.name, avatar: agent.avatar, status: agent.status, activity: agent.activity, earnedPoints: earned.get(agent.id) ?? 0 }));
+      const ids = agents.map((agent) => agent.id);
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const [earned, activity, pending] = await Promise.all([
+        agentEarnings(prisma, tenantId, ids),
+        agentActivity(prisma, tenantId, ids, startOfToday),
+        prisma.agentRequest.groupBy({ by: ["agentId"], where: { agentId: { in: ids }, doneAt: null }, _count: { _all: true } }),
+      ]);
+      const pendingBy = new Map(pending.map((row) => [row.agentId, row._count._all]));
+      dockAgents = agents.map((agent) => ({ id: agent.id, name: agent.name, avatar: agent.avatar, status: agent.status, activity: agent.activity, earnedPoints: earned.get(agent.id) ?? 0, ...(activity.get(agent.id) ?? { bids: 0, comments: 0, pointsToday: 0 }), pendingRequests: pendingBy.get(agent.id) ?? 0 }));
     } catch (error) {
       console.error("[layout] agents failed", error);
     }

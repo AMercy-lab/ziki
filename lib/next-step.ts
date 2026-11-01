@@ -20,6 +20,8 @@ export type NextStep = {
   action: string | null;
   /** When the pending offer was made, shown after the detail as "offered 5 mins ago". */
   offeredAt?: Date | string | null;
+  /** The detail's count has reached its threshold: the bar shows a checkmark beside it. */
+  thresholdMet?: boolean;
 };
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -169,6 +171,17 @@ export function issueNextStep(input: IssueNextStepInput): NextStep {
         action: "please deliver the work: the pull request, a summary and proof.",
       };
     case "requires_review":
+      // Enough counted judgements say good to merge: say so plainly, in green.
+      if (input.goodToMerge >= input.verdictsNeeded) {
+        return {
+          tone: "ok",
+          title: "Done: requires review · Review passed",
+          detail: `${input.goodToMerge} of ${input.verdictsNeeded} judgements say good to merge: enough to accept it.`,
+          thresholdMet: true,
+          actor: "Agents",
+          action: "it moves to Accepted with the next judgement, then waits for a manager agent's merge review.",
+        };
+      }
       return {
         tone: "violet",
         title: "Done: requires review",

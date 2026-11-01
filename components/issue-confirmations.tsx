@@ -2,6 +2,7 @@ import { EntrySummary } from "@/components/entry-summary";
 import { BASE_PATH } from "@/lib/base-path";
 import Link from "next/link";
 import { LocalTime } from "@/components/local-time";
+import { StepDate, StepTitle } from "@/components/issue-timeline";
 import { AddConfirmationDialog } from "@/components/add-confirmation-dialog";
 import { EntryReplyForm } from "@/components/entry-reply-form";
 import { EntryReplies, type EntryReplyView } from "@/components/entry-replies";
@@ -114,6 +115,7 @@ export function IssueConfirmationsPanel({
   summaryMaxChars,
   history = false,
   confirmed,
+  at,
 }: {
   bugId: string;
   data: ConfirmationsData;
@@ -124,6 +126,8 @@ export function IssueConfirmationsPanel({
   history?: boolean;
   /** The issue is past Requires confirmation (its status says so). */
   confirmed: boolean;
+  /** When this step started, at the far right of its title (#issue-timeline). */
+  at?: Date | string | null;
 }) {
   const mine = viewerId ? data.entries.find((entry) => entry.onBehalfOfUserId === viewerId) ?? null : null;
 
@@ -207,31 +211,13 @@ export function IssueConfirmationsPanel({
     // Past Requires confirmation: one compact card, the full entries behind it.
     const { confirms, deciding } = countedConfirms(data);
     return (
-      <details id="confirmations" className="group/conf mb-4 scroll-mt-24 rounded-xl border border-zk-divider bg-zk-surface" data-testid="confirmations-collapsed">
-        <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-2.5 text-[13px] text-zk-text2 [&::-webkit-details-marker]:hidden">
-          <svg
-            aria-hidden="true"
-            data-testid="confirmations-collapsed-icon"
-            viewBox="0 0 24 24"
-            className="h-4 w-4 shrink-0 text-zk-muted"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="3.5" y="3.5" width="17" height="17" rx="4" />
-            <path d="M8 12.5l2.75 2.75L16 9.5" />
-          </svg>
-          <span aria-hidden="true" className="inline-block text-zk-muted transition-transform group-open/conf:rotate-90">
-            ›
-          </span>
-          <span id="confirmations-heading" className="text-xs font-bold uppercase tracking-[0.08em] text-zk-muted">
-            Confirmations
-          </span>
-          <span className="font-mono text-xs text-zk-muted">{data.entries.length}</span>
-          <span>
-            · {confirmed ? "Confirmed" : "Not confirmed"}
+      <section id="confirmations" aria-labelledby="confirmations-heading" className="mb-4 scroll-mt-24" data-testid="confirmations-collapsed">
+        <StepTitle id="confirmations-heading" title="Confirmations" count={data.entries.length} at={at} />
+        <details className="group/conf rounded-xl border border-zk-divider bg-zk-surface">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-[13px] text-zk-text2 [&::-webkit-details-marker]:hidden">
+            <span aria-hidden="true" className="inline-block text-zk-muted transition-transform group-open/conf:rotate-90">›</span>
+            <span>
+            {confirmed ? "Confirmed" : "Not confirmed"}
             {confirms.length > 0 ? ` by ${confirms.map((entry) => entry.by).join(", ")}` : ""}
             {deciding ? (
               <>
@@ -239,9 +225,10 @@ export function IssueConfirmationsPanel({
               </>
             ) : null}
           </span>
-        </summary>
-        <div className="px-3 pb-3">{list}</div>
-      </details>
+          </summary>
+          <div className="px-3 pb-3">{list}</div>
+        </details>
+      </section>
     );
   }
 
@@ -271,6 +258,7 @@ export function IssueConfirmationsPanel({
               }
             />
           )}
+          <StepDate at={at} />
         </div>
       </div>
       {block && !history ? (

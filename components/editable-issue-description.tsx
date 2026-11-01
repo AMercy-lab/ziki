@@ -21,6 +21,8 @@ export type EditableIssueDescriptionProps = {
   canEdit: boolean;
   users: { id: string; name: string }[];
   children?: ReactNode;
+  /** Small tags (the issue's area) shown at the right of the summary. */
+  tags?: ReactNode;
   /** When the title or description was last edited (#303); null if never. */
   lastEditedAt?: Date | null;
   historyHref?: string;
@@ -34,6 +36,7 @@ export function EditableIssueDescription({
   canEdit,
   users,
   children,
+  tags = null,
   lastEditedAt = null,
   historyHref,
 }: EditableIssueDescriptionProps) {
@@ -193,8 +196,11 @@ export function EditableIssueDescription({
         </form>
       ) : summary ? (
         // One card: the summary, and the full description opened beneath it.
-        <div className="max-w-3xl">
-          <RichText className="mt-0! text-[15px] font-medium leading-relaxed text-zk-text" content={summary} />
+        <div>
+          <div className="flex items-start justify-between gap-3">
+            <RichText className="mt-0! max-w-3xl text-[15px] font-medium leading-relaxed text-zk-text" content={summary} />
+            {tags ? <div className="flex shrink-0 flex-wrap justify-end gap-1.5 pt-0.5">{tags}</div> : null}
+          </div>
           <button
             type="button"
             aria-expanded={showFull}
@@ -209,8 +215,9 @@ export function EditableIssueDescription({
           </button>
           {showFull ? (
             <div id={`${bugId}-full-description`} className="mt-3 border-t border-zk-divider pt-3 text-[15px] leading-relaxed text-zk-text2">
+              {/* Section headings at the text's own size, so the description doesn't read larger than the summary. */}
               <RichText
-                className="mt-0!"
+                className="mt-0! [&_h1]:!text-[15px] [&_h2]:!text-[15px] [&_h3]:!text-[15px] [&_h1]:!font-bold [&_h2]:!font-bold [&_h3]:!font-bold"
                 content={initialDescription}
                 renderMentions={(text) => <MentionText text={text} users={users} />}
               />
@@ -218,6 +225,7 @@ export function EditableIssueDescription({
           ) : null}
         </div>
       ) : (
+        <div className="flex items-start justify-between gap-3">
         <div className="max-w-3xl text-[15px] leading-relaxed text-zk-text2">
           <ExpandableText maxLines={6} expandText="View more" collapseText="View less">
             <RichText
@@ -226,6 +234,8 @@ export function EditableIssueDescription({
               renderMentions={(text) => <MentionText text={text} users={users} />}
             />
           </ExpandableText>
+        </div>
+          {tags ? <div className="flex shrink-0 flex-wrap justify-end gap-1.5 pt-0.5">{tags}</div> : null}
         </div>
       )}
 

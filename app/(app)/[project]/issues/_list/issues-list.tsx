@@ -107,7 +107,6 @@ const REJECTED_IDEAS_STATUS = "rejected_ideas";
 const IDEAS_PARAM = "ideas";
 type IdeasView = "new" | "drafts" | "rejected";
 /** Most ideas a list shows, highest score first. */
-const IDEAS_LIMIT = 100;
 
 /** `?status=rejected`: someone's confirmation entry rejected the issue (#1122, #issue-confirmations). */
 const REJECTED_STATUS = "rejected";
@@ -132,7 +131,7 @@ const STAGE_GROUPS = [
   // lists every substatus of its status together (Open: Requires confirmation
   // and Open), and each row says which one it is at.
   { label: "Ideas", statuses: [IDEAS_STATUS, REJECTED_IDEAS_STATUS] },
-  { label: "Working", statuses: ["open", "in_progress", "closed", POSSIBLY_DELIVERED] },
+  { label: "In Progress", statuses: ["open", "in_progress", "closed", POSSIBLY_DELIVERED] },
   { label: "Delivered", statuses: ["done", "merge", "resolved", ERROR_STATUS] },
 ] as const;
 
@@ -614,12 +613,23 @@ export async function IssuesList({
         )
       : ([] as string[]),
   ]);
+  // The Ideas lists page like the issue lists (#ideas-pages), 25 at a time.
+  const ideaPagination = calculatePagination({
+    page: pageParam,
+    totalCount: ideasView === "drafts" ? draftIds.length : ideasView === "rejected" ? rejectedIdeasCount : ideasCount,
+  });
+  const ideaPageParams: Record<string, string | undefined> = Object.fromEntries(
+    Object.entries(params)
+      .filter(([key]) => key !== "page" && key !== "status" && key !== IDEAS_PARAM)
+      .map(([key, value]) => [key, toSingleQueryParam(value)]),
+  );
   const ideaRows: IdeaListRow[] = isIdeasView && tenantId
     ? await loadOrEmpty("ideas list", async () => {
         const rows = await prisma.idea.findMany({
           where: ideasView === "drafts" ? { ...ideaWhere, id: { in: draftIds } } : ideasView === "rejected" ? rejectedIdeaWhere : ideaWhere,
           orderBy: [{ score: "desc" }, { createdAt: "desc" }, { id: "desc" }],
-          take: IDEAS_LIMIT,
+          skip: ideaPagination.skip,
+          take: ideaPagination.take,
           select: {
             id: true, number: true, title: true, score: true, projectId: true, createdAt: true, updatedAt: true,
             status: true, archiveReason: true, archiveDuplicateOf: true, rejectedAt: true, archivedAt: true,
@@ -859,6 +869,19 @@ export async function IssuesList({
         </Suspense>
         <div className="issues-actions flex flex-wrap items-center gap-2 print:hidden">
           {finishedWatched > 0 ? <UnwatchFinishedButton count={finishedWatched} /> : null}
+          {/* The workstream: the agents' work feed, drawn for people (#workstream). */}
+          <Link
+            href={projectPath(slug, "/workstream")}
+            title="Workstream: what agents are asked to do"
+            aria-label="Workstream: what agents are asked to do"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-zk-border bg-zk-surface text-zk-text2 hover:bg-zk-chip hover:text-zk-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-electric-blue"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 6h13M3 12h18M3 18h9" />
+              <circle cx="19" cy="6" r="2" />
+              <circle cx="15" cy="18" r="2" />
+            </svg>
+          </Link>
           {isIdeasView ? (
             <IdeasShowDoneButton showingDone={ideasView === "rejected"} openHref={ideasPath(slug)} doneHref={ideasPath(slug, "rejected")} />
           ) : null}
@@ -928,7 +951,20 @@ export async function IssuesList({
                   : undefined
             }
           />
-        ) : isFirstRun ? (
+        ) : null}
+        {isIdeasView && ideaRows.length > 0 ? (
+          <PaginationControls
+            basePath={ideasPath(slug, ideasView ?? "new")}
+            page={ideaPagination.page}
+            totalPages={ideaPagination.totalPages}
+            totalCount={ideaPagination.totalCount}
+            from={ideaPagination.from}
+            to={ideaPagination.to}
+            queryParams={ideaPageParams}
+            itemLabel="idea"
+          />
+        ) : null}
+        {isIdeasView ? null : isFirstRun ? (
           <FirstRunWelcome isAdmin={canDelete} hasTenant={Boolean(tenantId)} slug={slug} returnTo={returnTo} />
         ) : bugs.length === 0 ? (
           <WhimsicalEmptyState

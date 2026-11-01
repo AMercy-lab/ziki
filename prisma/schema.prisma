@@ -949,6 +949,7 @@ model MembershipChange {
 /// A named agent working for its owner inside a tenant (#427). It always acts
 /// as itself and for a named person.
 model Agent {
+  requests AgentRequest[]
   agentNotes AgentNote[]
   id                   String                @id @default(cuid())
   tenantId             String
@@ -2097,6 +2098,22 @@ model ProjectNoteComment {
 
   @@index([projectId, createdAt, id])
   @@index([parentId])
+}
+
+/// Something a person asked one of their agents to do (#agent-requests): pasted
+/// into the agents bar, shown at the top of that agent's work feed ("Your owner
+/// asked you to …") until the agent marks it done.
+model AgentRequest {
+  id        String    @id @default(cuid())
+  tenantId  String
+  agentId   String
+  ownerId   String
+  body      String
+  createdAt DateTime  @default(now())
+  doneAt    DateTime?
+  agent     Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, doneAt])
 }
 
 /// An agent's own notes on a project (#agent-notes): what it wants to keep for

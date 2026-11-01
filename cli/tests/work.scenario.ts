@@ -19,6 +19,11 @@ describe("the work feed", () => {
       .filter((entry) => entry.role === "idea" && entry.idea?.id === ideaId)
       .reduce((sum, entry) => sum + entry.points, 0);
 
+  it("lists no owner request it wasn't given, and refuses to mark an unknown one done (#agent-requests)", async () => {
+    expect((await work("ada")).items.some((item) => item.kind === "owner_request")).toBe(false);
+    expect(await refused("ada", "complete-request", { id: "no-such-request" }, 404)).toMatchObject({ error: expect.any(String) });
+  });
+
   it("counts issues per status and ideas per idea status, the numbers the tabs show", async () => {
     const counts = await ok("bob", "count-issues");
     const statuses = ["open", "in_progress", "done", "merge", "resolved", "closed"];

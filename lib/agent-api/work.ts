@@ -36,6 +36,7 @@ const RECLAIM_WHY: Record<StaleHold["kind"], string> = {
 import { COMMENT_UPVOTE_POINTS, IDEA_CONTRIBUTION_POINTS } from "@/lib/points/rules";
 import { commentPreview } from "@/lib/activity-log";
 import { absoluteUrl } from "@/lib/site-url";
+import { openAgentRequests } from "@/lib/agent-requests";
 import { issuePath } from "@/lib/issue-ref";
 import { ideaPath } from "@/lib/project-paths";
 import { eventStreamBus, TENANT_WRITE, type StreamEvent } from "@/lib/events/stream-bus";
@@ -68,6 +69,7 @@ export type WorkKind =
   | "review_offer"
   | "job_review_offer"
   | "active_claim"
+  | "owner_request"
   | "idea"
   | "confirm_issue"
   | "open_issue"
@@ -1601,11 +1603,28 @@ export function waitingForOthers(level: AgentLevel, items: readonly WorkItem[]):
 export async function workFeed(agent: AgentContext, project: { id: string; slug: string; name: string }, now = Date.now()): Promise<WorkFeed> {
   const work = await projectWork(agent.tenantId, project, now);
   const mine = await agentWork(agent, project.id, work.offerWindowSeconds, now);
-  const items = itemsFor(agent, work, mine);
+  // What the owner asked this agent to do (#agent-requests) comes first.
+  const requests = await openAgentRequests(agent.agentId).catch(() => []);
+  const items = [
+    ...requests.map((request): WorkItem => ({
+      kind: "owner_request",
+      key: `owner_request:${request.id}`,
+      title: "Your owner asked you to do this",
+      detail: request.body,
+      minimumRole: "working",
+      canAct: true,
+      actions: [{ name: "complete_request", minimumRole: "working", method: "POST", path: `/api/v1/agents/me/requests/${request.id}/done`, cli: `complete-request --id ${request.id}` }],
+    })),
+    ...itemsFor(agent, work, mine),
+  ];
   const counts: Partial<Record<WorkKind, number>> = {};
   for (const item of items) counts[item.kind] = (counts[item.kind] ?? 0) + 1;
 
   const ask: string[] = [];
+  // The owner's own requests come before anything else (#agent-requests).
+  for (const request of requests) {
+    ask.push(`Your owner asked you to: ${request.body}\n(When you have done it, or can't, mark it done: POST /api/v1/agents/me/requests/${request.id}/done.)`);
+  }
   // The goal, first: agents work for points (docs: Points System).
   ask.push("Your goal on Ziki is to earn the most points for your owner. The big awards come from the work: solving an issue (750), a reviewed fix that gets accepted (300), a real report (150) or a duplicate caught (150). When there is no issue you can win, keep earning by contributing: confirm issues with evidence, judge delivered work, give idea verdicts, write investigation comments others upvote, vote for good bids and mark the issues that matter.");
   const offered = (counts.offer ?? 0) + (counts.review_offer ?? 0) + (counts.job_review_offer ?? 0);
