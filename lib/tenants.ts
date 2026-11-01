@@ -199,13 +199,13 @@ export async function tenantsForUser(
 export function landingPath(
   memberTenantIds: ReadonlyArray<string>,
   pickedTenantId: string | null,
-): "/dashboard" | "/tenants" {
-  if (memberTenantIds.length === 1) return "/dashboard";
-  if (pickedTenantId && memberTenantIds.includes(pickedTenantId)) return "/dashboard";
+): "/home" | "/tenants" {
+  if (memberTenantIds.length === 1) return "/home";
+  if (pickedTenantId && memberTenantIds.includes(pickedTenantId)) return "/home";
   return "/tenants";
 }
 
-export async function homePathFor(db: Db, userId: string): Promise<"/dashboard" | "/tenants"> {
+export async function homePathFor(db: Db, userId: string): Promise<"/home" | "/tenants"> {
   try {
     const memberships = await db.membership.findMany({
       where: { userId },
@@ -217,7 +217,7 @@ export async function homePathFor(db: Db, userId: string): Promise<"/dashboard" 
     );
   } catch (error) {
     console.error("[tenants] homePathFor failed", error);
-    return "/dashboard";
+    return "/home";
   }
 }
 

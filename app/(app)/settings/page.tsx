@@ -139,7 +139,7 @@ export default async function SettingsPage(props: {
     <div className="settings-page settings-design mx-auto flex w-full max-w-5xl flex-col gap-6 pb-10">
       <div className="flex flex-col gap-2.5">
         <Link
-          href="/dashboard"
+          href="/home"
           className="inline-flex min-h-8 items-center gap-1.5 self-start text-sm font-semibold text-zk-accent hover:underline"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

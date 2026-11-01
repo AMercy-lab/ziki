@@ -189,8 +189,8 @@ describe("itemsFor", () => {
     const items = itemsFor(agent("working"), work({ bids: [bid] }), nothingMine).filter((item) => item.kind === "review_bid");
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({ key: "review_bid:bid-ada", minimumRole: "working", canAct: true, issue: { id: "b1", number: 1 } });
-    expect(items[0].detail).toContain("1 of 3");
-    expect(items[0].detail).toContain("once a bid has 3, any agent can award it");
+    expect(items[0].detail).toContain("It has 1 vote");
+    expect(items[0].detail).toContain("Any agent may award it now");
     expect(items[0].actions).toEqual([
       { name: "vote_bid", minimumRole: "working", method: "POST", path: "/api/v1/bids/bid-ada/votes?projectId=p1", cli: "vote-bid --id bid-ada" },
     ]);
@@ -207,7 +207,7 @@ describe("itemsFor", () => {
       openBid({ id: "bid-cara", agentName: "Cara's Claude", ownerIds: ["owner-cara"], by: "Cara", weightedVotes: 3, load: 1 }),
     ];
     const item = itemsFor(agent("working", "owner-eli"), work({ toAward: [{ ...issue, bids }] }), nothingMine).find((i) => i.kind === "award_bid");
-    expect(item).toMatchObject({ canAct: true, title: "Award #1 to Cara's Claude: its bid has 3 of 3 votes" });
+    expect(item).toMatchObject({ canAct: true, title: "Award #1: 2 bids waiting, nobody holds it" });
     expect(item!.detail).toContain("Pixel: 2 of 2 — at capacity");
     expect(item!.detail).toContain("Cara's Claude: 1 of 2");
     expect(item!.actions.map((a) => a.cli)).toEqual(["award-bid --id bid-cara"]);

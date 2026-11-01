@@ -76,7 +76,7 @@ vi.mock("@/lib/prisma", () => ({
     project: { findFirst: vi.fn(async () => ({ slug: "acme-web", name: "Acme Web", goal: null })) },
     bug: { count, findMany, groupBy },
     idea: { count: ideaCount, findMany: ideaFindMany },
-    ideaVerdict: { groupBy: ideaVerdictGroupBy },
+    ideaVerdict: { groupBy: ideaVerdictGroupBy, findMany: vi.fn(async () => []) },
     milestone: { findMany: vi.fn(async () => []) },
     projectArea: { findMany: vi.fn(async () => []) },
     user: { findUnique: vi.fn(async () => ({ keyboardShortcuts: true })) },
@@ -117,6 +117,10 @@ const IDEA = {
   score: 2,
   projectId: "project-acme",
   createdAt: new Date("2026-10-02T10:00:00Z"),
+  updatedAt: new Date("2026-10-03T10:00:00Z"),
+  rejectedAt: null,
+  archivedAt: null,
+  verdicts: [],
   reporter: { name: "Rita Reporter" },
   category: { name: "Web" },
   _count: { verdicts: 3 },
@@ -149,12 +153,13 @@ beforeEach(() => {
 });
 
 describe("issue list layout", () => {
-  it("links each row to its project address and offers a new-issue link", async () => {
+  it("links each row to its project address and offers Add Idea", async () => {
     const html = await renderList({ status: "all" });
     expect(html).toContain("Login button does nothing");
     // #project-urls: a row opens the issue at /<project-slug>/<number>.
     expect(html).toContain('href="/acme/7"');
-    expect(html).toContain('href="/acme/issues/new?from=');
+    // Add Idea opens the idea chat box in the toolbar (#idea-chat).
+    expect(html).toMatch(/<button[^>]*title="Add Idea"/);
   });
 
   it("says no issues match when the project has issues but the filters hide them", async () => {

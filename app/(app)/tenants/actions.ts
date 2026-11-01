@@ -44,7 +44,7 @@ import { ideasPath, orgPath } from "@/lib/project-paths";
 /** The org Settings page the action came from (`/<slug>/org/settings`, #project-urls). */
 async function orgSettingsPath(): Promise<string> {
   const slug = await refererProjectSlug();
-  return slug ? orgPath(slug, "settings") : "/dashboard";
+  return slug ? orgPath(slug, "settings") : "/home";
 }
 
 export type TenantFormResult = {
@@ -60,8 +60,8 @@ async function enterTenant(tenantId: string, projectId?: string): Promise<never>
   await setActiveTenantCookie(tenantId);
   revalidatePath("/", "layout");
   const project = projectId ? await prisma.project.findFirst({ where: { id: projectId, tenantId, archivedAt: null }, select: { slug: true } }) : null;
-  // /dashboard opens the first project of the workspace just made current.
-  redirect(project ? ideasPath(project.slug) : "/dashboard");
+  // /home opens the first project of the workspace just made current.
+  redirect(project ? ideasPath(project.slug) : "/home");
 }
 
 /**
@@ -87,14 +87,14 @@ export async function switchTenantForIssueAction(formData: FormData): Promise<vo
   const user = await requireUser();
   const issueId = String(formData.get("issueId") ?? "");
   const tenant = await memberTenantById(prisma, user.id, String(formData.get("tenantId") ?? ""));
-  if (!tenant || tenant.archivedAt) redirect("/dashboard");
+  if (!tenant || tenant.archivedAt) redirect("/home");
   await setActiveTenantCookie(tenant.id);
   revalidatePath("/", "layout");
   const bug = await prisma.bug.findFirst({
     where: { id: issueId, tenantId: tenant.id },
     select: { number: true, project: { select: { slug: true } } },
   });
-  redirect(bug ? issueHref(bug) : "/dashboard");
+  redirect(bug ? issueHref(bug) : "/home");
 }
 
 /** Create a tenant owned by the person, with its first project, and enter it. */

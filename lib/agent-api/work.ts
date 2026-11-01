@@ -629,7 +629,7 @@ async function closableIssues(tenantId: string, projectId: string, threshold: nu
 /** Open bids (not awarded, not withdrawn, from agents not revoked) on Open issues, oldest first (#bid-votes). */
 async function openBids(tenantId: string, projectId: string, managerVoteWeight: number, offerWindowSeconds: number): Promise<OpenBid[]> {
   const rows = await prisma.issueBid.findMany({
-    where: { ...OPEN_BID_WHERE, bug: { tenantId, projectId, isDeleted: false, substatus: "open" } },
+    where: { ...OPEN_BID_WHERE, bug: { tenantId, projectId, isDeleted: false, substatus: { in: ["open", "requires_confirmation"] } } },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     select: {
       id: true,
@@ -1163,13 +1163,7 @@ export function itemsFor(agent: AgentContext, work: ProjectWork, mine: AgentWork
       kind: "review_bid",
       key: `review_bid:${bid.id}`,
       title: `Vote for ${bid.agentName}'s bid on #${bid.issue.number}?`,
-      detail: `${bid.agentName} bids for ${bid.by}: ${bid.summary} If you think it is a good bid, vote for it. ${tallyLine(bid.weightedVotes, awardThreshold, managerVoteWeight)}; ${reached
-        ? "it has reached the threshold, so any agent can award it."
-        : thresholdOnly
-          ? "once the issue is free, the vote that reaches the threshold awards it."
-          : `once a bid has ${awardThreshold}, any agent can award it.`}${can("manager")
-        ? ` Your vote counts ${managerVoteWeight}${managerVoteWeight >= awardThreshold ? " and can reach the threshold alone" : ""}.`
-        : ""}`,
+      detail: `${bid.agentName} bids for ${bid.by}: ${bid.summary} If you think it is a good bid, vote for it: votes guide whoever awards, they don't gate it (#open-award). It has ${bid.weightedVotes} ${bid.weightedVotes === 1 ? "vote" : "votes"}${thresholdOnly && !reached ? `; in this project the vote that brings it to ${awardThreshold} awards it` : ""}. Any agent may award it now.${can("manager") ? ` Your vote counts ${managerVoteWeight}.` : ""}`,
       minimumRole: "working",
       canAct: true,
       issue: issueRef(bid.issue),
@@ -1415,24 +1409,22 @@ export function itemsFor(agent: AgentContext, work: ProjectWork, mine: AgentWork
     ` Load (live offers and active claims, of ${work.capacity}): ${bids.map((bid) => capacityLine(bid.agentName, bid.load, work.capacity)).join("; ")}.`;
   const capacityBlock = { canAct: false, blockedReason: EVERY_BIDDER_AT_CAPACITY };
   for (const issue of work.toAward) {
-    // Awarded by votes (#bid-votes): a bid whose weighted votes reached the
-    // project's awardThreshold may be awarded by any agent, the most voted
-    // first. Below the threshold there is nothing to award; its bids are
-    // review_bid items to vote on.
+    // Any agent may award any open bid (#open-award), its own owner's too:
+    // votes are guidance, the most voted listed first. Every issue with a bid
+    // and nobody holding it is an item, so awards don't wait on votes.
     const reached = [...issue.bids]
-      .filter((bid) => bid.weightedVotes >= awardThreshold)
       .sort((a, b) => b.weightedVotes - a.weightedVotes || a.createdAt.getTime() - b.createdAt.getTime());
     if (!reached.length) continue;
     const awardable = reached.filter(underCapacity);
     const top = awardable[0] ?? reached[0];
     const listed = reached
-      .map((bid) => `${bid.agentName} for ${bid.by} (${bid.weightedVotes} of ${awardThreshold}): ${bid.summary}`)
+      .map((bid) => `${bid.agentName} for ${bid.by} (${bid.weightedVotes} ${bid.weightedVotes === 1 ? "vote" : "votes"}): ${bid.summary}`)
       .join(" | ");
     items.push({
       kind: "award_bid",
       key: `award_bid:${issue.id}`,
-      title: `Award #${issue.number} to ${top.agentName}: its bid has ${top.weightedVotes} of ${awardThreshold} votes`,
-      detail: `Open and confirmed, and nobody holds it. ${reached.length === 1 ? "This bid has" : "These bids have"} reached the award threshold, so any agent may award ${reached.length === 1 ? "it" : "one"}: the award is an offer its agent accepts. A bid whose bidder is at capacity can't be awarded until it has capacity again. Bids: ${listed}${loadNote(reached)}`,
+      title: `Award #${issue.number}: ${reached.length} ${reached.length === 1 ? "bid" : "bids"} waiting, nobody holds it`,
+      detail: `Nobody holds this issue and it has ${reached.length === 1 ? "a bid" : "bids"}. Please award one now: read the bids, pick the one most likely to ship a good fix, and award it (your own owner's bid included). Votes are guidance, not a gate: ${top.agentName}'s leads with ${top.weightedVotes}. The award is an offer its agent accepts. A bid whose bidder is at capacity can't be awarded until it has capacity again. Bids: ${listed}${loadNote(reached)}`,
       minimumRole: "working",
       ...(awardable.length ? { canAct: true } : capacityBlock),
       issue: issueRef(issue),
@@ -1640,7 +1632,7 @@ export async function workFeed(agent: AgentContext, project: { id: string; slug:
   const toConvert = items.filter((item) => item.kind === "convert_idea" && item.canAct).length;
   if (toConvert && !thresholdOnly) ask.push(`${toConvert} idea${toConvert === 1 ? " has" : "s have"} reached the threshold. Read the verdicts and convert ${toConvert === 1 ? "it to an issue" : "them to issues"}.`);
   const toAward = items.filter((item) => item.kind === "award_bid" && item.canAct).length;
-  if (toAward) ask.push(`${toAward} open issue${toAward === 1 ? " has" : "s have"} a bid with enough votes to award. Any agent may award it: read the bid and award it.`);
+  if (toAward) ask.push(`${toAward} open issue${toAward === 1 ? " has" : "s have"} bids and nobody holding ${toAward === 1 ? "it" : "them"}. Any agent may award any bid, its own owner's included: read the bids and award the best one. Votes are guidance only.`);
   const toClose = items.filter((item) => item.kind === "close_issue" && item.canAct).length;
   if (toClose && thresholdOnly) ask.push(`${toClose} issue${toClose === 1 ? " has" : "s have"} suggestions to close. Read them and, if they hold up, suggest closing too, with the accurate reason and your evidence; the suggestion that brings one reason to the threshold closes it.`);
   if (toClose && !thresholdOnly) ask.push(`${toClose} issue${toClose === 1 ? " has" : "s have"} enough suggestions for one reason to close. As a manager agent, read them and close ${toClose === 1 ? "it" : "them"} if they hold up, with the evidence. Choose the accurate reason (superseded, not_reproducible, already_implemented, duplicate or not_planned), not superseded by default; a closed pull request alone is no reason to close as not_planned.`);

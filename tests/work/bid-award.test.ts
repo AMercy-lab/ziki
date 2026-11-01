@@ -143,33 +143,28 @@ describe("awardBid", () => {
     }));
   });
 
-  it("refuses every award below the threshold, a manager's too, with 409 below_threshold", async () => {
+  it("awards any open bid whatever its votes, none at all included: votes are guidance (#open-award)", async () => {
     db.issueBid.findUnique.mockResolvedValue(stored);
-    // Two working agents' votes: 2 of 3.
-    db.bidVote.findMany.mockResolvedValue([
-      { onBehalfOfUserId: "bob", agent: { level: "working" } },
-      { onBehalfOfUserId: "cara", agent: { level: "working" } },
-    ]);
-    for (const agent of [caller, manager, { ...manager, level: "merger" as const }]) {
-      await expect(awardBid(agent, "bid1")).rejects.toMatchObject({
-        status: 409,
-        body: { error: "below_threshold", message: expect.stringContaining("2 of the 3 votes"), votes: 2, threshold: 3 },
-      });
-    }
-    // No votes at all.
+    db.issueClaim.create.mockResolvedValue({ id: "claim1" });
     db.bidVote.findMany.mockResolvedValue([]);
-    await expect(awardBid(manager, "bid1")).rejects.toMatchObject({ status: 409, body: expect.objectContaining({ error: "below_threshold", votes: 0 }) });
-    expect(db.issueClaim.create).not.toHaveBeenCalled();
-    expect(notifyClaimOffered).not.toHaveBeenCalled();
+    // A working agent, with no votes on the bid.
+    await expect(awardBid({ ...caller, agentId: "cara-agent", ownerId: "cara" }, "bid1")).resolves.toMatchObject({ claimId: "claim1" });
+    expect(db.issueClaim.create).toHaveBeenCalledTimes(1);
   });
 
-  it("counts each person once, at the highest weight any of their agents cast", async () => {
+  it("lets an agent award its own owner's bid: an offer to oneself (#open-award)", async () => {
     db.issueBid.findUnique.mockResolvedValue(stored);
-    db.bidVote.findMany.mockResolvedValue([
-      { onBehalfOfUserId: "bob", agent: { level: "working" } },
-      { onBehalfOfUserId: "bob", agent: { level: "working" } },
-    ]);
-    await expect(awardBid(manager, "bid1")).rejects.toMatchObject({ body: expect.objectContaining({ votes: 1 }) });
+    db.issueClaim.create.mockResolvedValue({ id: "claim1" });
+    db.bidVote.findMany.mockResolvedValue([]);
+    // Ada's agent awards Ada's bid.
+    await expect(awardBid(caller, "bid1")).resolves.toMatchObject({ claimId: "claim1", beneficiaryUserId: "ada" });
+  });
+
+  it("awards while the issue still awaits confirmation (#open-award)", async () => {
+    db.issueBid.findUnique.mockResolvedValue({ ...stored, bug: { ...openBug, substatus: "requires_confirmation" } });
+    db.issueClaim.create.mockResolvedValue({ id: "claim1" });
+    vi.mocked(isConfirmed).mockResolvedValue(false);
+    await expect(awardBid(manager, "bid1")).resolves.toMatchObject({ claimId: "claim1" });
   });
 
   it("refuses a bid from another tenant as not found", async () => {

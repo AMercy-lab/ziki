@@ -135,7 +135,7 @@ describe("IssueBidsPanel (#issue-bids)", () => {
     expect(screen.queryByRole("button", { name: /Award/ })).toBeNull();
   });
 
-  it("offers Award on open bids at the threshold only, and only to a viewer who can award", () => {
+  it("offers Award on every open bid, whatever its votes, and only to a viewer who can award (#open-award)", () => {
     const at = new Date("2026-10-29T12:00:00Z");
     const bids: BidEntryView[] = [
       { ...bid, id: "open1", agentName: "Open agent", votes: 3 },
@@ -146,10 +146,10 @@ describe("IssueBidsPanel (#issue-bids)", () => {
     ];
     const { unmount } = render(<IssueBidsPanel bids={bids} canAward awardThreshold={3} />);
     const buttons = screen.getAllByRole("button", { name: /Award/ });
-    expect(buttons).toHaveLength(2);
+    expect(buttons).toHaveLength(3);
     const awardedIds = buttons.map((button) => (button.closest("form")?.querySelector("input[name=bidId]") as HTMLInputElement | null)?.value);
-    // The most voted open bid is listed first.
-    expect(awardedIds).toEqual(["open2", "open1"]);
+    // Every open bid, the most voted first; the one below the old threshold too.
+    expect(awardedIds).toEqual(["open2", "open1", "below1"]);
     expect(screen.getByTestId("bid-withdrawn").querySelector("button")).toBeNull();
     expect(screen.getByTestId("bid-released").querySelector("button")).toBeNull();
     unmount();

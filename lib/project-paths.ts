@@ -54,11 +54,6 @@ export function ideaPath(slug: string, number: number): string {
   return projectPath(slug, `/ideas/${number}`);
 }
 
-/** A workspace page shown under a project: `/<slug>/dashboard`, `/<slug>/org/members`. */
-export function workspacePath(slug: string, page: string): string {
-  return projectPath(slug, `/${page.replace(/^\//, "")}`);
-}
-
 /** The organization admin area under a project: `/<slug>/org`, `/<slug>/org/members`. */
 export function orgPath(slug: string, section = ""): string {
   return projectPath(slug, section ? `/org/${section}` : "/org");

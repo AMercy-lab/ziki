@@ -35,7 +35,7 @@ export type ProjectActionResult = {
 /** Back to the org's Projects page the action came from (#project-urls), with a message. */
 async function projectsMessage(key: "error" | "notice", message: string): Promise<string> {
   const slug = await refererProjectSlug();
-  return slug ? `${orgPath(slug, "projects")}?${key}=${encodeURIComponent(message)}` : "/dashboard";
+  return slug ? `${orgPath(slug, "projects")}?${key}=${encodeURIComponent(message)}` : "/home";
 }
 
 /** The current tenant, only when the signed-in person owns it or is super admin. */

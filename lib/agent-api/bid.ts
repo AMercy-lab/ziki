@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { assertKeyProject, type AgentContext } from "@/lib/agents/require-agent";
 import { requireLevel } from "@/lib/agents/levels";
 import { IssueApiError } from "@/lib/agent-api/errors";
-import { isConfirmed } from "@/lib/agent-api/confirmations";
 import { publish } from "@/lib/agent-api/events";
 import { workflowFor } from "@/lib/workflow";
 import { isOfferExpired, scheduleOfferExpiry } from "@/lib/agent-api/offer";
@@ -359,12 +358,8 @@ export async function awardBid(agent: AgentContext, bidId: string) {
       assertKeyProject(agent, bid.bug.projectId);
       const locked = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Bug" WHERE "id" = ${bid.bugId} AND "isDeleted" = false FOR UPDATE`;
       if (!locked.length) throw new IssueApiError(404, "Bid not found.");
-      const { awardThreshold, managerVoteWeight } = await workflowFor(bid.bug.projectId, tx);
-      const votes = await bidTally(bid.id, managerVoteWeight, tx);
-      if (votes < awardThreshold) {
-        const message = `This bid has ${votes} of the ${awardThreshold} votes it needs before it can be awarded.`;
-        throw new IssueApiError(409, message, { error: "below_threshold", message, votes, threshold: awardThreshold });
-      }
+      // Any agent may award any open bid, its own owner's included (#open-award):
+      // votes are guidance for choosing, not a gate.
       return awardInTransaction(tx, bidId, { userId: agent.ownerId, agentId: agent.agentId });
     });
     afterAward(result);
@@ -381,9 +376,9 @@ export type AwardResult = { bidId: string; claimId: string; bugId: string; bugTi
 
 /**
  * Awards an open bid as an offer, in the caller's transaction, with its issue
- * row already locked FOR UPDATE. The issue must be Open and confirmed, held by
- * nobody (a stale assignee is cleared, an expired offer released). An
- * agent's award of a bid at the threshold and, in a threshold-only project,
+ * row already locked FOR UPDATE. The issue must be Open (confirmed or not),
+ * held by nobody (a stale assignee is cleared, an expired offer released). An
+ * agent's award of any open bid and, in a threshold-only project,
  * the bid vote that reaches the project's `awardThreshold` (`decision`,
  * lib/agent-api/bid-votes.ts) both end here; `by` is who awarded it, or who cast the deciding vote. Throws a
  * 409 `IssueApiError` before writing anything when a rule stops the award.
@@ -403,11 +398,10 @@ export async function awardInTransaction(
     },
   });
   if (!fresh || fresh.withdrawnAt || fresh.awardedAt) throw new IssueApiError(409, "This bid is no longer open.");
-  if (fresh.bug.substatus !== "open") throw new IssueApiError(409, "Only open issues can be awarded.");
-  // One rule for ready: confirmed under isConfirmed(), no second check (#714).
-  const isReady = await isConfirmed(fresh.bugId, tx);
-  if (!isReady) {
-    throw new IssueApiError(409, "This is not ready yet. Reviewers confirm an issue before it can be passed on.");
+  // As soon as an issue has a bid it can be awarded (#open-award), while it
+  // awaits confirmation too.
+  if (fresh.bug.substatus !== "open" && fresh.bug.substatus !== "requires_confirmation") {
+    throw new IssueApiError(409, "Only open issues can be awarded.");
   }
   // Bidder capacity (#bidder-capacity): no award to a person whose agents
   // already hold the project's maxActiveClaims in live offers and active

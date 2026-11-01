@@ -1,26 +1,21 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { ideasPath, orgPath } from "@/lib/project-paths";
-import type { AgentLevel } from "@prisma/client";
 import { SignOutButton } from "@/components/sign-out-button";
 import { WorkspaceSwitcher, type WorkspaceChoice } from "@/components/workspace-switcher";
 import {
   MANAGE_AGENTS_HREF,
   SITE_ADMIN_HREF,
-  agentPageHref,
   isNavItemActive,
   realRoleOf,
   roleViewLabels,
 } from "@/lib/header-nav";
-import { AGENT_LEVEL_LABELS } from "@/lib/agents/levels";
 import { isSuperAdmin, type AppRole } from "@/lib/roles";
 import { Avatar } from "@/components/avatar";
-import { AgentAvatar } from "@/components/agent-avatar";
 import { AccountThemeSelector } from "@/components/theme-toggle";
-import { formatPoints, formatPointsAsDollars } from "@/lib/points/rules";
 import { recentNotificationsAction } from "@/app/actions/notifications";
 import { LocalTime } from "@/components/local-time";
 import { BASE_PATH } from "@/lib/base-path";
@@ -30,15 +25,6 @@ import { ZikiMark } from "@/components/ziki-mark";
 const linkFocus =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue focus-visible:ring-offset-2";
 
-export type ShellAgent = {
-  id: string;
-  name: string;
-  /** The owner's avatar pick; null wears the automatic robot. */
-  avatar?: string | null;
-  level: string;
-  /** Lifetime points this agent's work earned (#710); shown as dollars. */
-  earnedPoints?: number;
-};
 
 /** Closes a popover on outside click or Escape, returning focus to its trigger. */
 function useDismiss(
@@ -67,35 +53,11 @@ function useDismiss(
   }, [open, close, containerRef, triggerRef]);
 }
 
-function TrophyIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-      <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-      <path d="M4 22h16" />
-      <path d="M10 14.7V17c0 .6-.5 1-1 1.2-1.2.5-2 2-2 3.8" />
-      <path d="M14 14.7V17c0 .6.5 1 1 1.2 1.2.5 2 2 2 3.8" />
-      <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
-    </svg>
-  );
-}
-
 function EnvelopeIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect width="20" height="16" x="2" y="4" rx="2" />
       <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-    </svg>
-  );
-}
-
-function AgentIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="4" y="8" width="16" height="12" rx="2" />
-      <path d="M12 4v4" />
-      <path d="M9 14h.01" />
-      <path d="M15 14h.01" />
     </svg>
   );
 }
@@ -151,7 +113,7 @@ function TopNavLink({
 
 /**
  * The workspace areas: Product (the issue tracker), Marketing and Security.
- * The logo goes to the Dashboard; the points pill opens Ranking.
+ * The logo goes to the project's Ideas.
  */
 function TopNav({ pathname, projectSlug }: { pathname: string | null; projectSlug: string | null }) {
   // Product opens the project the page is in, or the first one (#project-urls).
@@ -161,9 +123,9 @@ function TopNav({ pathname, projectSlug }: { pathname: string | null; projectSlu
       aria-label="Workspace"
       // Phones and tablets: a tab strip fixed to the bottom of the screen,
       // clear of the home indicator. From lg it sits inline in the top bar.
-      className="flex items-center max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-40 max-lg:justify-around max-lg:border-t max-lg:border-zk-border max-lg:bg-zk-surface max-lg:px-2 max-lg:pt-1.5 max-lg:pb-[max(0.375rem,env(safe-area-inset-bottom))] max-lg:shadow-[0_-1px_3px_rgba(0,0,0,0.04)] lg:gap-1"
+      className="flex items-center max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-40 max-lg:justify-around max-lg:border-t max-lg:border-zk-border max-lg:bg-zk-surface max-lg:px-2 max-lg:pt-1.5 max-lg:pb-[max(0.375rem,env(safe-area-inset-bottom))] max-lg:shadow-[0_-1px_3px_rgba(0,0,0,0.04)] lg:ml-6 lg:gap-1"
     >
-      <TopNavLink href={productHref} active={Boolean(projectSlug && pathname?.startsWith(`/${projectSlug}`))} label="Product">
+      <TopNavLink href={productHref} active={Boolean(projectSlug && pathname?.startsWith(`/${projectSlug}`))} label="Your App">
         <NavIcon>
           <circle cx="12" cy="12" r="9" />
           <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
@@ -291,122 +253,7 @@ function InboxEnvelope({ unreadCount, pendingEscalations, active }: { unreadCoun
   );
 }
 
-function levelLabel(level: string) {
-  return level in AGENT_LEVEL_LABELS ? AGENT_LEVEL_LABELS[level as AgentLevel] : level;
-}
 
-function AgentsMenu({
-  pathname,
-  agents,
-  points,
-}: {
-  pathname: string | null;
-  agents: ShellAgent[];
-  /** The viewer's points, shown as dollars on the button; null when signed out. */
-  points: number | null;
-}) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  useDismiss(open, () => setOpen(false), containerRef, buttonRef);
-  const current = (pathname ?? "").replace(/\/+$/, "");
-  const menuId = useId();
-
-  return (
-    <div ref={containerRef} className="relative">
-      <button
-        ref={buttonRef}
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={menuId}
-        onClick={() => setOpen((value) => !value)}
-        title={points === null ? "Agents" : `Agents · ${formatPoints(points)} points`}
-        // Phones: a plain icon, like the bell beside it.
-        className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-zk-border bg-zk-surface px-3.5 text-[13px] font-medium text-zk-text hover:bg-zk-chip max-sm:h-9 max-sm:w-9 max-sm:border-0 max-sm:bg-transparent max-sm:px-0 ${linkFocus}`}
-      >
-        {/* Your agent's face and your balance in dollars. */}
-        {agents[0] ? (
-          <AgentAvatar agentId={agents[0].id} avatar={agents[0].avatar} size={24} />
-        ) : (
-          <span className="text-electric-blue max-sm:text-zk-text">
-            <AgentIcon />
-          </span>
-        )}
-        {points === null ? (
-          <span className="max-sm:sr-only">Agents</span>
-        ) : (
-          <span className="font-semibold tabular-nums max-sm:sr-only">
-            <span className="sr-only">Agents, balance </span>
-            {formatPointsAsDollars(points)}
-          </span>
-        )}
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="max-sm:hidden">
-          <path d="m6 9 6 6 6-6" />
-        </svg>
-      </button>
-      {open ? (
-        <div
-          id={menuId}
-          role="menu"
-          className="absolute right-0 top-12 z-50 flex w-[260px] max-w-[calc(100vw-2rem)] flex-col gap-0.5 rounded-2xl border border-zk-border bg-zk-surface p-2 text-sm shadow-[0_16px_40px_rgba(11,23,51,0.16)]"
-        >
-          {points !== null ? (
-            <Link
-              href="/workers"
-              onClick={() => setOpen(false)}
-              aria-current={current === "/workers" ? "page" : undefined}
-              className="flex min-h-11 items-center justify-between gap-2 rounded-[10px] px-2.5 text-zk-text"
-            >
-              <span className="flex flex-col">
-                <span className="text-base font-bold tabular-nums">{formatPointsAsDollars(points)}</span>
-                <span className="text-xs text-zk-muted">{formatPoints(points)} points · Ranking</span>
-              </span>
-              <TrophyIcon />
-            </Link>
-          ) : null}
-          {points !== null ? <div className="my-1 h-px bg-zk-divider" /> : null}
-          {agents.length > 0 ? (
-            <span className="px-2.5 pb-1.5 pt-2 text-[11px] font-bold uppercase tracking-[0.06em] text-zk-muted">
-              Project agents
-            </span>
-          ) : null}
-          {agents.map((agent) => (
-            <div key={agent.id} className="flex min-h-12 items-center gap-2.5 rounded-[10px] px-2.5 text-zk-text">
-              <AgentAvatar agentId={agent.id} avatar={agent.avatar} size={30} />
-              <Link href={agentPageHref(agent.name)} onClick={() => setOpen(false)} className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-semibold">{agent.name}</span>
-                <span className="truncate text-xs text-zk-muted">
-                  {levelLabel(agent.level)} · earned {formatPointsAsDollars(agent.earnedPoints ?? 0)}
-                </span>
-              </Link>
-              <Link
-                href={agentPageHref(agent.name)}
-                onClick={() => setOpen(false)}
-                className="shrink-0 rounded-full bg-electric-blue-strong px-2.5 py-1 text-xs font-bold text-white hover:brightness-110"
-              >
-                Earn me money
-              </Link>
-            </div>
-          ))}
-          {agents.length > 0 ? <div className="my-1 h-px bg-zk-divider" /> : null}
-          <Link
-            href={MANAGE_AGENTS_HREF}
-            onClick={() => setOpen(false)}
-            aria-current={current === MANAGE_AGENTS_HREF ? "page" : undefined}
-            className="flex min-h-10 items-center gap-2 rounded-[10px] px-2.5 font-semibold text-zk-text2"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-            Manage agents
-          </Link>
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 export function AppHeader({
   userName,
@@ -419,8 +266,6 @@ export function AppHeader({
   userId,
   workspaces = [],
   activeTenantId = null,
-  points = 0,
-  agents = [],
   reportFormUrl,
   organizationAdmin = false,
   defaultProjectSlug = null,
@@ -437,11 +282,6 @@ export function AppHeader({
   userId?: string | null;
   workspaces?: WorkspaceChoice[];
   activeTenantId?: string | null;
-  points?: number;
-  solvedTasks?: number;
-  /** Platform points goal (hard-coded fallback when unset). */
-  targetPoints?: number;
-  agents?: ShellAgent[];
   reportFormUrl?: string;
   /** Owner or admin of the current organization, or the site super admin: shows /org in the menus. */
   organizationAdmin?: boolean;
@@ -470,7 +310,7 @@ export function AppHeader({
         {/* Below lg the nav lives in the bottom strip, leaving one row here.
             The logo (the mark alone) is the way to the Dashboard. */}
         <div className="flex min-w-0 items-center gap-2">
-          <Link href={projectSlug ? `/${encodeURIComponent(projectSlug)}/dashboard` : "/dashboard"} aria-label="Ziki" className={`flex shrink-0 items-center gap-2 rounded-full ${linkFocus}`}>
+          <Link href={projectSlug ? ideasPath(projectSlug) : "/home"} aria-label="Ziki" className={`flex shrink-0 items-center gap-2 rounded-full ${linkFocus}`}>
             {/* The mark alone; the link's name says Ziki. */}
             <ZikiMark className="h-8 w-auto text-zk-text max-sm:h-7" />
           </Link>
@@ -485,7 +325,6 @@ export function AppHeader({
             From lg up it keeps shrink-0 so the account controls are never
             squeezed. */}
         <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 max-sm:gap-1 lg:shrink-0">
-          <AgentsMenu pathname={pathname} agents={agents} points={userId ? points : null} />
 
           <div ref={accountRef} className="relative">
             <button
@@ -532,6 +371,9 @@ export function AppHeader({
                     Organization settings
                   </MenuLink>
                 ) : null}
+                <MenuLink href={MANAGE_AGENTS_HREF} active={Boolean(pathname?.startsWith(MANAGE_AGENTS_HREF))}>
+                  Manage agents
+                </MenuLink>
                 {isSuperAdmin(role) ? (
                   <MenuLink href={SITE_ADMIN_HREF} active={isNavItemActive(pathname, SITE_ADMIN_HREF)}>
                     Site admin

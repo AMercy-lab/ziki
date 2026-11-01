@@ -21,7 +21,7 @@ function RaisedHandIcon() {
 
 /**
  * The one vote box on a list row, everywhere a row shows votes (the issue
- * list, the ideas list, the dashboard): up votes over down votes, coloured by
+ * list and the ideas list): up votes over down votes, coloured by
  * where the row stands, red when the down votes are at least the up votes.
  * When only one side has votes only that count shows,
  * larger and centred; hovering or focusing it shows both. A box that counts
@@ -228,22 +228,6 @@ export function ImportanceVoteBadge({ bugId, count, voted = false, highlighted =
         return { error: result.error };
       }}
       testId={{ box: "importance-count", up: "importance-up", down: "importance-down" }}
-    />
-  );
-}
-
-/** An idea's score where only the score is known (the dashboard): one count, nothing to tap. */
-export function IdeaScoreVoteBadge({ score }: { score: number }) {
-  return (
-    <VoteBadge
-      up={score}
-      down={null}
-      label={({ up }) => `Idea score ${up}`}
-      positive={false}
-      votable={false}
-      words={{ up: "", down: "", upCount: "score", downCount: "", noun: "idea" }}
-      act={async () => ({})}
-      testId={{ box: "idea-score-badge", up: "idea-score", down: "idea-score-down" }}
     />
   );
 }

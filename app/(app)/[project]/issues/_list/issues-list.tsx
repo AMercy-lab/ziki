@@ -1,3 +1,6 @@
+import { IdeasWelcome } from "@/components/ideas-welcome";
+import { IdeasShowDoneButton } from "@/components/ideas-show-done";
+import { IdeaChat } from "@/components/idea-chat";
 import { LocalTime } from "@/components/local-time";
 import { POSSIBLY_DELIVERED_STATUS, POSSIBLY_DELIVERED_WHERE, deliverySignals, type DeliverySignals } from "@/lib/possibly-delivered";
 import Link from "next/link";
@@ -102,8 +105,6 @@ const REJECTED_IDEAS_STATUS = "rejected_ideas";
 
 /** The filters under the Ideas tab: new ideas (no `?ideas=`), or `?ideas=drafts`. */
 const IDEAS_PARAM = "ideas";
-/** `?ideaSort=good|bad`: order the Ideas lists by their good or bad votes (#724). */
-const IDEA_SORT_PARAM = "ideaSort";
 type IdeasView = "new" | "drafts" | "rejected";
 /** Most ideas a list shows, highest score first. */
 const IDEAS_LIMIT = 100;
@@ -134,20 +135,6 @@ const STAGE_GROUPS = [
   { label: "Working", statuses: ["open", "in_progress", "closed", POSSIBLY_DELIVERED] },
   { label: "Delivered", statuses: ["done", "merge", "resolved", ERROR_STATUS] },
 ] as const;
-
-/** "+ Add Idea": every report starts as an idea (#idea-table). */
-function NewIssueButton({ slug, from, className = "" }: { slug: string; from: string; className?: string }) {
-  return (
-    <Link
-      href={newIssueHref(slug, from)}
-      title="Add Idea"
-      className={`issues-new inline-flex items-center justify-center gap-1.5 rounded-lg border border-zk-border bg-zk-surface px-2.5 text-[13px] font-semibold text-zk-text hover:bg-zk-chip ${className}`}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-      Add Idea
-    </Link>
-  );
-}
 
 /** A bug with head, antennae, segmented body and three pairs of legs. */
 const BUG_ICON_PATH =
@@ -253,14 +240,11 @@ export async function IssuesList({
   // The path names the list; a search stays in it (All looks across every issue).
   const statusParam: string = status;
   const sortParam = toSingleQueryParam(params.sort);
-  // #724: the Ideas lists sort by their good or bad votes.
-  const ideaSortParam = toSingleQueryParam(params[IDEA_SORT_PARAM]);
-  const ideaSort: "good" | "bad" | null = ideaSortParam === "good" || ideaSortParam === "bad" ? ideaSortParam : null;
   const pageParam = toSingleQueryParam(params.page);
   const deletedParam = toSingleQueryParam(params.deleted);
   const mineFilter = parseMineFilter(params.mine);
   const isDeletedView = canDelete && deletedParam === "true";
-  // Workspace-wide view (dashboard links). Absent → unchanged project scope.
+  // Workspace-wide view (`?all=1`). Absent → unchanged project scope.
   const allProjects = showsAllProjects(params[PROJECT_ALL_PARAM]);
 
   const currentSort = parseBugSort(sortParam, defaultSortFor(mineFilter));
@@ -494,18 +478,6 @@ export async function IssuesList({
       console.error("[bugs] platform tab counts failed", error);
     }
   }
-  // #724: the Ideas lists' column sort links keep every other parameter.
-  const ideaSortHref = (sort: "good" | "bad" | null) => {
-    const next = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (key === "page" || key === IDEA_SORT_PARAM) continue;
-      const single = toSingleQueryParam(value);
-      if (single) next.set(key, single);
-    }
-    if (sort) next.set(IDEA_SORT_PARAM, sort);
-    const qs = next.toString();
-    return listHref(new URLSearchParams(qs));
-  };
   const platformHref = (id: string | null) => {
     const next = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
@@ -649,8 +621,10 @@ export async function IssuesList({
           orderBy: [{ score: "desc" }, { createdAt: "desc" }, { id: "desc" }],
           take: IDEAS_LIMIT,
           select: {
-            id: true, number: true, title: true, score: true, projectId: true, createdAt: true,
-            status: true, archiveReason: true, archiveDuplicateOf: true,
+            id: true, number: true, title: true, score: true, projectId: true, createdAt: true, updatedAt: true,
+            status: true, archiveReason: true, archiveDuplicateOf: true, rejectedAt: true, archivedAt: true,
+            // Its newest verdict, for the Last update column.
+            verdicts: { orderBy: { updatedAt: "desc" }, take: 1, select: { updatedAt: true } },
             reporter: { select: { name: true } },
             category: { select: { name: true } },
             _count: { select: { verdicts: true } },
@@ -662,12 +636,19 @@ export async function IssuesList({
         }
         // Each idea's weighted votes (#724): the good and bad columns, and to mark the bad ones red (lib/idea-rejection.ts).
         const totals = await ideaVoteTotals(prisma, rows.map((row) => row.id));
+        // Ideas the viewer already gave a verdict on, any way (#idea-path): those show their way on, not Approve.
+        const approvedByMe = new Set(
+          userId
+            ? (await prisma.ideaVerdict.findMany({
+                where: { ideaId: { in: rows.map((row) => row.id) }, onBehalfOfUserId: userId },
+                select: { ideaId: true },
+              })).map((verdict) => verdict.ideaId)
+            : [],
+        );
         const listed = rows.map((row) => {
           const votes = totals.get(row.id) ?? NO_VOTES;
           return { row, votes };
         });
-        // #724: sort by the good or bad column; score order otherwise.
-        if (ideaSort) listed.sort((a, b) => b.votes[ideaSort] - a.votes[ideaSort] || b.row.score - a.row.score);
         return listed.map(({ row, votes }) => ({
           id: row.id,
           number: row.number,
@@ -682,6 +663,11 @@ export async function IssuesList({
           archived: row.status === "archived" ? archiveReasonLabel(row.archiveReason, row.archiveDuplicateOf) : null,
           good: votes.good,
           badVotes: votes.bad,
+          approvedByMe: approvedByMe.has(row.id),
+          // The latest thing that happened to it: an edit, a verdict, a rejection or archiving.
+          lastUpdateAt: new Date(Math.max(
+            ...[row.updatedAt, row.verdicts[0]?.updatedAt, row.rejectedAt, row.archivedAt].filter((date): date is Date => Boolean(date)).map((date) => date.getTime()),
+          )),
           bad: ideasView !== "rejected" && (thresholds.get(row.projectId) ?? null) !== null
             && isBadIdea(ideaVotes([{ opinion: "good", votes: votes.good }, { opinion: "bad", votes: votes.bad }, { opinion: "neutral", votes: votes.neutral }]), thresholds.get(row.projectId)!),
         }));
@@ -850,13 +836,14 @@ export async function IssuesList({
         </section>
       ) : null}
       <div className="issues-heading flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-col gap-1.5">
+        {/* flex-1: the Add Idea chat box opens in this bar and takes its width. */}
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           {/* No visible title: the stages above say where you are. */}
           <h1 className="sr-only">{isDeletedView ? "Deleted Issues" : "Issues"}</h1>
           {isDeletedView || allProjects || !isFirstRun ? (
             <div className="flex flex-wrap items-center gap-2">
               {/* Desktop: Add Idea at the far left of the toolbar. */}
-              {!isDeletedView && !isFirstRun ? <NewIssueButton slug={slug} from={returnTo} className="max-md:hidden" /> : null}
+              {!isDeletedView && !isFirstRun ? <IdeaChat projectId={project.id} className="max-md:hidden" /> : null}
               {isDeletedView ? (
                 <span className="rounded-md bg-zk-bad-bg px-2 py-0.5 text-[11px] font-bold text-zk-bad-fg">Admin view</span>
               ) : null}
@@ -872,12 +859,15 @@ export async function IssuesList({
         </Suspense>
         <div className="issues-actions flex flex-wrap items-center gap-2 print:hidden">
           {finishedWatched > 0 ? <UnwatchFinishedButton count={finishedWatched} /> : null}
+          {isIdeasView ? (
+            <IdeasShowDoneButton showingDone={ideasView === "rejected"} openHref={ideasPath(slug)} doneHref={ideasPath(slug, "rejected")} />
+          ) : null}
           <IssuesToolsToggle
             active={Boolean(searchText || selectedPlatform || selectedTags.length > 0 || selectedMilestone)}
           />
           {/* Phones: the + beside the title, since the tools row is collapsed there.
               Desktop has it at the far left of the toolbar, except on a first run. */}
-          {!isDeletedView ? <NewIssueButton slug={slug} from={returnTo} className={isFirstRun ? "" : "md:hidden"} /> : null}
+          {!isDeletedView ? <IdeaChat projectId={project.id} className={isFirstRun ? "" : "md:hidden"} /> : null}
         </div>
       </div>
     </>
@@ -928,8 +918,8 @@ export async function IssuesList({
           <IdeasList
             slug={slug}
             ideas={ideaRows}
-            sort={ideaSort}
-            sortHref={ideaSortHref}
+            // Open ideas, none yet and no search: what Ziki is for and where to type (#ideas-welcome).
+            welcome={ideasView === "new" && !qParam ? <IdeasWelcome projectId={project.id} projectName={project.name} /> : undefined}
             empty={
               ideasView === "drafts"
                 ? "No unstructured draft ideas are waiting to be structured."
@@ -1163,8 +1153,9 @@ export async function IssuesList({
     <Suspense fallback={null}>
       <RememberIssueList />
     </Suspense>
-    {/* The stages, centred, with Project notes at the right of the same row. */}
-    <div className="relative mx-auto mb-4 flex min-h-8 w-full max-w-6xl items-start justify-center">
+    {/* The stages, centred, with Project notes at the right of the same row. The row is as wide
+        as the panel below, so notes and platform line up with the panel's right edge. */}
+    <div className={`relative mx-auto mb-4 flex min-h-8 w-full items-start justify-center ${isIdeasView ? "max-w-[920px]" : "max-w-6xl"}`}>
       {!isDeletedView ? (
         <PipelineSteps
           stages={STAGE_GROUPS.map((group, index) => ({
@@ -1185,10 +1176,12 @@ export async function IssuesList({
         />
       </div>
     </div>
-    <div className="issues-page mx-auto w-full max-w-6xl space-y-5">
+    {/* The Ideas panel is narrower and centred, so each idea's status sits close to it. */}
+    <div className={`issues-page mx-auto w-full space-y-5 ${isIdeasView ? "max-w-[920px]" : "max-w-6xl"}`}>
       {headerContent}
       <div className="flex items-start gap-5 max-lg:flex-col max-lg:gap-3">
-        {stageIndex >= 0 ? (
+        {/* The Ideas stage has no sidebar: its Filter menu switches to Rejected ideas (#ideas-filter). */}
+        {stageIndex >= 0 && !isIdeasView ? (
           <StageSidebar
             steps={STAGE_GROUPS[stageIndex].statuses.map((value) => ({
               label: value === IDEAS_STATUS ? "New ideas" : value === REJECTED_IDEAS_STATUS ? "Rejected ideas" : statusFilterLabel(value),
