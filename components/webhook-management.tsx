@@ -114,10 +114,23 @@ export function WebhookManagement() {
 
   const [agentId, setAgentId] = useState("");
   const [url, setUrl] = useState("");
-  const [showSecret, setShowSecret] = useState(false);
   const [createdSecret, setCreatedSecret] = useState("");
   const [copied, setCopied] = useState(false);
   const createFormRef = useRef<HTMLFormElement | null>(null);
+  const secretDialogRef = useRef<HTMLDialogElement | null>(null);
+  const secretDialogReturnFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const dialog = secretDialogRef.current;
+    if (createdSecret && dialog && !dialog.open) {
+      const activeElement = document.activeElement;
+      secretDialogReturnFocusRef.current =
+        activeElement instanceof HTMLElement && activeElement !== document.body
+          ? activeElement
+          : null;
+      dialog.showModal();
+    }
+  }, [createdSecret]);
 
   const urlState = classifyUrl(url);
   const canAdd = Boolean(agentId) && urlState === "ok";
@@ -134,7 +147,6 @@ export function WebhookManagement() {
       const next = await createWebhookAction(_previous, formData);
       if (next.ok) {
         setCreatedSecret(next.secret);
-        setShowSecret(true);
         setCopied(false);
         setUrl("");
         setAgentId("");
@@ -365,10 +377,28 @@ export function WebhookManagement() {
           )}
         </section>
 
-        {showSecret && createdSecret ? (
-          <section
-            role="status"
-            className="flex flex-col gap-3 rounded-[20px] border border-zk-warn-bd bg-zk-warn-bg px-[22px] py-5"
+        {createdSecret ? (
+          <dialog
+            ref={secretDialogRef}
+            aria-labelledby="webhook-secret-title"
+            onCancel={(event) => {
+              event.preventDefault();
+              secretDialogRef.current?.close();
+            }}
+            onClose={() => {
+              setCreatedSecret("");
+              setCopied(false);
+              const returnFocus = secretDialogReturnFocusRef.current;
+              secretDialogReturnFocusRef.current = null;
+              if (returnFocus?.isConnected && !returnFocus.matches(":disabled")) {
+                returnFocus.focus();
+              } else {
+                createFormRef.current
+                  ?.querySelector<HTMLInputElement>("#webhook-url")
+                  ?.focus();
+              }
+            }}
+            className="m-auto max-h-[calc(100dvh-2rem)] w-[min(42rem,calc(100vw-2rem))] max-w-full overflow-y-auto flex-col gap-3 rounded-[20px] border border-zk-warn-bd bg-zk-warn-bg px-[22px] py-5 text-zk-text shadow-xl backdrop:bg-black/50 open:flex"
           >
             <div className="flex items-start gap-3">
               <svg
@@ -387,12 +417,16 @@ export function WebhookManagement() {
                 <path d="m10.7 12.3 9.3-9.3M17 6l3 3M14 9l2 2" />
               </svg>
               <div className="flex flex-col gap-1">
-                <span className="text-[15px] font-bold text-zk-warn-fg">
+                <h2
+                  id="webhook-secret-title"
+                  className="text-[15px] font-bold text-zk-warn-fg"
+                >
                   Copy your signing secret now
-                </span>
+                </h2>
                 <span className="text-[13px] leading-snug text-zk-text2">
-                  You&rsquo;ll use it to verify the HMAC-SHA256 signature on every
-                  delivery. For your security it&rsquo;s only shown once.
+                  You&rsquo;ll use it to verify{" "}
+                  <code>X-Ziki-Signature</code> headers. For your security,
+                  it&rsquo;s only shown once.
                 </span>
               </div>
             </div>
@@ -414,16 +448,14 @@ export function WebhookManagement() {
               <button
                 type="button"
                 onClick={() => {
-                  setShowSecret(false);
-                  setCreatedSecret("");
-                  setCopied(false);
+                  secretDialogRef.current?.close();
                 }}
                 className="inline-flex h-[42px] items-center rounded-full border border-zk-border bg-zk-surface px-4 text-sm font-bold text-zk-text"
               >
                 Done
               </button>
             </div>
-          </section>
+          </dialog>
         ) : null}
 
         <section
