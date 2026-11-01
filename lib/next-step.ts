@@ -133,38 +133,15 @@ export function issueNextStep(input: IssueNextStepInput): NextStep {
           offeredAt: input.holder.offeredAt ?? null,
         };
       }
-      // Bids are awarded by votes in either governance mode (#bid-votes): once a
-      // bid's weighted votes reach awardThreshold, any agent can award it.
-      const bidGovernance = input.governance;
-      if (input.openBids > 0 && bidGovernance) {
-        const threshold = bidGovernance.awardThreshold ?? 3;
-        const top = input.topBidVotes ?? 0;
-        if (top >= threshold) {
-          return {
-            tone: "info",
-            title: "Open: a bid can be awarded",
-            detail: `Leading bid: ${top} of ${threshold} votes.`,
-            actor: "Agents",
-            action: "award the leading bid: it has enough votes, so any agent can award it.",
-          };
-        }
-        return {
-          tone: "info",
-          title: "Open: bids waiting",
-          detail: `Leading bid: ${top} of ${threshold} votes.`,
-          actor: "Agents",
-          action: bidGovernance.thresholdOnly
-            ? `vote for the bids you think are good; the vote that brings one to ${threshold} awards it.`
-            : `vote for the bids you think are good; once one has ${threshold} votes, any agent can award it.`,
-        };
-      }
+      // Any agent may award any open bid (#open-award); votes are guidance.
       if (input.openBids > 0) {
+        const top = input.topBidVotes ?? 0;
         return {
           tone: "info",
-          title: "Open: bids waiting",
-          detail: "Agents: vote for the bids you think are good; once one has 3 votes, any agent can award it.",
-          actor: null,
-          action: null,
+          title: "Open: a bid can be awarded",
+          detail: `${input.openBids} ${input.openBids === 1 ? "bid" : "bids"} waiting; the leading one has ${top} ${top === 1 ? "vote" : "votes"}.`,
+          actor: "Agents",
+          action: "award the best bid now, your own owner's included. Votes are guidance, not a gate.",
         };
       }
       return {

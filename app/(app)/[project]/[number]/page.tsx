@@ -91,6 +91,7 @@ import { IssueActionsMenu } from "@/components/issue-actions-menu";
 import { EditableIssueDescription } from "@/components/editable-issue-description";
 import { IssueLinks } from "@/components/issue-links";
 import { NextStepBar } from "@/components/next-step-bar";
+import { DeliveredBanner, type DeliveredBannerProps } from "@/components/delivered-banner";
 import { BackToList } from "@/components/back-to-list";
 import { issueNextStep } from "@/lib/next-step";
 import { staleHold, type StaleHold } from "@/lib/agent-api/stale-hold";
@@ -660,7 +661,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     ]);
   // Anyone who owns an agent in the organisation can award, through it, an open bid whose votes reached the threshold (#award-bids).
   const canAwardBids =
-    bug.substatus === "open" && !bug.isDeleted
+    (bug.substatus === "open" || bug.substatus === "requires_confirmation") && !bug.isDeleted
       ? await loadOptional("award permission", false, async () => Boolean(await awardingAgentOf(user.id, bug.tenantId)))
       : false;
   // #603: the tenant's active agents, offered in the comment @mention list
@@ -763,6 +764,34 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
         loadOptional<MergeReviewView[]>("merge reviews", [], () => mergeReviewEntries(reviewBug)),
       ])
     : [[] as DeliveryView[], [] as TestVerdictView[], [] as MergeReviewView[]];
+  // The latest delivery as a banner at the top (#delivered-banner): green while
+  // the work is judged, merged or live; amber, with why, once it was sent back.
+  const latestDelivery = [...deliveryList].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0] ?? null;
+  let deliveredBanner: DeliveredBannerProps | null = null;
+  if (latestDelivery) {
+    const deliveredAt = new Date(latestDelivery.updatedAt).getTime();
+    const stillDelivered = ["done", "merge", "resolved"].includes(bug.status);
+    let sentBack: DeliveredBannerProps["sentBack"] = null;
+    if (!stillDelivered && bug.status !== "closed") {
+      const rejected = mergeReviewList
+        .filter((review) => review.verdict === "reject" && new Date(review.updatedAt).getTime() >= deliveredAt)
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+      const notGood = testVerdictList.filter((verdict) => !verdict.goodToMerge && new Date(verdict.updatedAt).getTime() >= deliveredAt);
+      sentBack = rejected
+        ? { reason: `${rejected.agentName} for ${rejected.by} rejected it for merging: ${rejected.summary}`, at: rejected.updatedAt }
+        : notGood.length > 0
+          ? { reason: `${notGood.length} ${notGood.length === 1 ? "judgement says" : "judgements say"} it is not good to merge.`, at: notGood[0].updatedAt }
+          : { reason: "The claim on it ended, so the issue is open for bids again.", at: null };
+    }
+    deliveredBanner = {
+      agentName: latestDelivery.agentName,
+      by: latestDelivery.by,
+      summary: latestDelivery.summary,
+      pullRequestUrl: latestDelivery.pullRequestUrl,
+      deliveredAt: latestDelivery.updatedAt,
+      sentBack,
+    };
+  }
   // Comments on the issue itself, at every stage (lib/comment-placement.ts).
   const takesComments = !bug.isDeleted;
   const commentCount = comments.shownThreads + comments.hiddenThreads;
@@ -1141,6 +1170,8 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
 
           <NextStepBar step={nextStep} />
 
+          {deliveredBanner ? <DeliveredBanner {...deliveredBanner} /> : null}
+
               {/* Who has the issue, for an active claim only: a pending offer is in the next-step bar. */}
               {hold?.status === "active" ? <AwardBox hold={hold} /> : null}
 
@@ -1155,7 +1186,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                     <DisputeAwardDialog bugNumber={bug.number} roles={disputeRoles} />
                   </div>
                   {deliveryList.length > 0 ? (
-                    <DeliveriesPanel bugId={bug.id} deliveries={deliveryList} canReply={!bug.isDeleted && delivering} collapsed={!delivering} />
+                    <DeliveriesPanel bugId={bug.id} deliveries={deliveryList} canReply={!bug.isDeleted && delivering} />
                   ) : null}
                   {testing || testVerdictList.length > 0 ? (
                     <TestVerdictsPanel bugId={bug.id} verdicts={testVerdictList} canReply={testing} history={!testing} />

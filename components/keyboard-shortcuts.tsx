@@ -30,13 +30,7 @@ function focusSearch(): boolean {
  * comes from the user's setting; the cheat sheet can still be opened from
  * Settings when they're off.
  */
-export function KeyboardShortcuts({
-  enabled,
-  dashboard = true,
-}: {
-  enabled: boolean;
-  dashboard?: boolean;
-}) {
+export function KeyboardShortcuts({ enabled }: { enabled: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   // The project the page belongs to (#project-urls): the shortcuts go to its lists.
@@ -84,7 +78,7 @@ export function KeyboardShortcuts({
         return;
       }
 
-      const result = shortcutFor(event, target, sequence.current, Date.now(), { dashboard });
+      const result = shortcutFor(event, target, sequence.current, Date.now());
       sequence.current = result.state;
       if (!result.action) return;
 
@@ -117,10 +111,6 @@ export function KeyboardShortcuts({
           event.preventDefault();
           if (slug) router.push(issuesPath(slug, "all"));
           break;
-        case "go-dashboard":
-          event.preventDefault();
-          router.push(slug ? `/${encodeURIComponent(slug)}/dashboard` : "/dashboard");
-          break;
         case "go-notifications":
           event.preventDefault();
           router.push("/inbox");
@@ -133,7 +123,7 @@ export function KeyboardShortcuts({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [enabled, router, dashboard, pathname, slug]);
+  }, [enabled, router, pathname, slug]);
 
   return (
     // <dialog> dismisses on Escape natively, so this has keyboard support
@@ -170,7 +160,7 @@ export function KeyboardShortcuts({
             .
           </p>
         ) : null}
-        {shortcutGroups({ dashboard }).map((group) => (
+        {shortcutGroups().map((group) => (
           <section key={group.title} className="mt-4">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{group.title}</h3>
             <dl className="mt-2 space-y-1.5">

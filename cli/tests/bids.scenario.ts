@@ -4,14 +4,13 @@ import { confirm, fileIssue, offeredTo, ok, refused, type Agent } from "./helper
 type Item = { kind: string; key: string; canAct: boolean; blockedReason?: string; issue?: { id: string }; actions: { name: string; cli: string }[] };
 
 /**
- * Offers only through bids, awarded by votes (#bids-only-offers, #bid-votes).
- * ada files the issue; bob and cara bid; ada and cara vote for bob's bid (1
- * each), which is still short of the default awardThreshold of 3, so nobody
- * may award it, dana (the manager agent) included. dana's vote counts 3 and
- * takes it over; then ada, a working agent, awards it as an offer and bob
- * accepts. Nothing offers the issue on its own.
+ * Offers only through bids, and any agent may award any bid (#bids-only-offers,
+ * #open-award). ada files the issue; bob and cara bid; ada and cara vote for
+ * bob's bid as guidance. Every agent sees the issue as an award_bid item with
+ * both bids, whatever their votes; ada, a working agent, awards bob's as an
+ * offer and bob accepts. Nothing offers the issue on its own.
  */
-describe("bids, votes and an award once the votes reach the threshold", () => {
+describe("bids, votes as guidance, and an award by any agent", () => {
   let id: string;
   let bobBid: string;
   let caraBid: string;
@@ -53,28 +52,18 @@ describe("bids, votes and an award once the votes reach the threshold", () => {
     expect(await byKey("bob", `review_bid:${bobBid}`)).toBeUndefined();
   });
 
-  it("refuses every award below the threshold, a manager's too, and lists none", async () => {
-    const body = await refused("dana", "award-bid", { id: bobBid }, 409);
-    expect(body).toMatchObject({ error: "below_threshold", votes: 2, threshold: 3 });
-    await refused("ada", "award-bid", { id: bobBid }, 409);
-    expect(await byKey("dana", `award_bid:${id}`)).toBeUndefined();
-    expect(await byKey("ada", `award_bid:${id}`)).toBeUndefined();
-    expect(await offeredTo(id)).toBeNull();
-  });
-
-  it("counts a manager's vote 3, which takes the bid to the threshold", async () => {
+  it("counts a manager's vote 3, still only guidance", async () => {
     expect(await byKey("dana", `review_bid:${bobBid}`)).toMatchObject({ kind: "review_bid", canAct: true });
-    expect(await ok("dana", "vote-bid", { id: bobBid })).toMatchObject({ bidId: bobBid, votes: 5, threshold: 3, awarded: false });
+    expect(await ok("dana", "vote-bid", { id: bobBid })).toMatchObject({ bidId: bobBid, votes: 5, awarded: false });
   });
 
-  it("lists the award for every agent once a bid reached the threshold", async () => {
+  it("lists the award for every agent, with every bid, the most voted first", async () => {
     for (const agent of ["ada", "cara", "dana", "eli"] as const) {
       const item = await byKey(agent, `award_bid:${id}`);
       expect(item, `${agent} sees the award`).toMatchObject({ kind: "award_bid", canAct: true, minimumRole: "working" });
-      // Only the bid at the threshold, not cara's.
-      expect(item!.actions.map((action) => action.cli)).toEqual([`award-bid --id ${bobBid}`]);
+      expect(item!.actions.map((action) => action.cli)).toEqual([`award-bid --id ${bobBid}`, `award-bid --id ${caraBid}`]);
     }
-    await refused("ada", "award-bid", { id: caraBid }, 409);
+    expect(await offeredTo(id)).toBeNull();
   });
 
   it("is awarded by ada, a working agent, as an offer: the issue stays Open until bob accepts", async () => {
@@ -105,11 +94,10 @@ describe("bids, votes and an award once the votes reach the threshold", () => {
 });
 
 /**
- * A manager acts through the same votes, and reaches the threshold alone
- * (#bid-votes): dana bids, votes for its own owner's bid (a manager may; its
- * vote counts 3, the default awardThreshold) and awards it.
+ * An agent may award its own owner's bid, an offer to itself (#open-award):
+ * dana bids and awards it with no votes on it, then accepts it.
  */
-describe("a manager votes its own owner's bid to the threshold and awards it", () => {
+describe("an agent awards its own owner's bid", () => {
   let id: string;
   let danaBid: string;
 
@@ -119,9 +107,7 @@ describe("a manager votes its own owner's bid to the threshold and awards it", (
     danaBid = (await ok("dana", "bid", { id, summary: "I will fix it myself.", description: "A one-line fix to the export handler, with a test." })).bid_id;
   });
 
-  it("is refused below the threshold, then awarded once dana's own vote reaches it", async () => {
-    expect(await refused("dana", "award-bid", { id: danaBid }, 409)).toMatchObject({ error: "below_threshold", votes: 0, threshold: 3 });
-    expect(await ok("dana", "vote-bid", { id: danaBid })).toMatchObject({ bidId: danaBid, votes: 3, threshold: 3, awarded: false });
+  it("is awarded with no votes on it, and accepted", async () => {
     const awarded = await ok("dana", "award-bid", { id: danaBid });
     expect(awarded).toMatchObject({ bidId: danaBid, bugId: id, status: "offered" });
     const accepted = await ok("dana", "accept-offer", { id: awarded.claimId });

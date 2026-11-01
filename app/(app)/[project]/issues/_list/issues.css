@@ -12,10 +12,11 @@
 .issues-heading > div:first-child > div { grid-column: 1; grid-row: 1; }
 .issues-heading > div:first-child > p { grid-column: 1 / -1; grid-row: 2; font-size: 14px; line-height: 22px; }
 .issues-heading h1 { font-size: 14px; font-weight: 600; line-height: 20px; letter-spacing: 0; }
-.issues-heading .issues-actions { grid-column: 3; grid-row: 1; align-self: center; flex-wrap: nowrap; }
+/* The actions sit before the search, which is at the far right of the toolbar. */
+.issues-heading .issues-actions { grid-column: 2; grid-row: 1; align-self: center; flex-wrap: nowrap; }
 .issues-heading > .issues-filters { display: contents; }
 .issues-heading > .issues-filters > * { margin: 0; }
-.issues-heading > .issues-filters > div:first-child { grid-column: 2; grid-row: 1; align-self: center; }
+.issues-heading > .issues-filters > div:first-child { grid-column: 3; grid-row: 1; align-self: center; }
 .issues-heading .issues-filters .issues-active-filters,
 .issues-heading .issues-filters .issues-selected-tags { grid-column: 1 / -1; max-width: none; width: 100%; }
 .issues-heading .issues-active-filters { align-items: center; gap: 8px; padding-top: 12px; margin-top: 4px; }
@@ -114,3 +115,7 @@
 @media (prefers-reduced-motion: reduce) {
   .hammering-head { animation: none; transform: none; }
 }
+
+/* The Add Idea chat box (#idea-chat) opens in the header bar. On phones it
+   opens in the actions, which then take the whole row so it has room. */
+.issues-heading:has(.issues-actions [data-idea-chat-open]) .issues-actions { grid-column: 1 / -1; grid-row: 1; flex-wrap: wrap; }

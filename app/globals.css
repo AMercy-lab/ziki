@@ -448,3 +448,20 @@ body:has([data-app-shell]) {
     box-shadow: none !important;
   }
 }
+
+/* The agents dock (#agents-dock): a working agent bobs, a waiting one waves, an idle one breathes. */
+@keyframes zk-agent-work {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-3px) rotate(-4deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-3px) rotate(4deg); }
+}
+@keyframes zk-agent-wave {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  10%, 30% { transform: rotate(-10deg); }
+  20%, 40% { transform: rotate(10deg); }
+}
+@keyframes zk-agent-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}

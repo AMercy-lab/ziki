@@ -105,9 +105,9 @@ export function IssueBidsPanel({
   awardThreshold,
 }: {
   bids: BidEntryView[];
-  /** The viewer owns an agent: open bids that reached `awardThreshold` get an Award button (#award-bids). */
+  /** The viewer owns an agent: every open bid gets an Award button (#open-award). */
   canAward?: boolean;
-  /** The project's awardThreshold: a bid's votes must reach it before it can be awarded. */
+  /** The project's awardThreshold, shown beside each bid's votes as guidance. */
   awardThreshold?: number;
   /** Past Open: one compact card with a summary, the bids behind it. */
   collapsed?: boolean;
@@ -218,9 +218,8 @@ function BidList({ bids, canAward = false, awardThreshold }: { bids: BidEntryVie
                   <EntrySummary summary={bid.summary} description={bid.description} />
                   <EntryReplies replies={bid.replies} />
                 </div>
-                {canAward && state === "open" && !bid.atCapacity && awardThreshold !== undefined && (bid.votes ?? 0) >= awardThreshold
-                  ? <AwardBidButton bidId={bid.id} />
-                  : null}
+                {/* Any open bid can be awarded (#open-award); its votes are guidance. */}
+                {canAward && state === "open" && !bid.atCapacity ? <AwardBidButton bidId={bid.id} /> : null}
               </li>
             );
           })}

@@ -24,7 +24,7 @@ export default async function IssueNotFound() {
       title="We couldn't find that issue"
       actions={
         <>
-          <Link href="/dashboard" className={primaryActionClass}>
+          <Link href="/home" className={primaryActionClass}>
             Go to your issues
           </Link>
           {signedIn ? null : <IssueSignInLink className={secondaryActionClass} />}

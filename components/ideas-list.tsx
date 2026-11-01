@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { IdeaVoteBadge } from "@/components/vote-badge";
 import { IdeaRowStatus } from "@/components/issue-row-status";
+import { IdeaPathChips } from "@/components/idea-path";
 import { LocalTime } from "@/components/local-time";
 import { ideaPath } from "@/lib/project-paths";
 
@@ -24,6 +25,10 @@ export type IdeaListRow = {
   /** Weighted good and bad votes (#724), shown as columns; 0 when nobody voted. */
   good: number;
   badVotes: number;
+  /** The viewer already gave it a verdict (good, bad or neutral): its path shows In progress → Done, not Approve. */
+  approvedByMe?: boolean;
+  /** The latest thing that happened to it: an edit, a verdict, a rejection or archiving. */
+  lastUpdateAt?: Date;
 };
 
 /**
@@ -31,47 +36,14 @@ export type IdeaListRow = {
  * have their own numbers and pages, take verdicts instead of votes, and
  * leave this list once an agent converts them.
  */
-/** A column heading that sorts the list by it (#724), and back to score order when it already does. */
-function SortHeading({ label, column, sort, sortHref, className }: {
-  label: React.ReactNode;
-  column: "good" | "bad";
-  sort?: "good" | "bad" | null;
-  sortHref?: (sort: "good" | "bad" | null) => string;
-  className: string;
-}) {
-  if (!sortHref) return <span className={className}>{label}</span>;
-  const active = sort === column;
-  return (
-    <Link href={sortHref(active ? null : column)} aria-sort={active ? "descending" : undefined} className={`${className} hover:text-zk-text ${active ? "text-zk-text" : ""}`}>
-      {label}
-    </Link>
-  );
-}
-
-/** One Good or Bad column: the heading and the counts under it share this width, on one line. */
-const VOTE_COLUMN = "w-16 shrink-0 whitespace-nowrap text-center";
-
-/** The good and bad vote counts on a row (#724), with names a screen reader reads. */
-function VoteCounts({ good, bad }: { good: number; bad: number }) {
-  return (
-    <>
-      <span className={`${VOTE_COLUMN} font-mono text-[13px] font-semibold tabular-nums text-zk-ok-fg`} title={`${good} good`} data-testid="idea-good-votes">
-        <span className="sr-only">Good votes: </span>{good}
-      </span>
-      <span className={`${VOTE_COLUMN} font-mono text-[13px] font-semibold tabular-nums text-zk-bad-fg`} title={`${bad} bad`} data-testid="idea-bad-votes">
-        <span className="sr-only">Bad votes: </span>{bad}
-      </span>
-    </>
-  );
-}
-
-export function IdeasList({ slug, ideas, empty, sort, sortHref }: {
+export function IdeasList({ slug, ideas, empty, welcome }: {
   slug: string;
   ideas: IdeaListRow[];
   empty?: string;
-  sort?: "good" | "bad" | null;
-  sortHref?: (sort: "good" | "bad" | null) => string;
+  /** No open ideas yet: what Ziki is for, and a box to type the first one in. */
+  welcome?: React.ReactNode;
 }) {
+  if (ideas.length === 0 && welcome) return <>{welcome}</>;
   if (ideas.length === 0) {
     return (
       <div className="rounded-[20px] border border-zk-border bg-zk-surface px-4 py-12 text-center">
@@ -89,12 +61,8 @@ export function IdeasList({ slug, ideas, empty, sort, sortHref }: {
           <div className="issues-table-heading">
             <span className="w-[52px]">Score</span>
             <span className="min-w-0 flex-1">Idea</span>
-            {/* The same box as the row's counts (VoteCounts), so each number sits under its heading. */}
-            <span className="hidden shrink-0 items-center md:flex">
-              <SortHeading label={<><span aria-hidden="true">✓ </span>Good</>} column="good" sort={sort} sortHref={sortHref} className={VOTE_COLUMN} />
-              <SortHeading label={<><span aria-hidden="true">✕ </span>Bad</>} column="bad" sort={sort} sortHref={sortHref} className={VOTE_COLUMN} />
-            </span>
-            <span className="issues-status-cell">Status</span>
+            <span className="hidden w-24 shrink-0 md:block">Last update</span>
+            <span className="issues-status-cell" style={{ width: 264, flexBasis: 264 }}>Status</span>
           </div>
           <ul>
             {ideas.map((idea, index) => (
@@ -126,8 +94,6 @@ export function IdeasList({ slug, ideas, empty, sort, sortHref }: {
                     <span>
                       {idea.verdicts} verdict{idea.verdicts === 1 ? "" : "s"}
                     </span>
-                    {/* Phones: the counts in the meta line; wider screens have the columns. */}
-                    <span className="md:hidden">✓ {idea.good} · ✕ {idea.badVotes}</span>
                     {idea.platform ? <span>{idea.platform}</span> : null}
                     <LocalTime date={idea.createdAt} />
                     <span className="inline-flex min-w-0 md:sr-only">
@@ -135,11 +101,12 @@ export function IdeasList({ slug, ideas, empty, sort, sortHref }: {
                     </span>
                   </span>
                 </Link>
-                <span className="hidden shrink-0 items-center md:flex">
-                  <VoteCounts good={idea.good} bad={idea.badVotes} />
+                <span className="hidden w-24 shrink-0 text-xs text-zk-muted md:block" data-testid="idea-last-update">
+                  {idea.lastUpdateAt ? <LocalTime date={idea.lastUpdateAt} /> : null}
                 </span>
-                <span className="issues-status-cell" aria-hidden="true">
-                  <IdeaRowStatus score={idea.score} threshold={idea.threshold} rejected={idea.rejected} archived={idea.archived} bad={idea.bad} />
+                {/* Idea → In progress → Done (or → Rejected), like the Live tab's deploy steps. Wider than the issues' status cell. */}
+                <span className="issues-status-cell" style={{ width: 264, flexBasis: 264 }}>
+                  <IdeaPathChips ideaId={idea.id} approvedByMe={Boolean(idea.approvedByMe)} score={idea.score} threshold={idea.threshold} rejected={idea.rejected} archived={idea.archived} bad={idea.bad} />
                 </span>
               </li>
             ))}

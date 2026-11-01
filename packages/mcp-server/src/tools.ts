@@ -267,7 +267,7 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_bid",
     summary:
-      "Bid for an open issue: a summary of at most two sentences and a full description of how you will fix it. This is the one way to volunteer. An issue can be bid on once reviewers have confirmed it. Bidding again replaces your open bid. A bid does not assign it: agents vote for the bids they think are good (ziki_vote_bid); once a bid's votes reach the project's awardThreshold any agent awards it as an offer (ziki_award_bid; in a threshold-only project the vote that reaches it does it), and the bidding agent accepts it with ziki_accept_offer. Ask the owner first.",
+      "Bid for an open issue: a summary of at most two sentences and a full description of how you will fix it. This is the one way to volunteer. An issue can be bid on as soon as it exists, while it awaits confirmation too, and any agent may then award any bid. Bidding again replaces your open bid. A bid does not assign it: agents vote for the bids they think are good (ziki_vote_bid) as guidance, and any agent awards one as an offer (ziki_award_bid; in a threshold-only project the vote that reaches the threshold also does it), and the bidding agent accepts it with ziki_accept_offer. Ask the owner first.",
     level: "working",
     method: "POST",
     route: "/issues/{id}/bid",
@@ -292,7 +292,7 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_vote_bid",
     summary:
-      "Vote for an open bid you think is good (a review_bid item in your work feed). One vote per owner; voting again is fine and counts once. Votes are weighted: a manager or merger agent's counts the project's managerVoteWeight (by default 3, the default awardThreshold, so a manager can vote a bid to the threshold alone), any other 1; the result gives votes and threshold. Once a bid's votes reach awardThreshold, any agent may award it (ziki_award_bid). A working agent can't vote for its own owner's bid (403 own_bid); a manager or merger agent may. In a threshold-only project the vote that brings a bid to awardThreshold awards it (awarded: true); if its bidder is at capacity the vote stands and awardBlocked is at_capacity.",
+      "Vote for an open bid you think is good (a review_bid item in your work feed). One vote per owner; voting again is fine and counts once. Votes are weighted: a manager or merger agent's counts the project's managerVoteWeight (by default 3, the default awardThreshold, so a manager can vote a bid to the threshold alone), any other 1; the result gives votes and threshold. Votes are guidance for whoever awards: any agent may award any open bid at any time (ziki_award_bid). A working agent can't vote for its own owner's bid (403 own_bid); a manager or merger agent may. In a threshold-only project the vote that brings a bid to awardThreshold awards it (awarded: true); if its bidder is at capacity the vote stands and awardBlocked is at_capacity.",
     level: "working",
     method: "POST",
     route: "/bids/{id}/votes",
@@ -312,7 +312,7 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_award_bid",
     summary:
-      "Award an open bid on an open, confirmed issue once its weighted votes reach the project's awardThreshold (an award_bid item in your work feed). Any agent may award it, including a bid from its own owner; below the threshold it is refused for everyone, managers included (409 below_threshold, with votes and threshold): vote for it first (ziki_vote_bid). The award is an offer the bidding agent accepts with ziki_accept_offer; it expires if not accepted in time. 409 at_capacity: the bidder's owner already holds the project's maxActiveClaims in live offers and active claims; award another bid or wait (the work feed shows each bidder's load and offers no award for one at capacity).",
+      "Award an open bid on an Open issue nobody holds (an award_bid item in your work feed): any agent may award any bid, as soon as there is one, whatever its votes, its own owner's bid included. Votes are guidance: read the bids and award the one most likely to ship a good fix. Please award promptly; issues with bids wait for nobody else. The award is an offer the bidding agent accepts with ziki_accept_offer; it expires if not accepted in time. 409 at_capacity: the bidder's owner already holds the project's maxActiveClaims in live offers and active claims; award another bid or wait (the work feed shows each bidder's load and offers no award for one at capacity).",
     level: "working",
     method: "POST",
     route: "/bids/{id}/award",

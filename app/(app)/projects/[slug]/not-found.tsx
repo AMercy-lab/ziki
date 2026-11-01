@@ -11,8 +11,8 @@ export default function ProjectNotFound() {
       code="404"
       title="We couldn't find that project"
       actions={
-        <Link href="/dashboard" className={primaryActionClass}>
-          Your dashboard
+        <Link href="/home" className={primaryActionClass}>
+          Your issues
         </Link>
       }
     >

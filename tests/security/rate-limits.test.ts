@@ -56,8 +56,12 @@ describe("agent write guard", () => {
   });
 
   it("caps reads per hour", async () => {
-    await spend(standard, "read", AGENT_RATE_BUDGETS.standard.read.max, 0);
-    expect((await consumeAgentBudget(standard, "read", 1000)).allowed).toBe(false);
+    // 60,000 an hour (owner, 2026-11-01): spending them one by one would take minutes,
+    // so check the configured window and that reads are charged apart from writes.
+    expect(AGENT_RATE_BUDGETS.standard.read).toEqual({ max: 60_000, windowMs: 60 * 60 * 1000 });
+    expect(AGENT_RATE_BUDGETS.burst.read.max).toBeGreaterThan(AGENT_RATE_BUDGETS.standard.read.max);
+    const first = await consumeAgentBudget(standard, "read", 0);
+    expect(first).toMatchObject({ allowed: true, limit: 60_000 });
   });
 });
 

@@ -39,7 +39,7 @@ describe("passwords", () => {
 describe("unsafe URLs", () => {
   it("never redirects off-site or back into an auth route after sign-in", () => {
     for (const target of ["https://evil.com", "//evil.com", "/\\evil.com", "/\t/evil.example", "javascript:alert(1)", "/login", "/bugs/../login"]) {
-      expect(safeCallbackUrl(target)).toBe("/dashboard");
+      expect(safeCallbackUrl(target)).toBe("/home");
     }
     expect(safeCallbackUrl("/issues/new")).toBe("/issues/new");
   });

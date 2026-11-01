@@ -92,7 +92,7 @@ export default auth((req) => {
   // Signed-in people land on the Overview, the post-login home.
   if (isLoggedIn && isAuthPage) {
     return NextResponse.redirect(
-      new URL(BASE_PATH ? `${BASE_PATH}/dashboard` : "/dashboard", req.nextUrl.origin),
+      new URL(BASE_PATH ? `${BASE_PATH}/home` : "/home", req.nextUrl.origin),
     );
   }
 

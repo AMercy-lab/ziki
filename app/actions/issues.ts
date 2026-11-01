@@ -1607,7 +1607,7 @@ export async function deleteBugAction(bugId: string): Promise<ActionResult> {
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
-  redirect("/dashboard");
+  redirect("/home");
 }
 
 /**
