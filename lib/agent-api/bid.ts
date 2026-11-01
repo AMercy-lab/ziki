@@ -102,21 +102,42 @@ export async function placeBid(caller: AgentContext, projectId: string, issueRef
     if (!locked.length) throw new IssueApiError(404, "Issue not found in this project.");
     const bug = await tx.bug.findFirst({
       where: { id: bugId, tenantId: caller.tenantId, projectId, isDeleted: false },
-      select: { id: true, projectId: true, status: true, voteCount: true },
+      select: { id: true, projectId: true, substatus: true, voteCount: true },
     });
     if (!bug) throw new IssueApiError(404, "Issue not found in this project.");
-    if (bug.status !== "open") throw new IssueApiError(409, "Only open issues can take bids.");
-    // One rule for ready: confirmed under isConfirmed(), no second check (#714).
-    const isReady = await isConfirmed(bugId, tx);
-    if (!isReady) {
-      throw new IssueApiError(409, "This is not ready yet. Reviewers confirm an issue before it can be passed on.");
+    // An issue takes bids from the moment it exists, while it awaits
+    // confirmation too; only awarding waits until it is confirmed (awardBid).
+    if (bug.substatus !== "open" && bug.substatus !== "requires_confirmation") {
+      throw new IssueApiError(409, "Only open issues can take bids.");
     }
     await assertRedesignOpen(bugId, tx);
     await competingClaim(tx, bugId);
 
     const existing = await tx.issueBid.findUnique({ where: { bugId_agentId: { bugId, agentId: caller.agentId } } });
-    if (existing?.awardedAt) throw new IssueApiError(409, "This bid was already awarded.");
     const written = { summary: input.summary, description: input.description };
+    // #745: an awarded bid holds the issue only while its offer or claim is
+    // live, and `competingClaim` above already refused that. Here the hold has
+    // ended (expired, declined, released, judged not good) and the issue is
+    // Open again, so the agent bids afresh on its one bid row: the old award,
+    // its claim link and the old round's votes go, and the event says what it was.
+    if (existing?.awardedAt) {
+      const bid = await tx.issueBid.update({
+        where: { id: existing.id },
+        data: { ...written, awardedAt: null, claimId: null, withdrawnAt: null, beneficiaryUserId: caller.ownerId },
+      });
+      await tx.bidVote.deleteMany({ where: { bidId: existing.id } });
+      await publish(tx, {
+        tenantId: caller.tenantId,
+        type: "issue.bid",
+        actorAgentId: caller.agentId,
+        bugId,
+        payload: {
+          bidId: bid.id, issueId: bugId, projectId, beneficiaryUserId: caller.ownerId, summary: bid.summary,
+          rebid: { previousAwardedAt: existing.awardedAt.toISOString(), previousClaimId: existing.claimId },
+        },
+      });
+      return { bid, replaced: false as const };
+    }
     if (existing && !existing.withdrawnAt) {
       const bid = await tx.issueBid.update({ where: { id: existing.id }, data: written });
       return { bid, replaced: true as const };
@@ -378,11 +399,11 @@ export async function awardInTransaction(
     where: { id: bidId },
     include: {
       beneficiary: { select: { name: true } },
-      bug: { select: { id: true, title: true, status: true, assigneeId: true, tenantId: true, projectId: true, reporterId: true, voteCount: true, assignee: { select: { name: true } } } },
+      bug: { select: { id: true, title: true, substatus: true, assigneeId: true, tenantId: true, projectId: true, reporterId: true, voteCount: true, assignee: { select: { name: true } } } },
     },
   });
   if (!fresh || fresh.withdrawnAt || fresh.awardedAt) throw new IssueApiError(409, "This bid is no longer open.");
-  if (fresh.bug.status !== "open") throw new IssueApiError(409, "Only open issues can be awarded.");
+  if (fresh.bug.substatus !== "open") throw new IssueApiError(409, "Only open issues can be awarded.");
   // One rule for ready: confirmed under isConfirmed(), no second check (#714).
   const isReady = await isConfirmed(fresh.bugId, tx);
   if (!isReady) {

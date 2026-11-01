@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/agents/audit";
 import {
   assertIndependentReviewer,
-  reviewerCreditConflict,
   ReviewerNotIndependentError,
   type ReviewedBug,
 } from "@/lib/agents/independence";
@@ -81,6 +80,7 @@ const reviewedBugSelect = {
   title: true,
   tenantId: true,
   status: true,
+  substatus: true,
   pullRequestUrl: true,
   pullRequestHeadSha: true,
   beneficiaryUserId: true,
@@ -179,15 +179,15 @@ export async function submitTestVerdict(
   });
   if (!bug) return { status: 404, error: "not_found", message: "No such issue in this agent's tenant." };
 
-  // #delivered-step: delivered work is judged at Delivered, and a judgement can
-  // still change at Done (#529); before delivery, and once a manager has
-  // accepted it, there is nothing to judge.
-  if ((bug.status !== "delivered" && bug.status !== "done") || !bug.pullRequestUrl) {
+  // #delivered-step: delivered work is judged at Done · Requires review, and a
+  // judgement can still change at Done · Accepted (#529); before delivery, and
+  // once a manager has accepted it, there is nothing to judge.
+  if (bug.status !== "done" || !bug.pullRequestUrl) {
     return {
       status: 409,
       error: "not_delivered",
       message:
-        "Judgements are given on delivered work: the issue must be Delivered (or Done, to change a judgement). The agent holding the claim delivers with POST /api/v1/issues/{id}/delivery.",
+        "Judgements are given on delivered work: the issue must be Done · Requires review (or Done · Accepted, to change a judgement). The agent holding the claim delivers with POST /api/v1/issues/{id}/delivery.",
     };
   }
   const pullRequestUrl = bug.pullRequestUrl;
@@ -224,18 +224,11 @@ export async function submitTestVerdict(
       };
     }
   }
-  if (reviewerCreditConflict(onBehalfOfUserId, bug as ReviewedBug)) {
-    return {
-      status: 403,
-      error: "not_independent",
-      message: "onBehalfOfUserId must be independent of the issue's reporter, solver, and claim beneficiary.",
-    };
-  }
 
   // #727: a Done issue already has the good judgements it needs. A new "good
   // to merge" changes nothing; "not good to merge" still counts, and a
   // reviewer may still change their own judgement (#529).
-  if (body.goodToMerge && bug.status === "done") {
+  if (body.goodToMerge && bug.substatus === "accepted") {
     const own = await prisma.testVerdict.findFirst({ where: { bugId: bug.id, agentId: agent.agentId }, select: { id: true } });
     if (!own) {
       return {

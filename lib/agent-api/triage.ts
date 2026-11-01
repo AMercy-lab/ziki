@@ -52,7 +52,7 @@ import { issuePath } from "@/lib/issue-ref";
  */
 
 /** The statuses triage lists (and Open issues with open bids). */
-export const TRIAGE_STATUSES = ["in_progress", "delivered", "done", "ready_to_merge"] as const;
+export const TRIAGE_STATUSES = ["in_progress", "done", "merge"] as const;
 
 export const TRIAGE_DEFAULT_LIMIT = 50;
 
@@ -102,7 +102,7 @@ export type TriageAction = {
 };
 
 export type TriageItem = {
-  issue: { id: string; number: number; title: string; status: string; url: string };
+  issue: { id: string; number: number; title: string; status: string; substatus: string; url: string };
   holder: TriageHolder;
   pullRequest: TriagePullRequest;
   /** Judgements on the linked pull request; null with no pull request. */
@@ -199,7 +199,7 @@ export function nextActions(caller: TriageCaller, facts: TriageFacts): TriageAct
   const linkProblem = prGateNow.broken ? prGateNow.reason : pr.linkState === "missing" ? "No pull request is linked." : null;
 
   // 1. A link to repair, or a pull request the author must replace.
-  if (bug.status !== "open" && prGateNow.broken) {
+  if (bug.substatus !== "open" && prGateNow.broken) {
     const number = ref ? `#${ref.number}` : "That number";
     const note = prGateNow.broken === "old_repository"
       ? `Leave pullRequestUrl out to link ${number} in ${repoName}; nobody has reported that one yet, so report it after.`
@@ -210,12 +210,12 @@ export function nextActions(caller: TriageCaller, facts: TriageFacts): TriageAct
   }
 
   // 2. A pull request someone should check on GitHub and report.
-  if (bug.status !== "open" && pr.reportWanted) {
+  if (bug.substatus !== "open" && pr.reportWanted) {
     push("report_pr_status", route("pull-request-status"), "working", gate("working"), pr.reportWanted);
   }
 
   // 3. Merged already: resolve it, or wait for the release.
-  if (pr.state === "merged" && bug.status !== "open") {
+  if (pr.state === "merged" && bug.substatus !== "open") {
     if (prGateNow.awaitingRelease) {
       push("awaiting_release", route("resolve"), "manager", { canAct: false, blockedReason: prGateNow.reason ?? "Waiting for the release to the default branch." });
     } else {
@@ -225,12 +225,11 @@ export function nextActions(caller: TriageCaller, facts: TriageFacts): TriageAct
   }
 
   // 4. The step's own move.
-  switch (bug.status) {
+  switch (bug.substatus) {
     case "in_progress": {
       if (facts.stranded) {
-        const credited = facts.stranded.creditedUserId === caller.ownerId ? "Your owner is credited on this issue." : null;
         const broken = prGateNow.broken ? `${prGateNow.reason} Nothing to deliver; reclaim it if it is idle.` : null;
-        push("deliver_stranded", route("delivery"), "manager", gate("manager", [broken, credited]),
+        push("deliver_stranded", route("delivery"), "manager", gate("manager", [broken]),
           `${facts.stranded.goodVerdicts} of ${facts.stranded.needed} good-to-merge judgements are on the linked pull request.`);
       }
       // A stranded delivery is asked once, as deliver_stranded, not also as idle work (as in the work feed),
@@ -247,12 +246,12 @@ export function nextActions(caller: TriageCaller, facts: TriageFacts): TriageAct
       }
       break;
     }
-    case "delivered": {
+    case "requires_review": {
       const judged = facts.judgedByCaller ? "Your owner already judged this pull request." : null;
       push("submit_test_result", route("test-results"), "working", gate("working", [linkProblem, judged]));
       break;
     }
-    case "done": {
+    case "accepted": {
       const j = facts.judgements;
       const short = j && j.good < j.needed ? `${j.good} of ${j.needed} good-to-merge judgements on the linked pull request.` : null;
       const head = j && j.goodAtHead !== null && j.goodAtHead < j.needed
@@ -262,7 +261,8 @@ export function nextActions(caller: TriageCaller, facts: TriageFacts): TriageAct
       push("accept_fix", route("merge"), role, gate(role, [prGateNow.canAccept ? null : prGateNow.reason, short]), head);
       break;
     }
-    case "ready_to_merge": {
+    case "ready_to_merge":
+    case "error": {
       // Ziki doesn't merge: the merger merges on GitHub, reports it merged here, then resolves it.
       push("merge_on_github", route("pull-request-status"), "merger", gate("merger", [prGateNow.canAccept ? null : prGateNow.reason]),
         `Merge ${pr.url ?? "the pull request"} on GitHub yourself, then report it merged (state "merged", inDefaultBranch) and resolve it (POST ${route("resolve")}).`);
@@ -352,7 +352,7 @@ export async function triageQueue(
       projectId: project.id,
       isDeleted: false,
       AND: [
-        { OR: [{ status: { in: [...TRIAGE_STATUSES] } }, { status: "open", bids: { some: OPEN_BID_WHERE } }] },
+        { OR: [{ status: { in: [...TRIAGE_STATUSES] } }, { substatus: "open", bids: { some: OPEN_BID_WHERE } }] },
         cursorWhere(query.cursor, "asc"),
       ],
     },
@@ -369,10 +369,10 @@ export async function triageQueue(
     const [hold, judged, bids, stranded, idle, stale] = await Promise.all([
       currentHold(bug.id),
       bug.pullRequestUrl ? judgementsOn(bug, pullRequest.headSha, workflow.verdictsNeeded, caller.ownerId) : Promise.resolve(null),
-      bug.status === "open" ? openBidsOn(bug.id, workflow.managerVoteWeight) : Promise.resolve([]),
+      bug.substatus === "open" ? openBidsOn(bug.id, workflow.managerVoteWeight) : Promise.resolve([]),
       bug.status === "in_progress" ? strandedDelivery(bug.id, prisma, new Date(now)) : Promise.resolve(null),
       bug.status === "in_progress" ? idleInProgress(bug.id, prisma, now) : Promise.resolve(null),
-      bug.status === "open" || bug.status === "in_progress" ? staleHold(bug.id, new Date(now)) : Promise.resolve(null),
+      bug.substatus === "open" || bug.status === "in_progress" ? staleHold(bug.id, new Date(now)) : Promise.resolve(null),
     ]);
     const facts: TriageFacts = {
       bug,
@@ -396,11 +396,11 @@ export async function triageQueue(
       judgedByCaller: judged?.byCaller ?? false,
     };
     return {
-      issue: { id: bug.id, number: bug.number, title: bug.title, status: bug.status, url: absoluteUrl(issuePath(project.slug, bug.number)) },
+      issue: { id: bug.id, number: bug.number, title: bug.title, status: bug.status, substatus: bug.substatus, url: absoluteUrl(issuePath(project.slug, bug.number)) },
       holder: holderOf(bug, hold),
       pullRequest,
       judgements: facts.judgements,
-      bids: bug.status === "open" ? { open: bids.length } : null,
+      bids: bug.substatus === "open" ? { open: bids.length } : null,
       nextActions: nextActions(caller, facts),
     };
   }));
@@ -409,7 +409,7 @@ export async function triageQueue(
 
 /** Who holds the issue, in triage's words. */
 export function holderOf(
-  bug: { status: string; assignee: { id: string; name: string | null } | null },
+  bug: { substatus: string; assignee: { id: string; name: string | null } | null },
   hold: IssueHold | null,
 ): TriageHolder {
   return {
@@ -420,7 +420,7 @@ export function holderOf(
     offeredAt: hold?.offeredAt?.toISOString() ?? null,
     claimedAt: hold?.claimedAt?.toISOString() ?? null,
     assignee: bug.assignee,
-    staleAssignee: bug.status === "open" && Boolean(bug.assignee) && !hold,
+    staleAssignee: bug.substatus === "open" && Boolean(bug.assignee) && !hold,
   };
 }
 

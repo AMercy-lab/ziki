@@ -8,6 +8,8 @@ import { notifyMergeFailed } from "@/lib/agent-notifications";
 import { issueIdFor } from "@/lib/issue-ref";
 import { pullRequestReportSchema } from "@/lib/validations/pull-request-report";
 import type { GateReport } from "@/lib/agent-api/pr-gate";
+import { moveTo } from "@/lib/issue-substatus";
+import { statusChangedSummary } from "@/lib/activity-log";
 
 /**
  * Pull request reports (#pr-reports).
@@ -16,8 +18,9 @@ import type { GateReport } from "@/lib/agent-api/pr-gate";
  * request on GitHub and report what they saw: its state (open, closed without
  * merging, merged, or 404), the branch it was merged into and whether the
  * default branch contains it, its head and merge commits, its checks and
- * whether it can merge. Any agent independent of the issue may report (the
- * same rule as reviewers, lib/agents/independence.ts). The latest report for
+ * whether it can merge. Any agent may report, the owner's own included
+ * (#owner-agents), except the agent holding the claim or the one that
+ * delivered the pull request (lib/agents/independence.ts). The latest report for
  * the issue's current pull request is its state, shown with who reported it
  * and when, so a wrong report is corrected by the next one. The rules read it
  * through one gate (lib/agent-api/pr-gate.ts).
@@ -164,13 +167,25 @@ const fail = (status: 400 | 403 | 404 | 409, error: string, message: string, fie
   ({ status, body: { error, message, ...(field ? { field } : {}) } });
 
 /**
- * `POST /api/v1/issues/{id}/pull-request-status`: an agent independent of the
- * issue reports what it saw on GitHub for the issue's linked pull request.
+ * `POST /api/v1/issues/{id}/pull-request-status`: an agent other than the one
+ * holding the claim or that delivered the pull request reports what it saw on GitHub for the issue's linked pull request.
  * Each report is a new row; the latest one counts. An open pull request
  * reported at a head commit other than the one Ziki has records that head on
  * the issue (as the pull_request webhook does), so judgements and the accept
  * bind to the code that is there now.
  */
+/**
+ * Where a report puts an issue in Merge (#substatus): Error when its
+ * pull request can't merge as it is (closed without merging, missing,
+ * conflicting or with failing checks), else Ready to merge. A merged report
+ * leaves it Ready to merge: the merger resolves it.
+ */
+export function mergeSubstatusFor(report: { state: string; mergeable?: boolean | null; checks?: string | null }): "ready_to_merge" | "error" {
+  if (report.state === "closed" || report.state === "not_found") return "error";
+  if (report.state === "open" && (report.mergeable === false || report.checks === "failing")) return "error";
+  return "ready_to_merge";
+}
+
 export async function reportPullRequestStatus(
   agent: AgentContext,
   scope: { tenantId: string; projectId: string },
@@ -193,13 +208,15 @@ export async function reportPullRequestStatus(
       id: true,
       tenantId: true,
       projectId: true,
+      status: true,
+      substatus: true,
       pullRequestUrl: true,
       pullRequestHeadSha: true,
       beneficiaryUserId: true,
       reporterId: true,
       assigneeId: true,
       createdByAgent: { select: { ownerUserId: true } },
-      claims: { select: { status: true, releasedAt: true, beneficiaryUserId: true, dispatcherUserId: true, agent: { select: { ownerUserId: true } } } },
+      claims: { select: { status: true, releasedAt: true, beneficiaryUserId: true, agentId: true, dispatcherUserId: true, agent: { select: { ownerUserId: true } } } },
     },
   });
   if (!bug) return fail(404, "not_found", "No such issue in this project.");
@@ -215,11 +232,12 @@ export async function reportPullRequestStatus(
     where: {
       bugId: bug.id,
       pullRequestUrl: bug.pullRequestUrl,
-      OR: [{ beneficiaryUserId: agent.ownerId }, { agent: { ownerUserId: agent.ownerId } }],
+      // #owner-agents: only the agent that delivered it is left out; the owner's other agents may report.
+      agentId: agent.agentId,
     },
     select: { id: true },
   });
-  if (delivered) return fail(403, "not_independent", "This pull request was delivered by or for this agent's owner, so another owner's agent reports on it.");
+  if (delivered) return fail(403, "not_independent", "This agent delivered this pull request, so another agent reports on it, your owner's other agents included.");
 
   const headMoved = body.state === "open" && body.headSha !== undefined && body.headSha !== bug.pullRequestHeadSha;
   const pullRequestUrl = bug.pullRequestUrl;
@@ -245,6 +263,22 @@ export async function reportPullRequestStatus(
     if (headMoved) {
       await tx.bug.updateMany({ where: { id: bug.id, pullRequestUrl }, data: { pullRequestHeadSha: body.headSha } });
     }
+    // In Merge, the latest report decides Ready to merge or Error (#substatus).
+    const mergeStep = bug.status === "merge" ? mergeSubstatusFor(body) : null;
+    if (mergeStep && mergeStep !== bug.substatus) {
+      const moved = await tx.bug.updateMany({ where: { id: bug.id, status: "merge", pullRequestUrl }, data: moveTo(mergeStep) });
+      if (moved.count) {
+        await tx.bugActivity.create({
+          data: {
+            bugId: bug.id,
+            actorId: agent.ownerId,
+            type: "status_changed",
+            summary: statusChangedSummary(bug.substatus, mergeStep),
+            metadata: { field: "status", from: bug.substatus, to: mergeStep, via: "pull_request_report", pullRequestReportId: report.id },
+          },
+        });
+      }
+    }
     const payload: Prisma.InputJsonObject = {
       issueId: bug.id,
       projectId: bug.projectId,
@@ -258,6 +292,7 @@ export async function reportPullRequestStatus(
       checks: body.checks ?? null,
       mergeable: body.mergeable ?? null,
       note: body.note,
+      ...(mergeStep && mergeStep !== bug.substatus ? { substatus: { from: bug.substatus, to: mergeStep } } : {}),
       ...(headMoved ? { headMoved: { from: bug.pullRequestHeadSha, to: body.headSha ?? null } } : {}),
     };
     await audit(agent, "issue.pull_request_reported", `bug:${bug.id}`, payload, { bugId: bug.id, db: tx });

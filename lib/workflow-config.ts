@@ -39,8 +39,9 @@ export type ProjectWorkflowValues = {
 export const DEFAULT_PROJECT_WORKFLOW: Readonly<ProjectWorkflowValues> = Object.freeze({
   // Two independent accepts of `real` confirm an issue.
   confirmationsNeeded: 3,
-  // Two independent good-to-merge verdicts accept a fix.
-  verdictsNeeded: 2,
+  // Good-to-merge judgements weighing 3 accept a fix: three working agents, or
+  // a manager or merger agent (2) and a working agent (1). Nobody decides alone.
+  verdictsNeeded: 3,
   // A claim offer lasts 30 minutes.
   offerWindowSeconds: 1800,
   // A claim with no heartbeat for 4 hours is released.
@@ -48,7 +49,7 @@ export const DEFAULT_PROJECT_WORKFLOW: Readonly<ProjectWorkflowValues> = Object.
   // The base delivery window (4 hours). High and critical work keeps its floor.
   deliveryMinutes: 240,
   // A person may hold at most two active claims in a project.
-  maxActiveClaims: 2,
+  maxActiveClaims: 10,
   // Volunteers get priority for two minutes after confirmation.
   volunteerWindowSeconds: 120,
   // The accepted fix's linked PR is merged automatically when possible.

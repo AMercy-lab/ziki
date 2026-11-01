@@ -9,7 +9,9 @@ export type SidebarStep = { label: string; count: number; href: string; selected
 
 export function StageSidebar({ steps }: { steps: SidebarStep[] }) {
   return (
-    <nav aria-label="Status" className="shrink-0 max-lg:w-full max-lg:overflow-x-auto max-lg:border-b max-lg:border-zk-divider max-lg:pb-3 lg:w-40 lg:py-1">
+    // relative: the labels' screen-reader-only (absolute) counts stay inside the
+    // scrolling strip on phones instead of widening the page.
+    <nav aria-label="Status" className="relative shrink-0 max-lg:w-full max-lg:overflow-x-auto max-lg:border-b max-lg:border-zk-divider max-lg:pb-3 lg:w-40 lg:py-1">
       <ol className="m-0 flex list-none p-0 max-lg:gap-5 lg:flex-col">
         {steps.map((step, index) => {
           const last = index === steps.length - 1;
@@ -29,7 +31,7 @@ export function StageSidebar({ steps }: { steps: SidebarStep[] }) {
                     className={`flex h-7 min-w-7 shrink-0 items-center justify-center rounded-lg px-1 font-mono text-[11px] font-semibold tabular-nums ${
                       step.selected
                         ? "bg-electric-blue-strong text-white ring-4 ring-electric-blue-strong/20"
-                        : "border-2 border-zk-border bg-zk-surface text-zk-muted group-hover:border-zk-accent group-hover:text-zk-accent"
+                        : "border-2 border-zk-border bg-zk-surface text-zk-muted group-hover:border-electric-blue-strong group-hover:text-zk-accent"
                     }`}
                   >
                     {step.count}
@@ -37,7 +39,7 @@ export function StageSidebar({ steps }: { steps: SidebarStep[] }) {
                   {last ? null : <span aria-hidden="true" className="my-1 min-h-5 w-0.5 flex-1 rounded-full bg-zk-border max-lg:hidden" />}
                 </span>
                 <span
-                  className={`flex min-h-7 min-w-0 flex-1 items-center leading-tight max-lg:whitespace-nowrap text-sm group-hover:text-zk-accent ${last ? "" : "lg:mb-5"} ${
+                  className={`flex min-h-7 min-w-0 flex-1 items-center leading-tight max-lg:whitespace-nowrap text-sm group-hover:text-zk-accent ${
                     step.selected ? "font-bold text-zk-text" : "font-medium text-zk-text2"
                   }`}
                 >

@@ -66,7 +66,7 @@ import {
   getProofLinkChanges,
   TICKET_EDIT_ERRORS,
 } from "@/lib/ticket-editing";
-import { Prisma, type ActivityType } from "@prisma/client";
+import { Prisma, type ActivityType, type Substatus } from "@prisma/client";
 import { notifyLater } from "@/lib/notify";
 import { ensureWatching } from "@/lib/watch";
 import { parseResolutionNote } from "@/lib/resolution-note";
@@ -78,7 +78,6 @@ import { attachmentIdsInMarkdown, linkAttachments } from "@/lib/attachment-link"
 import {
   bugInTenant,
   currentTenantIdFor,
-  defaultProjectIdFor,
   NO_TENANT_MESSAGE,
 } from "@/lib/tenant-context";
 import { currentTenantAccess } from "@/lib/tenant-access";
@@ -104,7 +103,8 @@ import {
   mentionedAgents,
   type MentionedAgent,
 } from "@/lib/agent-mentions";
-import { ideaPath } from "@/lib/issue-ref";
+import { ideaPath } from "@/lib/project-paths";
+import { ENTRY_SUBSTATUS, moveTo } from "@/lib/issue-substatus";
 
 export type ActionResult = {
   error?: string;
@@ -237,10 +237,15 @@ export async function createBugAction(
 
   // #425: the idea goes into the reporter's tenant. No membership, no idea.
   const tenantId = await currentTenantIdFor(userId);
-  const projectId = tenantId ? await defaultProjectIdFor(prisma, tenantId) : null;
-  if (!tenantId || !projectId) {
+  // #project-urls: the project the form was opened in, and only if it is in this workspace.
+  const requestedProjectId = typeof formData.get("projectId") === "string" ? String(formData.get("projectId")) : "";
+  const targetProject = tenantId && requestedProjectId
+    ? await prisma.project.findFirst({ where: { id: requestedProjectId, tenantId, archivedAt: null }, select: { id: true, slug: true } })
+    : null;
+  if (!tenantId || !targetProject) {
     return { error: NO_TENANT_MESSAGE };
   }
+  const projectId = targetProject.id;
 
   if (typeId) {
     const issueType = await issueTypeForCreate(typeId, tenantId);
@@ -334,8 +339,8 @@ export async function createBugAction(
     throw error;
   }
 
-  revalidatePath("/issues");
-  redirect(ideaPath(idea.number));
+  revalidatePath("/[project]", "layout");
+  redirect(ideaPath(targetProject.slug, idea.number));
 }
 
 /** Updates status (assignee/admin) and type/assignee (admin) and logs activity. */
@@ -480,6 +485,7 @@ export async function updateBugAction(
 
   const data: {
     status?: typeof parsed.data.status;
+    substatus?: Substatus;
     typeId?: string | null;
     assigneeId?: string | null;
     categoryId?: string | null;
@@ -489,7 +495,7 @@ export async function updateBugAction(
     boostedAt?: Date | null;
   } = {};
 
-  if (parsed.data.status) data.status = parsed.data.status;
+  if (parsed.data.status && parsed.data.status !== existing.status) Object.assign(data, moveTo(ENTRY_SUBSTATUS[parsed.data.status]));
   if (admin) {
     if (parsed.data.typeId !== undefined) {
       data.typeId = parsed.data.typeId === "" ? null : parsed.data.typeId;
@@ -514,14 +520,14 @@ export async function updateBugAction(
   };
   const pending: PendingActivity[] = [];
 
-  if (data.status && data.status !== existing.status) {
+  if (data.substatus && data.substatus !== existing.substatus) {
     pending.push({
       type: "status_changed",
-      summary: statusChangedSummary(existing.status, data.status),
+      summary: statusChangedSummary(existing.substatus, data.substatus),
       metadata: {
         field: "status",
-        from: existing.status,
-        to: data.status,
+        from: existing.substatus,
+        to: data.substatus,
         ...(resolutionNote ? { note: resolutionNote } : {}),
       },
     });
@@ -842,7 +848,7 @@ export async function updateBugAction(
   }
   if (events.length > 0) notifyLater(...events);
 
-  revalidatePath("/issues");
+  revalidatePath("/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -890,7 +896,7 @@ export async function reopenAgentResolvedAction(bugId: string): Promise<ActionRe
   const tenantId = await currentTenantIdFor(user.id);
   const existing = await prisma.bug.findUnique({
     where: { id: bugId, ...bugInTenant(tenantId) },
-    select: { id: true, status: true, assigneeId: true, isDeleted: true },
+    select: { id: true, status: true, substatus: true, assigneeId: true, isDeleted: true },
   });
   if (!existing || existing.isDeleted) return { error: "Issue not found" };
   if (
@@ -915,23 +921,23 @@ export async function reopenAgentResolvedAction(bugId: string): Promise<ActionRe
 
   const reopened = await prisma.$transaction(async (tx) => {
     // Someone may have changed the status since the read above.
-    const changed = await tx.bug.updateMany({ where: { id: bugId, status: "resolved" }, data: { status: to } });
+    const changed = await tx.bug.updateMany({ where: { id: bugId, status: "resolved" }, data: moveTo(to) });
     if (changed.count !== 1) return false;
     await tx.bugActivity.create({
       data: {
         bugId,
         actorId: user.id,
         type: "status_changed",
-        summary: statusChangedSummary("resolved", to),
-        metadata: { field: "status", from: "resolved", to, via: "reopen_agent_resolve" },
+        summary: statusChangedSummary(existing.substatus, to),
+        metadata: { field: "status", from: existing.substatus, to, via: "reopen_agent_resolve" },
       },
     });
-    await publishWebEvent(tx, { bugId, type: "issue.updated", actorUserId: user.id, payload: issueChangePayload({ status: to }) });
+    await publishWebEvent(tx, { bugId, type: "issue.updated", actorUserId: user.id, payload: issueChangePayload(moveTo(to)) });
     return true;
   });
   if (!reopened) return { error: "The issue's status changed meanwhile. Refresh and try again." };
 
-  revalidatePath("/issues");
+  revalidatePath("/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -975,6 +981,7 @@ export async function editBugContentAction(
       reporterId: true,
       beneficiaryUserId: true,
       status: true,
+      substatus: true,
       tenantId: true,
       isDeleted: true,
     },
@@ -1078,7 +1085,7 @@ export async function editBugContentAction(
         description: normalizedDescription,
         updatedAt: new Date(),
         // #requires-confirmation: the edit voided its confirmations, so an Open issue needs confirming again.
-        ...(existing.status === "open" ? { status: "requires_confirmation" as const } : {}),
+        ...(existing.substatus === "open" ? moveTo("requires_confirmation") : {}),
       },
     });
 
@@ -1129,7 +1136,7 @@ export async function editBugContentAction(
     });
   }
 
-  revalidatePath("/issues");
+  revalidatePath("/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -1254,7 +1261,7 @@ export async function editProofLinksAction(
     }
   });
 
-  revalidatePath("/issues");
+  revalidatePath("/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -1263,7 +1270,7 @@ export async function editProofLinksAction(
 
 /**
  * Adds a comment to a bug and records the activity: a reply to one stage
- * entry, or, while the issue is Open, a comment on it or a reply to one.
+ * entry, or a comment on the issue itself (at any stage) or a reply to one.
  */
 export async function addCommentAction(
   bugId: string,
@@ -1303,6 +1310,7 @@ export async function addCommentAction(
       assigneeId: true,
       tenantId: true,
       status: true,
+      substatus: true,
       pullRequestUrl: true,
     },
   });
@@ -1408,7 +1416,7 @@ export async function addCommentAction(
   });
   notifyLater(...events);
 
-  revalidatePath("/issues");
+  revalidatePath("/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -1522,7 +1530,7 @@ export async function toggleVoteAction(
     };
   });
 
-  revalidatePath("/issues");
+  revalidatePath("/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -1595,11 +1603,11 @@ export async function deleteBugAction(bugId: string): Promise<ActionResult> {
     return { error: TICKET_DELETION_ERRORS.failed };
   }
 
-  revalidatePath("/issues");
+  revalidatePath("/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
-  redirect("/issues");
+  redirect("/dashboard");
 }
 
 /**
@@ -1674,7 +1682,7 @@ export async function restoreBugAction(bugId: string): Promise<ActionResult> {
     return { error: TICKET_DELETION_ERRORS.failedRestore };
   }
 
-  revalidatePath("/issues");
+  revalidatePath("/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -1745,7 +1753,7 @@ export async function toggleBoostBugAction(
     return { error: TICKET_BOOST_ERRORS.failed };
   }
 
-  revalidatePath("/issues");
+  revalidatePath("/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -1867,7 +1875,7 @@ export async function selfAssignBugAction(
   });
 
   revalidateIssue();
-  revalidatePath("/issues");
+  revalidatePath("/[project]", "layout");
   revalidatePath(`/bugs/${bugId}`);
   revalidatePath("/bugs");
   return { ok: true };

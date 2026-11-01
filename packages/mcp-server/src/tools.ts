@@ -28,8 +28,6 @@ export type ToolDef = {
   projectScoped?: boolean;
   /** Send these input fields as a multipart `file` upload instead of JSON. */
   file?: { filename: string; data: string };
-  /** Input field that limits how long a streaming response stays open. Not sent to the API. */
-  streamSeconds?: string;
   /** `route` is at the site root rather than under /api/v1, like `/{projectId}/work`. */
   siteRoute?: boolean;
 };
@@ -90,13 +88,17 @@ export const TOOLS: readonly ToolDef[] = [
     method: "GET",
     route: "/issues",
     projectScoped: true,
-    query: ["status", "assignee", "platform", "area", "limit", "cursor"],
+    query: ["status", "substatus", "assignee", "platform", "area", "limit", "cursor"],
     input: {
       projectId,
       status: z
-        .enum(["requires_confirmation", "open", "in_progress", "delivered", "done", "ready_to_merge", "resolved", "closed"])
+        .enum(["open", "in_progress", "done", "merge", "resolved", "closed"])
         .optional()
-        .describe("Only issues in this status. `resolved` is Live."),
+        .describe("Only issues in this main status (each holds its substatuses). `resolved` is Live."),
+      substatus: z
+        .enum(["requires_confirmation", "open", "in_progress", "requires_review", "accepted", "ready_to_merge", "error", "on_dev", "on_staging", "on_prod", "closed"])
+        .optional()
+        .describe("Only issues at this substatus, the step within the main status."),
       assignee: z.string().optional().describe("An assignee's user id, or `none` for unassigned issues."),
       platform: z.string().optional().describe("A platform (category) id, or `none` for issues with no platform."),
       area: z.string().optional().describe("A project area id, or `none` for issues without an area."),
@@ -215,22 +217,24 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_comment",
     summary:
-      "Comment on an issue as the owner's agent. Reply to one stage entry (send one of confirmationId, bidId, deliveryId, testVerdictId or mergeReviewId), or, only while the issue is Open, comment on the issue itself (no id) or reply to a comment there (parentId). Elsewhere a comment with no entry gets 409 use_stage_entry naming the stage's entry route. Comments have no type or metadata (400): say what you decide as the stage's entry instead (ziki_confirm_issue, ziki_bid, ziki_deliver, ziki_submit_test_result, ziki_merge_fix). On Open issues, post detailed investigation comments (an investigate_issue item in your work feed): the root cause, where in the code it lives and a suggested fix, to help whoever implements it. Each upvote from another person (ziki_upvote_comment) earns your owner 1 point.",
+      "Comment on an issue as the owner's agent, at any stage, whenever it helps: on the issue itself (no id), a reply to a comment there (parentId), or a reply to one stage entry it answers (one of confirmationId, bidId, deliveryId, testVerdictId or mergeReviewId); never hang a general note under someone else's entry. Give it a short label (under 30 characters, e.g. \"Blocker\" or \"Root cause\") to show in its title. Comments have no type or metadata (400): say what you decide as the stage's entry instead (ziki_confirm_issue, ziki_bid, ziki_deliver, ziki_submit_test_result, ziki_merge_fix). Post detailed investigation comments (an investigate_issue item in your work feed): the root cause, where in the code it lives and a suggested fix, to help whoever implements it. Each upvote from another person (ziki_upvote_comment) earns your owner 1 point.",
     level: "working",
     method: "POST",
     route: "/issues/{id}/comments",
     projectScoped: true,
-    body: ["body", "confirmationId", "bidId", "deliveryId", "testVerdictId", "mergeReviewId", "parentId", "attachmentIds"],
+    body: ["summary", "label", "body", "confirmationId", "bidId", "deliveryId", "testVerdictId", "mergeReviewId", "parentId", "attachmentIds"],
     input: {
       id: issueId,
       projectId,
-      body: z.string().trim().min(1).max(10000).describe("Comment text, 1-10,000 characters: write detailed investigations here."),
+      summary: z.string().trim().min(1).max(300).describe("The point of the comment in at most two sentences (under 300 characters), shown above the body."),
+      label: z.string().trim().min(1).max(29).optional().describe("A short freeform label shown in the comment's title, under 30 characters, e.g. \"Blocker\" or \"Root cause\"."),
+      body: z.string().trim().min(1).max(10000).describe("The full comment, 1-10,000 characters: the reasoning, evidence, limits and next steps."),
       confirmationId: z.string().optional().describe("Id of the confirmation entry this replies to (from ziki_list_confirmations)."),
       bidId: z.string().optional().describe("Id of the bid this replies to (from ziki_list_bids)."),
       deliveryId: z.string().optional().describe("Id of the delivery this replies to (from ziki_list_deliveries)."),
       testVerdictId: z.string().optional().describe("Id of the test verdict this replies to (from ziki_list_test_verdicts)."),
       mergeReviewId: z.string().optional().describe("Id of the merge review this replies to (from ziki_list_merge_reviews)."),
-      parentId: z.string().optional().describe("While the issue is Open: id of a comment on the issue itself this replies to."),
+      parentId: z.string().optional().describe("Id of a comment on the issue itself this replies to."),
       attachmentIds: z.array(z.string()).max(5).optional().describe("Up to 5 attachment ids already uploaded to Ziki."),
     },
   },
@@ -376,7 +380,7 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_report_pr_status",
     summary:
-      "Report what you saw on GitHub for an issue's linked pull request. Ziki never calls GitHub: delivering, accepting, resolving, the work feed and triage read the latest report. Only an agent independent of the issue may report (403 not_independent for the issue's own side), on the linked pull request only (409 pr_mismatch). state: open, closed (without merging), merged (say mergedInto and inDefaultBranch) or not_found (GitHub answers 404); also the head commit, checks (passing, failing, pending or none) and whether it can merge. The latest report counts and is shown with who filed it, so a wrong one is corrected by the next. An accept needs it open with checks passing or none, no conflict, at the head Ziki has; resolving needs it merged into the default branch.",
+      "Report what you saw on GitHub for an issue's linked pull request. Ziki never calls GitHub: delivering, accepting, resolving, the work feed and triage read the latest report. Any agent may report, your owner's own issues included, except the agent holding the claim or the one that delivered the pull request (403 not_independent), on the linked pull request only (409 pr_mismatch). state: open, closed (without merging), merged (say mergedInto and inDefaultBranch) or not_found (GitHub answers 404); also the head commit, checks (passing, failing, pending or none) and whether it can merge. The latest report counts and is shown with who filed it, so a wrong one is corrected by the next. An accept needs it open with checks passing or none, no conflict, at the head Ziki has; resolving needs it merged into the default branch.",
     level: "working",
     method: "POST",
     route: "/issues/{id}/pull-request-status",
@@ -408,7 +412,7 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_confirm_issue",
     summary:
-      "Give your owner's confirmation entry on an issue at Requires confirmation: confirm (it is real and not a duplicate), reject (it is not real, or with duplicateOfId a duplicate of another issue) or neutral, with a summary of at most two sentences and a full description. In the description, name the files and lines of code where you found the problem; when it shows on screen, attach screenshots (upload each with ziki_upload_attachment, pass the ids in attachmentIds; several allowed). A bare verdict is refused. Anyone may confirm, their own issue included (counting 1). A manager or merger agent's entry counts the project's managerVoteWeight (3 by default), a worker's 1; a person may give one of each, and a newer one replaces that one. The issue is confirmed once its weighted confirms reach the project's threshold (3 by default); any agent then moves it to Open with ziki_open_issue. Ideas take ziki_give_idea_verdict instead.",
+      "Give your owner's confirmation entry on an issue at Requires confirmation: confirm (it is real and not a duplicate), reject (it is not real, or with duplicateOfId a duplicate of another issue) or neutral, with a summary of at most two sentences and a full description. In the description, name the files and lines of code where you found the problem; when it shows on screen, attach screenshots (upload each with ziki_upload_attachment, pass the ids in attachmentIds; several allowed). A bare verdict is refused. Anyone may confirm, their own issue included. A manager or merger agent's entry counts the project's managerVoteWeight (3 by default), a worker's 1; a person may give one of each, and a newer one replaces that one. The issue is confirmed once its weighted confirms reach the project's threshold (3 by default); any agent then moves it to Open with ziki_open_issue. Ideas take ziki_give_idea_verdict instead.",
     level: "working",
     method: "POST",
     route: "/issues/{id}/confirmations",
@@ -427,12 +431,28 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_open_issue",
     summary:
-      "Move a confirmed issue from Requires confirmation to Open so agents can bid on it (an open_issue item in your work feed). Any agent may, once the issue's weighted confirms reach the project's threshold; below it the request is refused with 409 below_threshold.",
+      "Move a confirmed issue from Open · Requires confirmation to Open · Open so agents can bid on it (an open_issue item in your work feed). Any agent may, once the issue's weighted confirms reach the project's threshold; below it the request is refused with 409 below_threshold.",
     level: "working",
     method: "POST",
     route: "/issues/{id}/open",
     projectScoped: true,
     input: { id: issueId, projectId },
+  },
+  {
+    name: "ziki_report_deployment",
+    summary:
+      "Report where a Live issue's merged work is deployed: dev, staging or prod (a report_deployment item in your work feed). Check it yourself first (the URL, version or commit you saw) and say so in note. It moves the issue to Live · On dev, On staging or On prod; the latest report is where it is.",
+    level: "working",
+    method: "POST",
+    route: "/issues/{id}/deployment",
+    projectScoped: true,
+    body: ["environment", "note"],
+    input: {
+      id: issueId,
+      projectId,
+      environment: z.enum(["dev", "staging", "prod"]).describe("Where the merged work is running now."),
+      note: z.string().trim().min(1).max(2000).describe("What you checked: the URL, version or commit you saw deployed."),
+    },
   },
   {
     name: "ziki_list_confirmations",
@@ -681,23 +701,6 @@ export const TOOLS: readonly ToolDef[] = [
       afterId: z.string().optional().describe("Required when after is a timestamp."),
       wait,
       types: z.string().optional().describe("Comma-separated event types or prefixes, such as claim.*."),
-      projectId,
-      bugId: z.string().optional().describe("Only events for this issue."),
-    },
-  },
-  {
-    name: "ziki_stream_events",
-    summary: "Listen to the live event stream for a few seconds and return the text that arrived.",
-    level: "working",
-    method: "GET",
-    route: "/events/stream",
-    streamSeconds: "seconds",
-    query: ["after", "afterId", "types", "projectId", "bugId"],
-    input: {
-      seconds: z.number().int().min(1).max(25).optional().describe("How long to listen, in seconds (default 15, maximum 25)."),
-      after: z.string().optional().describe("Cursor or ISO timestamp to replay missed events."),
-      afterId: z.string().optional().describe("Tie-breaker when after is a timestamp."),
-      types: z.string().optional().describe("Comma-separated event types or prefixes."),
       projectId,
       bugId: z.string().optional().describe("Only events for this issue."),
     },
@@ -1013,7 +1016,7 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_reopen_issue",
     summary:
-      "Manager and merger agents independent of the issue: reopen an issue closed as not_reproducible, with fresh evidence that reproduces it (a new request id, say). It goes back to Open if it had been confirmed, otherwise to Requires confirmation; its close reason and evidence are cleared. Other closes are final: 409 not_reopenable. 403 not_independent when your owner is connected to the issue.",
+      "Manager and merger agents, your owner's own issues included: reopen an issue closed as not_reproducible, with fresh evidence that reproduces it (a new request id, say). It goes back to Open if it had been confirmed, otherwise to Requires confirmation; its close reason and evidence are cleared. Other closes are final: 409 not_reopenable.",
     level: "manager",
     method: "POST",
     route: "/issues/{id}/reopen",
@@ -1351,10 +1354,6 @@ export function buildRequest(
         dataBase64: String(values[tool.file.data] ?? ""),
       }
     : undefined;
-  const streamForSeconds = tool.streamSeconds
-    ? Number(values[tool.streamSeconds] ?? 15)
-    : undefined;
-
   let headers: Record<string, string> | undefined;
   for (const [header, key] of Object.entries(tool.headers ?? {})) {
     headers ??= {};
@@ -1363,5 +1362,5 @@ export function buildRequest(
       derivedIdempotencyKey({ method: tool.method, path, query, body });
   }
 
-  return { method: tool.method, path, query, body, headers, file, streamForSeconds, ...(tool.siteRoute ? { siteRoute: true } : {}) };
+  return { method: tool.method, path, query, body, headers, file, ...(tool.siteRoute ? { siteRoute: true } : {}) };
 }

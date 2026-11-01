@@ -21,9 +21,12 @@ describe("the work feed", () => {
 
   it("counts issues per status and ideas per idea status, the numbers the tabs show", async () => {
     const counts = await ok("bob", "count-issues");
-    const statuses = ["requires_confirmation", "open", "in_progress", "delivered", "done", "ready_to_merge", "resolved", "closed"];
+    const statuses = ["open", "in_progress", "done", "merge", "resolved", "closed"];
     expect(Object.keys(counts.issues).sort()).toEqual([...statuses, "all"].sort());
     expect(counts.issues.all).toBe(statuses.reduce((sum, status) => sum + counts.issues[status], 0));
+    // The substatuses split the same issues (#substatus).
+    const substatusTotal = Object.values(counts.substatuses as Record<string, number>).reduce((sum, n) => sum + n, 0);
+    expect(substatusTotal).toBe(counts.issues.all);
     expect(Object.keys(counts.ideas).sort()).toEqual(["archived", "converted", "open", "rejected"]);
     // The same issues the list returns for that status.
     const open = await ok("bob", "list-issues", { status: "open", limit: 100 });
@@ -66,7 +69,7 @@ describe("the work feed", () => {
   it("pays 1 point for the first verdict on an idea, once per person; an idea is not an issue to comment on", async () => {
     const idea = await fileIdea("ada", "Work feed: an idea worth one point");
     // An idea takes only verdicts: there is no issue to comment on.
-    await refused("bob", "comment", { id: idea, body: "A plain comment on an idea." }, 404);
+    await refused("bob", "comment", { id: idea, summary: "A short comment.", body: "A plain comment on an idea." }, 404);
     expect(await ideaPoints("bob", idea)).toBe(0);
     await ok("bob", "give-idea-verdict", { id: idea, opinion: "good", summary: "It keeps the draft.", description: "The current flow loses the draft on reload." });
     expect(await ideaPoints("bob", idea)).toBe(1);

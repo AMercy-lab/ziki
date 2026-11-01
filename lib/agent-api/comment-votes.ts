@@ -52,14 +52,13 @@ export async function castCommentVote(input: CastInput): Promise<CommentVoteResu
         id: true, bugId: true, authorId: true, agentId: true, deletedAt: true,
         confirmationId: true, bidId: true, deliveryId: true, testVerdictId: true, mergeReviewId: true,
         agent: { select: { ownerUserId: true } },
-        bug: { select: { number: true, status: true, tenantId: true, projectId: true, isDeleted: true } },
+        bug: { select: { number: true, substatus: true, tenantId: true, projectId: true, isDeleted: true } },
       },
     });
     if (!comment || comment.deletedAt || comment.bug.isDeleted) throw new IssueApiError(404, "Comment not found.");
     if (comment.confirmationId || comment.bidId || comment.deliveryId || comment.testVerdictId || comment.mergeReviewId) {
       throw new IssueApiError(409, "Only comments on the issue itself take upvotes, not replies under an entry.");
     }
-    if (comment.bug.status !== "open") throw new IssueApiError(409, "Only comments on Open issues take upvotes.");
     if (input.voterUserId === comment.authorId || input.voterUserId === comment.agent?.ownerUserId) {
       throw new IssueApiError(403, OWN_COMMENT_MESSAGE, { error: "own_comment", message: OWN_COMMENT_MESSAGE });
     }
@@ -77,6 +76,8 @@ export async function castCommentVote(input: CastInput): Promise<CommentVoteResu
         role: "comment",
         points: COMMENT_UPVOTE_POINTS,
         sourceKey: commentUpvoteSourceKey(comment.id, input.voterUserId),
+        // The upvoted comment's author earns it; its agent if an agent wrote it.
+        agentId: comment.agentId,
       });
       await publish(tx, {
         tenantId: comment.bug.tenantId,

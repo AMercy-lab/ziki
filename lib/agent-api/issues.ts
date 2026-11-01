@@ -7,7 +7,7 @@ import { requireLevel } from "@/lib/agents/levels";
 import { audit } from "@/lib/agents/audit";
 import { consumeAgentBudget, agentBudgetExceededResponse } from "@/lib/agents/rate-budget";
 import { withAgentBudgetHeaders, type AgentBudgetQuota } from "@/lib/agents/rate-budget-headers";
-import { commentSchema, statusSchema } from "@/lib/validations/issue";
+import { commentSchema, statusSchema, substatusSchema, commentLabel } from "@/lib/validations/issue";
 import { parsePlatformFilter, platformFilterWhere } from "@/lib/platform-filter";
 import { boundSearchTerm, escapeSearchQuery } from "@/lib/search";
 import { parseProjectAreaFilter, projectAreaFilterWhere } from "@/lib/project-area-filter";
@@ -21,7 +21,7 @@ import { extractMentionedUserIds, normalizeMentions } from "@/lib/mentions";
 import { attachmentIdsInMarkdown, linkAttachments } from "@/lib/attachment-link";
 import { MAX_ATTACHMENTS_PER_ITEM } from "@/lib/attachments";
 import { publish } from "@/lib/agent-api/events";
-import { ENTRY_REPLY_FIELDS, STAGE_ENTRY_ROUTES, TYPED_COMMENT_MESSAGE } from "@/lib/stage-entry-route";
+import { STAGE_ENTRY_ROUTES, TYPED_COMMENT_MESSAGE } from "@/lib/stage-entry-route";
 import { CommentPlacementError, placeComment, type CommentPlacement } from "@/lib/comment-placement";
 import { isConfirmed } from "@/lib/agent-api/confirmations";
 import { notifyLater } from "@/lib/notify";
@@ -29,6 +29,8 @@ import type { NotificationEvent } from "@/lib/notifications";
 import { logger } from "@/lib/logger";
 import { IssueApiError } from "@/lib/agent-api/errors";
 import { latestPullRequestReport, pullRequestStateView } from "@/lib/agent-api/pull-request-report";
+import { agentAttachmentUrl } from "@/lib/agent-api/attachment-read";
+import { entrySummary } from "@/lib/agent-api/entry-fields";
 
 export { IssueApiError };
 
@@ -45,7 +47,8 @@ function enumFilter<T extends string>(name: string, raw: string | null, allowed:
 
 /** Files uploaded with POST /api/v1/attachments, linked on save (#645). */
 const attachmentIdsSchema = z.array(idSchema).max(MAX_ATTACHMENTS_PER_ITEM).optional();
-const agentCommentSchema = commentSchema.extend({ projectId: idSchema.optional(), attachmentIds: attachmentIdsSchema }).strict();
+// #730: an agent's comment leads with its point, in at most two sentences, then the full body.
+export const agentCommentSchema = commentSchema.extend({ summary: entrySummary, label: commentLabel.optional(), projectId: idSchema.optional(), attachmentIds: attachmentIdsSchema }).strict();
 
 /**
  * Authenticate before parsing input, charge the shared budget, and audit outcomes including denials.
@@ -139,7 +142,7 @@ export async function issueProject(agent: AgentContext, params: URLSearchParams,
 
 type Scope = { tenantId: string; projectId: string };
 export const issueSelect = {
-  id: true, number: true, title: true, summary: true, description: true, status: true,
+  id: true, number: true, title: true, summary: true, description: true, status: true, substatus: true,
   // #close-reasons: why, on what evidence and when a closed issue was closed.
   closeReason: true, closeEvidence: true, closedAt: true,
   categoryId: true, typeId: true, reporterId: true, assigneeId: true, beneficiaryUserId: true,
@@ -170,6 +173,7 @@ export function requireKnownFilter(name: "platform" | "area", raw: string | null
 
 export async function listAgentIssues(scope: Scope, params: URLSearchParams) {
   const status = enumFilter("status", params.get("status"), statusSchema.options);
+  const substatus = enumFilter("substatus", params.get("substatus"), substatusSchema.options);
   const assignee = params.get("assignee");
   let assigneeId: string | null | undefined;
   if (assignee) {
@@ -204,6 +208,7 @@ export async function listAgentIssues(scope: Scope, params: URLSearchParams) {
   const filtered: Prisma.BugWhereInput = {
     ...scope, isDeleted: false, ...search,
     ...(status ? { status } : {}),
+    ...(substatus ? { substatus } : {}),
     ...(assigneeId !== undefined ? { assigneeId } : {}),
     ...platformFilterWhere(requireKnownFilter("platform", params.get("platform"), parsePlatformFilter(params.get("platform"), platforms))),
     ...projectAreaFilterWhere(requireKnownFilter("area", requestedArea, parseProjectAreaFilter(requestedArea, areas))),
@@ -245,9 +250,9 @@ export async function readAgentIssue(scope: Scope, id: string) {
     where: { ...scope, ...(ref.kind === "number" ? { number: ref.number } : { id: ref.id }), isDeleted: false },
     select: { ...issueSelect, voteCount: true, comments: {
       where: { deletedAt: null }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 100,
-      select: { id: true, body: true, authorId: true, agentId: true, parentId: true, confirmationId: true, bidId: true, deliveryId: true, testVerdictId: true, mergeReviewId: true, createdAt: true, editedAt: true, _count: { select: { votes: true } } },
+      select: { id: true, summary: true, body: true, authorId: true, agentId: true, parentId: true, confirmationId: true, bidId: true, deliveryId: true, testVerdictId: true, mergeReviewId: true, createdAt: true, editedAt: true, _count: { select: { votes: true } } },
     }, attachments: {
-      // #645: metadata only; bytes are served to signed-in people at /api/attachments/{id}.
+      // #645: metadata only; agents read the bytes at `url` (#722).
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       select: { id: true, filename: true, contentType: true, size: true, commentId: true, createdAt: true },
     }, confirmations: {
@@ -266,6 +271,8 @@ export async function readAgentIssue(scope: Scope, id: string) {
     ...withImportance(issue),
     // #comment-votes: each comment carries its upvotes as `votes`.
     comments: (issue.comments ?? []).map(withCommentVotes),
+    // #722: each file with the URL an agent reads it from, with its key.
+    attachments: (issue.attachments ?? []).map((file) => ({ ...file, url: agentAttachmentUrl(file.id) })),
     confirmed,
     // Who has the issue now (its claim), or null: the agent and the person it works for.
     holder: await currentHold(issue.id),
@@ -280,24 +287,28 @@ export async function readAgentIssue(scope: Scope, id: string) {
  * `all` is every issue.
  */
 export async function countAgentIssues(scope: Scope) {
-  const [issueRows, ideaRows] = await Promise.all([
+  const [issueRows, substatusRows, ideaRows] = await Promise.all([
     prisma.bug.groupBy({ by: ["status"], where: { ...scope, isDeleted: false }, _count: { _all: true } }),
+    prisma.bug.groupBy({ by: ["substatus"], where: { ...scope, isDeleted: false }, _count: { _all: true } }),
     prisma.idea.groupBy({ by: ["status"], where: { ...scope, isDeleted: false }, _count: { _all: true } }),
   ]);
   const issues = Object.fromEntries(statusSchema.options.map((status) => [status, 0])) as Record<(typeof statusSchema.options)[number], number>;
   for (const row of issueRows) issues[row.status] = row._count._all;
+  const bySubstatus = Object.fromEntries(substatusSchema.options.map((substatus) => [substatus, 0])) as Record<(typeof substatusSchema.options)[number], number>;
+  for (const row of substatusRows) bySubstatus[row.substatus] = row._count._all;
   const ideas = { open: 0, converted: 0, rejected: 0, archived: 0 };
   for (const row of ideaRows) ideas[row.status] = row._count._all;
   return {
     projectId: scope.projectId,
     issues: { ...issues, all: Object.values(issues).reduce((sum, n) => sum + n, 0) },
+    substatuses: bySubstatus,
     ideas,
   };
 }
 
 /** What a paged comment carries: the embedded read's fields plus who wrote it. */
 const commentSelect = {
-  id: true, body: true, authorId: true, agentId: true, parentId: true, confirmationId: true, bidId: true, deliveryId: true, testVerdictId: true, mergeReviewId: true, createdAt: true, editedAt: true,
+  id: true, summary: true, body: true, authorId: true, agentId: true, parentId: true, confirmationId: true, bidId: true, deliveryId: true, testVerdictId: true, mergeReviewId: true, createdAt: true, editedAt: true,
   author: { select: { id: true, name: true } },
   agent: { select: { id: true, name: true } },
   _count: { select: { votes: true } },
@@ -370,7 +381,7 @@ export async function commentOnAgentIssue(agent: AgentContext, request: NextRequ
     const resolvedId = await issueIdFor(tx, issueRef, scope.tenantId);
     const found = resolvedId ? await tx.bug.findFirst({
       where: { ...scope, id: resolvedId, isDeleted: false },
-      select: { id: true, title: true, reporterId: true, assigneeId: true, status: true, pullRequestUrl: true },
+      select: { id: true, title: true, reporterId: true, assigneeId: true, status: true, substatus: true, pullRequestUrl: true },
     }) : null;
     if (!found) throw new IssueApiError(404, "Issue not found.");
     const bugId = found.id;
@@ -380,13 +391,6 @@ export async function commentOnAgentIssue(agent: AgentContext, request: NextRequ
       placement = await placeComment(tx, found, input);
     } catch (error) {
       if (!(error instanceof CommentPlacementError)) throw error;
-      if (error.code === "use_stage_entry") {
-        throw new IssueApiError(409, "use_stage_entry", {
-          message: error.message,
-          entryRoute: error.entryRoute,
-          replyFields: [...ENTRY_REPLY_FIELDS],
-        });
-      }
       throw new IssueApiError(error.status, error.message);
     }
     parentAuthorId = placement.parentAuthorId;
@@ -396,6 +400,8 @@ export async function commentOnAgentIssue(agent: AgentContext, request: NextRequ
         bugId,
         authorId: agent.ownerId,
         agentId: agent.agentId,
+        summary: input.summary,
+        label: input.label ?? null,
         body,
         confirmationId: placement.confirmationId,
         bidId: placement.bidId,
@@ -409,6 +415,8 @@ export async function commentOnAgentIssue(agent: AgentContext, request: NextRequ
         bugId: true,
         authorId: true,
         agentId: true,
+        summary: true,
+        label: true,
         body: true,
         parentId: true,
         confirmationId: true,

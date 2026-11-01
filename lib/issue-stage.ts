@@ -1,5 +1,4 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
-import type { ReviewedBug } from "@/lib/agents/independence";
 import { workflowFor } from "@/lib/workflow";
 import { DEFAULT_PROJECT_WORKFLOW } from "@/lib/workflow-config";
 
@@ -28,11 +27,11 @@ export function parseIssueStageView(raw: string | null | undefined): IssueStageV
 }
 
 /** The stage of an open issue. Anything no longer open has no stage. */
-export function issueStage(input: { status: string }): IssueStage | null {
-  // #requires-confirmation: the stage follows the status. Requires
-  // confirmation is a status of its own; an Open issue was confirmed.
-  if (input.status === "requires_confirmation") return "confirming";
-  return input.status === "open" ? "ready" : null;
+export function issueStage(input: { substatus: string }): IssueStage | null {
+  // #substatus: the stage follows the substatus. Open · Requires confirmation
+  // is being confirmed; Open · Open was confirmed.
+  if (input.substatus === "requires_confirmation") return "confirming";
+  return input.substatus === "open" ? "ready" : null;
 }
 
 /** A confirmation entry, as the confirmed rule reads it (#issue-confirmations). */
@@ -55,9 +54,6 @@ export type ConfirmationEntry = {
 /** A counted entry with what it counts for (#confirmation-weights). */
 export type CountedConfirmation = ConfirmationEntry & { weight: number };
 
-/** What the rule needs about the issue. */
-export type ConfirmationBug = ReviewedBug & { createdByAgentId: string | null };
-
 /** Whether the entry's person reported the issue, is the one it is for, or owns the agent that filed it. */
 export function ownsIssue(
   owner: string,
@@ -71,11 +67,10 @@ export function ownsIssue(
  * (#confirmation-weights): given after its latest edit and not undone. A
  * person may give one entry of each class: a manager or merger agent's counts
  * `managerVoteWeight`, a worker agent's or the person's own counts 1. Anyone
- * may confirm their own issue, but such an entry counts 1 whatever its class.
+ * may confirm their own issue, at the same weight (#owner-agents).
  */
 export function countedConfirmationEntries(
   entries: readonly ConfirmationEntry[],
-  bug: ConfirmationBug,
   revisedAt: Date | null,
   managerVoteWeight = DEFAULT_PROJECT_WORKFLOW.managerVoteWeight,
 ): CountedConfirmation[] {
@@ -90,7 +85,7 @@ export function countedConfirmationEntries(
     const key = `${entry.verdict}:${owner}:${weightClass}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    const weight = ownsIssue(owner, bug) || weightClass !== "manager" ? 1 : managerVoteWeight;
+    const weight = weightClass === "manager" ? managerVoteWeight : 1;
     counted.push({ ...entry, weight });
   }
   return counted;
@@ -133,6 +128,7 @@ export type ConfirmationState = {
 
 export type ReadConfirmation = Omit<ConfirmationState, "stage"> & {
   status: string;
+  substatus: string;
   confirmed: boolean;
   /** A counted reject marked it a duplicate of another issue. */
   duplicate: boolean;
@@ -172,10 +168,7 @@ export async function readConfirmations(
       id: true,
       projectId: true,
       status: true,
-      beneficiaryUserId: true,
-      reporterId: true,
-      createdByAgentId: true,
-      createdByAgent: { select: { ownerUserId: true } },
+      substatus: true,
     },
   });
   if (!bugs?.length) return result;
@@ -227,20 +220,9 @@ export async function readConfirmations(
   }
 
   for (const bug of bugs) {
-    // A later assignee or claim must not undo an entry that was independent
-    // when it was given (#579): those are checked when it is given.
-    const reviewed: ConfirmationBug = {
-      beneficiaryUserId: bug.beneficiaryUserId,
-      reporterId: bug.reporterId,
-      assigneeId: null,
-      createdByAgent: bug.createdByAgent,
-      createdByAgentId: bug.createdByAgentId,
-      claims: [],
-    };
     const workflow = workflows.get(bug.projectId);
     const counted = countedConfirmationEntries(
       entriesByBug.get(bug.id) ?? [],
-      reviewed,
       revisedAt.get(bug.id) ?? null,
       workflow?.managerVoteWeight ?? DEFAULT_PROJECT_WORKFLOW.managerVoteWeight,
     );
@@ -250,6 +232,7 @@ export async function readConfirmations(
     const needed = workflow?.confirmationsNeeded ?? DEFAULT_PROJECT_WORKFLOW.confirmationsNeeded;
     result.set(bug.id, {
       status: bug.status,
+      substatus: bug.substatus,
       confirmed: isConfirmedCount(accepts, needed),
       accepts,
       rejects,
@@ -270,10 +253,10 @@ export async function openIssueConfirmations(
   db: Db,
   where: Prisma.BugWhereInput,
 ): Promise<Map<string, ConfirmationState>> {
-  const read = await readConfirmations(db, { ...where, status: { in: ["requires_confirmation", "open"] }, isDeleted: false });
+  const read = await readConfirmations(db, { ...where, status: "open", isDeleted: false });
   const result = new Map<string, ConfirmationState>();
-  for (const [id, { status, accepts, rejects, needed, confirmed }] of read) {
-    const stage = issueStage({ status });
+  for (const [id, { substatus, accepts, rejects, needed, confirmed }] of read) {
+    const stage = issueStage({ substatus });
     if (stage) result.set(id, { stage, accepts, rejects, needed, confirmed });
   }
   return result;

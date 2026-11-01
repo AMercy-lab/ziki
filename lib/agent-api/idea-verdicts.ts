@@ -16,6 +16,7 @@ import { ideaVotes, isBadIdea, notRejectableReason } from "@/lib/idea-rejection"
 import { duplicateRef, IDEA_WITHDRAWN_REASON, withdrawnNotArchivableMessage, type ArchiveIdeaInput, type WithdrawIdeaInput } from "@/lib/idea-archive";
 import { WORKFLOW_LIMITS } from "@/lib/workflow-config";
 import { isThresholdOnly, thresholdDecision, voteWeight, type ThresholdDecision } from "@/lib/governance";
+import { moveTo } from "@/lib/issue-substatus";
 
 /**
  * Idea verdicts and conversion (#idea-verdicts, #idea-table). Each person
@@ -211,6 +212,7 @@ export async function giveIdeaVerdict(
       role: "idea",
       points: IDEA_CONTRIBUTION_POINTS,
       sourceKey: ideaContributionSourceKey(ideaId, giver.userId),
+      agentId: giver.agent?.id ?? null,
     });
 
     const convertible = ideaScore >= ideaThreshold;
@@ -383,7 +385,7 @@ async function convertLocked(
       reporterId: idea.reporterId,
       beneficiaryUserId: idea.beneficiaryUserId,
       createdByAgentId: idea.createdByAgentId,
-      status: "requires_confirmation",
+      ...moveTo("requires_confirmation"),
       watches: { create: { userId: idea.reporterId } },
       activities: {
         create: { actorId: idea.reporterId, type: "created", summary: createdSummary(idea.title), metadata: { fromIdea: locked.number } },
