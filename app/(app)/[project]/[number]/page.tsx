@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { issuesPath } from "@/lib/project-paths";
+import { ideaPath, issuesPath } from "@/lib/project-paths";
 import Image from "next/image";
 import { Suspense } from "react";
 import type { Metadata } from "next";
@@ -42,6 +42,7 @@ import { IssueStageProvider } from "@/components/issue-stage-context";
 import { IssueComments } from "@/components/comment-thread";
 import { CommentComposer } from "@/components/comment-composer";
 import { AwardBox } from "@/components/award-box";
+import { AwardStep, IdeaStep, IssueTimeline, TimelineStep, type AwardStepView } from "@/components/issue-timeline";
 import { currentHold, shownAssignee, type IssueHold } from "@/lib/issue-holders";
 import { isOpenBid } from "@/lib/open-bids";
 import {
@@ -69,7 +70,7 @@ import { AttachmentList, type AttachmentView } from "@/components/attachment-lis
 import { ChooseRedesignButton } from "@/components/choose-redesign-button";
 import { isTenantAdminRole } from "@/lib/agents/membership";
 import type { OrganizationRole } from "@/lib/organization-role";
-import { UserNameWithBadges } from "@/components/user-name-with-badges";
+import { AgentChip, UserNameWithBadges } from "@/components/user-name-with-badges";
 import { fetchVoterSummary } from "@/lib/voter-summaries";
 import { createEmptyVoterSummary } from "@/lib/voters";
 import {
@@ -91,6 +92,8 @@ import { IssueActionsMenu } from "@/components/issue-actions-menu";
 import { EditableIssueDescription } from "@/components/editable-issue-description";
 import { IssueLinks } from "@/components/issue-links";
 import { NextStepBar } from "@/components/next-step-bar";
+import { agentInstructionsFor } from "@/lib/agent-instructions";
+import { countedJudgements } from "@/lib/agent-api/tested-status";
 import { DeliveredBanner, type DeliveredBannerProps } from "@/components/delivered-banner";
 import { BackToList } from "@/components/back-to-list";
 import { issueNextStep } from "@/lib/next-step";
@@ -418,12 +421,29 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   // has it (its claims), then every bid it took (#issue-bids).
   const pastConfirmation = bug.substatus !== "requires_confirmation";
   // Bids come in from the start, while it awaits confirmation too.
-  const [hold, bidList] = await Promise.all([
+  const [hold, bidList, awardClaim] = await Promise.all([
     pastConfirmation ? loadOptional<IssueHold | null>("holder", null, () => currentHold(bug.id)) : Promise.resolve(null as IssueHold | null),
     // While Open, an open bid whose bidder is at the project's capacity says so (#bidder-capacity).
     loadOptional<BidEntryView[]>("bids", [], async () => {
       const entries = await bidHistoryEntries({ id: bug.id, areaId: bug.areaId ?? null });
       return bug.status === "open" ? markAtCapacity({ tenantId: bug.tenantId, projectId: bug.projectId }, entries) : entries;
+    }),
+    // The timeline's Award step (#issue-timeline): the newest offer or claim, held or since released.
+    loadOptional<AwardStepView | null>("award", null, async () => {
+      const claim = await prisma.issueClaim.findFirst({
+        where: { bugId: bug.id, OR: [{ offeredAt: { not: null } }, { claimedAt: { not: null } }] },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: {
+          offeredAt: true,
+          claimedAt: true,
+          releasedAt: true,
+          agent: { select: { name: true } },
+          beneficiary: { select: { name: true } },
+        },
+      });
+      return claim
+        ? { agentName: claim.agent.name, personName: claim.beneficiary.name, offeredAt: claim.offeredAt, claimedAt: claim.claimedAt, releasedAt: claim.releasedAt }
+        : null;
     }),
   ]);
 
@@ -867,6 +887,11 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   const stale = bug.isDeleted ? null : (await loadOptional("stale hold", null, () => staleHold(bug.id)))?.kind ?? null;
   const abandonCheck = bug.isDeleted || bug.status !== "in_progress" ? null : await loadOptional("sense check", null, () => senseCheck(bug.id));
   const closeSuggestions = await loadOptional<CloseSuggestionsData | null>("close suggestions", null, () => closeSuggestionsFor(bug.id));
+  // The judgements as the Delivered rule counts them (independent, weighted, on
+  // the delivered pull request), so the bar says what will actually move it.
+  const judgementCount = bug.status === "done" && !bug.isDeleted
+    ? await loadOptional("judgement count", null, () => countedJudgements(prisma, bug.id))
+    : null;
   const nextStep = issueNextStep({
     status: bug.status,
     substatus: bug.substatus,
@@ -875,8 +900,8 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     confirmationsNeeded: confirmationsData?.confirmationsNeeded ?? 0,
     holder: hold ? { agentName: hold.agentName, personName: hold.personName, status: hold.status, offeredAt: hold.offeredAt } : null,
     openBids: bidList.filter(isOpenBid).length,
-    goodToMerge: testVerdictList.filter((verdict) => verdict.goodToMerge).length,
-    verdictsNeeded,
+    goodToMerge: judgementCount?.good ?? testVerdictList.filter((verdict) => verdict.goodToMerge).length,
+    verdictsNeeded: judgementCount?.needed ?? verdictsNeeded,
     stale,
     senseCheck: abandonCheck,
     closeSuggested: closeSuggestions && closeSuggestions.tallies[0]
@@ -891,6 +916,18 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     },
     topBidVotes,
     mergeReviews: mergeReviewVotesNow,
+  });
+  // A brief to paste into an agent so it can act on this step (#agent-instructions).
+  const agentInstructions = agentInstructionsFor({
+    issueId: bug.id,
+    number: bug.number,
+    title: bug.title,
+    projectId: bug.projectId,
+    projectSlug: bug.project.slug,
+    substatus: bug.substatus,
+    path: issueHref(bug),
+    pullRequestUrl: bug.pullRequestUrl ?? null,
+    step: nextStep,
   });
 
   // The flags under the status chip in the side rail (#close-reasons): why it was
@@ -908,9 +945,20 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
         ...(stale ? [{ label: STALE_FLAG[stale], tone: "bad" as const }] : []),
       ];
 
+  // The timeline reads newest first (#issue-timeline); each step is dated by when it started, its first entry.
+  const newestFirst = <T extends { updatedAt: Date | string }>(list: T[]) =>
+    [...list].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  const firstAt = (list: { updatedAt: Date | string }[]) => newestFirst(list).at(-1)?.updatedAt ?? null;
+  const timelineDeliveries = newestFirst(deliveryList);
+  const timelineVerdicts = newestFirst(testVerdictList);
+  const timelineReviews = newestFirst(mergeReviewList);
+
   // The Conversation card shows only when it has entries in it: no empty boxes.
   // Its Dispute award button alone is not enough (nothing to dispute before an award).
   const conversationHasContent =
+    Boolean(sourceIdea) ||
+    Boolean(awardClaim) ||
+    confirming ||
     deliveryList.length > 0 ||
     testing ||
     testVerdictList.length > 0 ||
@@ -919,8 +967,8 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     bidList.length > 0 ||
     pastConfirmation;
 
-  // The confirmations, apart from the Conversation: above the Conversation while
-  // they decide the issue, below it (as history) once it is past them.
+  // The confirmations, the timeline's second step (#issue-timeline): open while
+  // they decide the issue, folded (as history) once it is past them.
   const confirmationsCard =
     confirmationsData && (confirming || (pastConfirmation && confirmationsData.entries.length > 0)) ? (
       <div className="[&>*]:mb-0">
@@ -932,6 +980,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
           summaryMaxChars={CONFIRMATION_SUMMARY_MAX_CHARS}
           history={!confirming}
           confirmed={!confirming}
+          at={confirmationsData.entries.length ? firstAt(confirmationsData.entries) : null}
         />
       </div>
     ) : null;
@@ -1120,15 +1169,16 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
             users={users}
             lastEditedAt={lastRevision?.editedAt ?? null}
             historyHref={issueHref(bug, "/history")}
+            tags={
+              bug.area ? (
+                <span title="Area" className="inline-flex items-center rounded-full bg-zk-chip px-2.5 py-0.5 text-xs font-semibold text-zk-text2 ring-1 ring-zk-border">
+                  {bug.area.name}
+                </span>
+              ) : null
+            }
           >
-            {(bug.area || bug.milestone) ? (
+            {bug.milestone ? (
               <dl className="mt-4 grid grid-cols-1 gap-3 text-sm text-zk-text2 sm:grid-cols-2">
-                {bug.area ? (
-                  <div>
-                    <dt className="font-medium text-zk-muted">Area</dt>
-                    <dd>{bug.area.name}</dd>
-                  </div>
-                ) : null}
                 {bug.milestone ? (
                   <div>
                     <dt className="font-medium text-zk-muted">Milestone</dt>
@@ -1168,14 +1218,12 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
             setback={stageSetback(currentStage, sentBack)}
           />
 
-          <NextStepBar step={nextStep} />
+          <NextStepBar step={nextStep} agentInstructions={agentInstructions} />
 
           {deliveredBanner ? <DeliveredBanner {...deliveredBanner} /> : null}
 
-              {/* Who has the issue, for an active claim only: a pending offer is in the next-step bar. */}
-              {hold?.status === "active" ? <AwardBox hold={hold} /> : null}
-
-              {confirming ? confirmationsCard : null}
+              {/* Who has the issue, while it is the latest thing (In progress); the timeline below keeps the award after that. */}
+              {hold?.status === "active" && bug.status === "in_progress" ? <AwardBox hold={hold} /> : null}
 
               {conversationHasContent ? (
                 <section
@@ -1185,29 +1233,57 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                   <div className="flex justify-end empty:hidden">
                     <DisputeAwardDialog bugNumber={bug.number} roles={disputeRoles} />
                   </div>
-                  {deliveryList.length > 0 ? (
-                    <DeliveriesPanel bugId={bug.id} deliveries={deliveryList} canReply={!bug.isDeleted && delivering} />
-                  ) : null}
-                  {testing || testVerdictList.length > 0 ? (
-                    <TestVerdictsPanel bugId={bug.id} verdicts={testVerdictList} canReply={testing} history={!testing} />
-                  ) : null}
-                  {mergeReviewing || mergeReviewList.length > 0 ? (
-                    <MergeReviewsPanel bugId={bug.id} reviews={mergeReviewList} canReply={mergeReviewing} history={!mergeReviewing} />
-                  ) : null}
-                  {pastConfirmation || bidList.length > 0 ? (
-                    <IssueBidsPanel
-                      bids={bidList}
-                      collapsed={bug.status !== "open"}
-                      canAward={canAwardBids}
-                      awardThreshold={workflow.awardThreshold}
-                      />
-                  ) : null}
+                  <IssueTimeline>
+                    {mergeReviewing || timelineReviews.length > 0 ? (
+                      <TimelineStep>
+                        <MergeReviewsPanel at={firstAt(timelineReviews)} bugId={bug.id} reviews={timelineReviews} canReply={mergeReviewing} history={!mergeReviewing} />
+                      </TimelineStep>
+                    ) : null}
+                    {testing || timelineVerdicts.length > 0 ? (
+                      <TimelineStep>
+                        <TestVerdictsPanel at={firstAt(timelineVerdicts)} bugId={bug.id} verdicts={timelineVerdicts} canReply={testing} />
+                      </TimelineStep>
+                    ) : null}
+                    {timelineDeliveries.length > 0 ? (
+                      <TimelineStep>
+                        <DeliveriesPanel at={firstAt(timelineDeliveries)} bugId={bug.id} deliveries={timelineDeliveries} canReply={!bug.isDeleted && delivering} />
+                      </TimelineStep>
+                    ) : null}
+                    {awardClaim ? (
+                      <TimelineStep>
+                        <AwardStep award={awardClaim} />
+                      </TimelineStep>
+                    ) : null}
+                    {pastConfirmation || bidList.length > 0 ? (
+                      <TimelineStep>
+                        <IssueBidsPanel
+                          bids={bidList}
+                          at={firstAt(bidList)}
+                          collapsed={bug.status !== "open"}
+                          canAward={canAwardBids}
+                          awardThreshold={workflow.awardThreshold}
+                        />
+                      </TimelineStep>
+                    ) : null}
+                    {confirmationsCard ? (
+                      <TimelineStep>{confirmationsCard}</TimelineStep>
+                    ) : null}
+                    {sourceIdea ? (
+                      <TimelineStep>
+                        <IdeaStep
+                          number={sourceIdea.number}
+                          href={ideaPath(bug.project.slug, sourceIdea.number)}
+                          verdicts={sourceIdea._count.verdicts}
+                          convertedAt={sourceIdea.convertedAt}
+                        />
+                      </TimelineStep>
+                    ) : null}
+                  </IssueTimeline>
                 </section>
               ) : null}
 
               {closeSuggestions ? <CloseSuggestionsPanel data={closeSuggestions} /> : null}
 
-              {!confirming ? confirmationsCard : null}
 
               {/* Comments, apart from the stage entries (bids, deliveries) in the Conversation. */}
               {takesComments || commentCount > 0 ? (
@@ -1323,18 +1399,22 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
             <span className="text-xs font-bold uppercase tracking-[0.08em] text-zk-muted">People</span>
             <div className="flex min-w-0 items-center gap-3">
               <span className="w-16 shrink-0 text-xs text-zk-muted">Reporter</span>
-              <UserNameWithBadges
-                name={bug.reporter.name}
-                image={bug.reporter.image}
-                avatar="sm"
-                className="text-xs"
-                userId={bug.reporterId}
-                agentName={bug.createdByAgent?.name}
-              />
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                {/* One line: a long name truncates rather than dropping under the avatar. */}
+                <UserNameWithBadges
+                  name={bug.reporter.name}
+                  image={bug.reporter.image}
+                  avatar="sm"
+                  className="min-w-0 !flex-nowrap text-xs"
+                  userId={bug.reporterId}
+                />
+                {/* The agent that filed it, on the right. */}
+                {bug.createdByAgent ? <AgentChip name={bug.createdByAgent.name} className="ml-auto" /> : null}
+              </div>
             </div>
             <div className="flex min-w-0 items-center gap-3">
               <span className="w-16 shrink-0 text-xs text-zk-muted">Assignee</span>
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                 {assignee ? (
                   <UserNameWithBadges
                     name={assignee.name}
@@ -1342,13 +1422,16 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                     organizationRole={organizationRoles[assignee.id] ?? null}
                     image={assignee.image}
                     avatar="sm"
-                    className="text-xs"
+                    className="min-w-0 !flex-nowrap text-xs"
                     userId={assignee.id}
                   />
                 ) : (
                   <span className="text-xs text-zk-muted">Unassigned</span>
                 )}
-                {canSelfAssign ? (
+                {/* The agent doing the work for the assignee, on the right. */}
+                {assignee && hold?.agentName ? <AgentChip name={hold.agentName} className="ml-auto" /> : null}
+                {/* Only an unassigned issue offers Assign to me (and your own, Unassign). */}
+                {canSelfAssign && (!assignee || isAssignee) ? (
                   <SelfAssignButton
                     bugId={bug.id}
                     isAssignedToMe={isAssignee}

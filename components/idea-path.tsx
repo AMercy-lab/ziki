@@ -63,7 +63,8 @@ export function IdeaPathChips({ ideaId, approvedByMe = false, score, threshold, 
       });
     };
     return (
-      <div className="flex items-center gap-[3px]" data-testid="idea-path" title={error ?? `At Idea, score ${scoreText}`}>
+      // Two steps sit at the right of the Status column.
+      <div className="flex w-full items-center justify-end gap-[3px]" data-testid="idea-path" title={error ?? `At Idea, score ${scoreText}`}>
         <span className={`${chip} ${tone.current}`}><Icon state="current" />Idea</span>
         <Arrow small />
         <button
@@ -96,7 +97,8 @@ export function IdeaPathChips({ ideaId, approvedByMe = false, score, threshold, 
         ? `At Idea, score ${scoreText}; rejection advised`
         : `At Idea, score ${scoreText}; next In progress, then Done`;
   return (
-    <div className="flex items-center gap-[3px]" role="img" aria-label={name} title={name} data-testid="idea-path">
+    // Two steps (→ Rejected, → Archived) sit at the right of the Status column, like Approve.
+    <div className={`flex items-center gap-[3px] ${steps.length === 2 ? "w-full justify-end" : ""}`} role="img" aria-label={name} title={name} data-testid="idea-path">
       {steps.map((step, index) => (
         <Fragment key={step.label}>
           {index > 0 ? <Arrow small /> : null}

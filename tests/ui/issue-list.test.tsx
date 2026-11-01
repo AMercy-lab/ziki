@@ -234,9 +234,9 @@ describe("issue list layout", () => {
           { status: "closed", _count: { _all: 3 } },
         ]) as never);
     const html = await renderList({ status: "open" });
-    // Ideas: new ideas + rejected ideas. Working: Open, In progress, Closed. Delivered: Done, Merge, Live.
-    // Possibly delivered is a list inside Open, so Working's total doesn't count it again.
-    expect(counted(stages(html))).toEqual({ Ideas: 8, Working: 18, Delivered: 15 });
+    // Ideas: new ideas + rejected ideas. In Progress: Open, In progress, Closed. Delivered: Done, Merge, Live.
+    // Possibly delivered is a list inside Open, so In Progress's total doesn't count it again.
+    expect(counted(stages(html))).toEqual({ Ideas: 8, "In Progress": 18, Delivered: 15 });
     expect(counted(statusList(html))).toEqual({ Open: 13, "In progress": 2, Closed: 3, "Possibly delivered": 1 });
   });
 

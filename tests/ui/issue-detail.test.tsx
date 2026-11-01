@@ -121,10 +121,11 @@ describe("IssueBidsPanel (#issue-bids)", () => {
       />,
     );
     const card = screen.getByTestId("bids");
-    expect(card).not.toHaveAttribute("open");
+    const fold = card.querySelector("details")!;
+    expect(fold).not.toHaveAttribute("open");
     expect(card).toHaveTextContent(/Ada's Claude/);
-    await user.click(screen.getByText("Bids"));
-    expect(card).toHaveAttribute("open");
+    await user.click(screen.getByText(/Awarded to Ada's Claude/));
+    expect(fold).toHaveAttribute("open");
     expect(screen.getByText("Bob's agent")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Award bid" })).toBeNull();
   });
@@ -197,12 +198,13 @@ describe("IssueConfirmationsPanel past Requires confirmation", () => {
     const user = userEvent.setup({ delay: null });
     render(<IssueConfirmationsPanel bugId="bug1" data={data} viewerId="viewer" block={null} summaryMaxChars={200} history confirmed />);
     const card = screen.getByTestId("confirmations-collapsed");
-    expect(card).not.toHaveAttribute("open");
+    const fold = card.querySelector("details")!;
+    expect(fold).not.toHaveAttribute("open");
     expect(card).toHaveTextContent(/Ada.*Bob/);
     // No big banner while it is collapsed.
     expect(screen.queryByTestId("confirmation-banner")).toBeNull();
-    await user.click(screen.getByText("Confirmations"));
-    expect(card).toHaveAttribute("open");
+    await user.click(screen.getByText(/Confirmed by/));
+    expect(fold).toHaveAttribute("open");
     expect(screen.getByText("Ada reproduced it.")).toBeVisible();
   });
 

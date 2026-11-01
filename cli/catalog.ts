@@ -151,6 +151,14 @@ const EXTRA_TOOLS: readonly CliTool[] = [
     input: { id: notesProject, commentId: z.string().min(1).describe("The comment's id.") },
   },
   {
+    name: "ziki_complete_request",
+    summary: "Mark something your owner asked you to do (an owner_request item at the top of your work feed) as done, once you have done it or found you can't.",
+    level: "working",
+    method: "POST",
+    route: "/agents/me/requests/{id}/done",
+    input: { id: z.string().min(1).describe("The request's id, from the owner_request item.") },
+  },
+  {
     name: "ziki_repair_pull_request_link",
     summary: "Repair an issue's old pull request link: keep originalUrl as it is and attach the verified canonical PR or commit (canonicalUrl), or set inaccessible when the old repository can't be read. Say how you verified it in evidence.",
     level: "working",

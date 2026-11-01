@@ -1,6 +1,7 @@
 import { AwardBidButton } from "@/components/award-bid-button";
 import { EntrySummary } from "@/components/entry-summary";
 import { LocalTime } from "@/components/local-time";
+import { StepTitle } from "@/components/issue-timeline";
 import { EntryReplies, type EntryReplyView } from "@/components/entry-replies";
 import { isOpenBid } from "@/lib/open-bids";
 
@@ -103,8 +104,11 @@ export function IssueBidsPanel({
   collapsed = false,
   canAward = false,
   awardThreshold,
+  at,
 }: {
   bids: BidEntryView[];
+  /** When this step started, at the far right of its title (#issue-timeline). */
+  at?: Date | string | null;
   /** The viewer owns an agent: every open bid gets an Award button (#open-award). */
   canAward?: boolean;
   /** The project's awardThreshold, shown beside each bid's votes as guidance. */
@@ -116,34 +120,27 @@ export function IssueBidsPanel({
   if (collapsed) {
     const awarded = bids.find((bid) => bidState(bid) === "awarded");
     return (
-      <details id="bids" className="group/bids mb-4 scroll-mt-24 rounded-xl border border-zk-divider bg-zk-surface" data-testid="bids">
-        <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-2.5 text-[13px] text-zk-text2 [&::-webkit-details-marker]:hidden">
-          <span aria-hidden="true" className="inline-block text-zk-muted transition-transform group-open/bids:rotate-90">
-            ›
-          </span>
-          <span id="bids-heading" className="text-xs font-bold uppercase tracking-[0.08em] text-zk-muted">
-            Bids
-          </span>
-          <span className="font-mono text-xs text-zk-muted">{bids.length}</span>
-          <span>
-            · {awarded ? `Awarded to ${awarded.agentName} for ${awarded.by}` : bids.length ? "None awarded" : "No bids"}
-          </span>
-        </summary>
-        <div className="px-3 pb-3">
-          <BidList bids={bids} />
-        </div>
-      </details>
+      <section id="bids" aria-labelledby="bids-heading" className="mb-4 scroll-mt-24" data-testid="bids">
+        <StepTitle id="bids-heading" title="Bids" count={bids.length} at={at} />
+        <details className="group/bids rounded-xl border border-zk-divider bg-zk-surface">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-[13px] text-zk-text2 [&::-webkit-details-marker]:hidden">
+            <span aria-hidden="true" className="inline-block text-zk-muted transition-transform group-open/bids:rotate-90">›</span>
+            <span>{awarded ? `Awarded to ${awarded.agentName} for ${awarded.by}` : bids.length ? "None awarded" : "No bids"}</span>
+          </summary>
+          <div className="px-3 pb-3">
+            <BidList bids={bids} />
+          </div>
+        </details>
+      </section>
     );
   }
   return (
     <section id="bids" aria-labelledby="bids-heading" className="mb-4 scroll-mt-24" data-testid="bids">
-      <h3 id="bids-heading" className="mb-1.5 mt-0 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-zk-muted">
-        Bids
-        <span className="font-mono font-normal normal-case tracking-normal">{bids.length}</span>
+      <StepTitle id="bids-heading" title="Bids" count={bids.length} at={at}>
         {openCount > 0 && openCount < bids.length ? (
           <span className="font-normal normal-case tracking-normal">· {openCount} active</span>
         ) : null}
-      </h3>
+      </StepTitle>
       <BidList bids={bids} canAward={canAward} awardThreshold={awardThreshold} />
     </section>
   );
