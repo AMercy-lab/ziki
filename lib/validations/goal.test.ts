@@ -27,6 +27,15 @@ describe("createGoalSchema (#616)", () => {
     expect(createGoalSchema.safeParse({ title: "Ship it", budgetPool: 1.5 }).success).toBe(false);
     expect(createGoalSchema.safeParse({ title: "Ship it", budgetPool: 1, extra: true }).success).toBe(false);
   });
+
+  it("rejects non-numeric budgetPool primitives: null, empty string, booleans, arrays, exponential notation (#502)", () => {
+    expect(createGoalSchema.safeParse({ title: "Ship it", budgetPool: null }).success).toBe(false);
+    expect(createGoalSchema.safeParse({ title: "Ship it", budgetPool: "" }).success).toBe(false);
+    expect(createGoalSchema.safeParse({ title: "Ship it", budgetPool: false }).success).toBe(false);
+    expect(createGoalSchema.safeParse({ title: "Ship it", budgetPool: true }).success).toBe(false);
+    expect(createGoalSchema.safeParse({ title: "Ship it", budgetPool: [] }).success).toBe(false);
+    expect(createGoalSchema.safeParse({ title: "Ship it", budgetPool: "1e2" }).success).toBe(false);
+  });
 });
 
 describe("splitGoalPoolSchema (#616)", () => {
@@ -88,6 +97,30 @@ describe("splitGoalPoolSchema (#616)", () => {
     });
     expect(parsed.success).toBe(false);
     expect(parsed.error?.issues.some((i) => i.path.join(".") === "targets.0.targetAgentId")).toBe(true);
+  });
+
+  it("rejects non-numeric amount and weight primitives (#502)", () => {
+    for (const invalid of [null, "", false, true, [], "1e2"]) {
+      expect(
+        splitGoalPoolSchema.safeParse({
+          method: "proportional",
+          amount: invalid,
+          targets: [{ targetType: "issue", targetBugId: "b1", weight: 1 }],
+        }).success,
+      ).toBe(false);
+      expect(
+        splitGoalPoolSchema.safeParse({
+          method: "proportional",
+          targets: [{ targetType: "issue", targetBugId: "b1", weight: invalid }],
+        }).success,
+      ).toBe(false);
+      expect(
+        splitGoalPoolSchema.safeParse({
+          method: "manual",
+          targets: [{ targetType: "issue", targetBugId: "b1", amount: invalid }],
+        }).success,
+      ).toBe(false);
+    }
   });
 
   it("rejects method/target mismatches", () => {
