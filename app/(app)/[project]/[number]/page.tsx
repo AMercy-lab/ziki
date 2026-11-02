@@ -64,7 +64,7 @@ import { DeliveriesPanel, MergeReviewsPanel, TestVerdictsPanel, type DeliveryVie
 import { Badge } from "@/components/ui/badge";
 import { VoteButton } from "@/components/vote-button";
 import { IssueConfirmationsPanel, type ConfirmationBlock, type ConfirmationsData } from "@/components/issue-confirmations";
-import { CONFIRMATION_SUMMARY_MAX_CHARS, listConfirmations } from "@/lib/agent-api/confirmations";
+import { CONFIRMATION_SUMMARY_MAX_CHARS, listConfirmations, takesConfirmations } from "@/lib/agent-api/confirmations";
 import { DisputeAwardDialog, type DisputeRole } from "@/components/dispute-award-dialog";
 import { AttachmentList, type AttachmentView } from "@/components/attachment-list";
 import { ChooseRedesignButton } from "@/components/choose-redesign-button";
@@ -711,12 +711,13 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
 
   // #idea-table: the idea this issue was converted from.
   const sourceIdea = bug.idea;
-  // #issue-confirmations: at Requires confirmation the issue takes confirmation
-  // entries; afterwards they stay, read-only, under the comments.
-  const confirming = !bug.isDeleted && bug.substatus === "requires_confirmation";
-  const confirmationsData: ConfirmationsData | null = await loadOptional<ConfirmationsData | null>("confirmations", null, () =>
+  const confirmationsData = await loadOptional<(ConfirmationsData & { confirmed?: boolean }) | null>("confirmations", null, () =>
     listConfirmations({ tenantId: bug.tenantId, projectId: bug.projectId }, bug.id),
   );
+  // #issue-confirmations: at Requires confirmation the issue takes confirmation
+  // entries, and so does one whose work started before it was confirmed, until
+  // it is (`takesConfirmations`); afterwards they stay, read-only, under the comments.
+  const confirming = !bug.isDeleted && takesConfirmations(bug.substatus, confirmationsData?.confirmed ?? pastConfirmation);
   // Anyone may confirm their own issue (#confirmation-weights): it counts 1.
   const confirmationBlock: ConfirmationBlock = null;
   // #close-reasons: the issue's owner may withdraw it while it is not closed or live.

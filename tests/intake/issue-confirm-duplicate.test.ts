@@ -43,6 +43,7 @@ vi.mock("@/lib/agents/audit", () => ({ audit }));
 vi.mock("@/lib/workflow", () => ({ workflowFor: vi.fn(async () => ({ confirmationsNeeded: 2 })) }));
 
 import { giveConfirmation, isConfirmed, openConfirmedIssue } from "@/lib/agent-api/confirmations";
+import { workflowFor } from "@/lib/workflow";
 import { IssueApiError } from "@/lib/agent-api/errors";
 import { DUPLICATE_ERRORS, duplicateLinkProblem } from "@/lib/duplicates";
 
@@ -225,10 +226,53 @@ describe("giveConfirmation (#issue-confirmations)", () => {
     expect((await rejection(openConfirmedIssue(opener, scope, "bug1"))).body).toMatchObject({ error: "not_confirming" });
   });
 
-  it("takes entries only at Requires confirmation, and 404s an unknown issue", async () => {
-    state.bug = bugRow({ status: "open", substatus: "open" });
-    expect((await rejection(giveConfirmation(person("bob"), scope, "bug1", body("confirm")))).body).toMatchObject({ error: "not_confirming" });
+  it("takes no entries once a confirmed issue has left Requires confirmation, and 404s an unknown issue", async () => {
+    await giveConfirmation(person("bob"), scope, "bug1", body("confirm"));
+    await giveConfirmation(person("cara"), scope, "bug1", body("confirm"));
+    state.bug = { ...state.bug, status: "open", substatus: "open" };
+    expect((await rejection(giveConfirmation(person("dan"), scope, "bug1", body("confirm")))).body).toMatchObject({ error: "not_confirming" });
+    state.bug = { ...state.bug, status: "in_progress", substatus: "in_progress" };
+    expect((await rejection(giveConfirmation(person("dan"), scope, "bug1", body("confirm")))).body).toMatchObject({ error: "not_confirming" });
     expect((await rejection(giveConfirmation(person("bob"), scope, "nope", body("confirm")))).status).toBe(404);
+  });
+
+  it("still takes entries when the work started before the issue was confirmed (#open-award), without moving it", async () => {
+    // Awarded at 1 of 2, then delivered and judged: the accept needs the missing confirmation.
+    await giveConfirmation(person("bob"), scope, "bug1", body("confirm"));
+    state.bug = { ...state.bug, status: "done", substatus: "accepted" };
+    const last = await giveConfirmation(person("cara"), scope, "bug1", body("confirm"));
+    expect(last).toMatchObject({ confirmed: true, newlyConfirmed: true, opened: false, confirmations: 2 });
+    expect(state.bug.substatus).toBe("accepted");
+    expect(db.bug.update).not.toHaveBeenCalled();
+    expect(await isConfirmed("bug1")).toBe(true);
+    // The reporter is paid once, as for any confirmed issue.
+    expect(state.points.filter((p) => p.sourceKey === "reporter:bug1:ada")).toHaveLength(1);
+  });
+
+  it("takes them at Open, In progress and Requires review too, but not after the fix is accepted or the issue is closed", async () => {
+    for (const [status, substatus] of [["open", "open"], ["in_progress", "in_progress"], ["done", "requires_review"]] as const) {
+      state.bug = bugRow({ status, substatus });
+      state.entries = [];
+      await expect(giveConfirmation(person("bob"), scope, "bug1", body("confirm"))).resolves.toMatchObject({ confirmations: 1 });
+    }
+    for (const [status, substatus] of [["merge", "ready_to_merge"], ["resolved", "on_dev"], ["closed", "closed"]] as const) {
+      state.bug = bugRow({ status, substatus });
+      state.entries = [];
+      expect((await rejection(giveConfirmation(person("bob"), scope, "bug1", body("confirm")))).body).toMatchObject({ error: "not_confirming" });
+    }
+  });
+
+  it("does not open an issue whose work already started, even in a threshold-only project", async () => {
+    vi.mocked(workflowFor).mockImplementation(async () => ({ confirmationsNeeded: 2, governance: "threshold" }) as never);
+    try {
+      state.bug = bugRow({ status: "in_progress", substatus: "in_progress" });
+      await giveConfirmation(person("bob"), scope, "bug1", body("confirm"));
+      const last = await giveConfirmation(person("cara"), scope, "bug1", body("confirm"));
+      expect(last).toMatchObject({ confirmed: true, opened: false });
+      expect(state.bug.substatus).toBe("in_progress");
+    } finally {
+      vi.mocked(workflowFor).mockImplementation(async () => ({ confirmationsNeeded: 2 }) as never);
+    }
   });
 
   it("marks a duplicate with a reject naming another issue, and pays the marker", async () => {

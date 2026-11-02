@@ -21,7 +21,8 @@ import { moveTo } from "@/lib/issue-substatus";
 
 /**
  * Confirmations (#issue-confirmations). An issue at Requires confirmation
- * takes one entry per person: `confirm` (it is real and not a duplicate),
+ * takes one entry per person, and so does one whose work started before it was
+ * confirmed (`takesConfirmations`): `confirm` (it is real and not a duplicate),
  * `reject` (it is not real, or, with `duplicateOfId`, it duplicates another
  * issue) or `neutral`. Every entry has a summary of at most two sentences and
  * a full description — nobody gives a bare verdict. Giving it again replaces
@@ -204,6 +205,24 @@ export type GivenConfirmation = {
 
 const NOT_FOUND = "No such issue in this project.";
 
+/**
+ * Where an issue can be before it is confirmed. A bid can be awarded while the
+ * issue awaits confirmation (#open-award), and a released claim sends it back
+ * to Open, so its work can start, be delivered and be judged first; accepting
+ * it still needs the confirmation (`merge.ts`), so it must still be possible
+ * to give one there.
+ */
+const UNCONFIRMED_WORK_SUBSTATUSES: ReadonlySet<string> = new Set(["open", "in_progress", "requires_review", "accepted"]);
+
+/**
+ * Whether an issue takes confirmation entries: always at Requires
+ * confirmation, and at the stages above until it is confirmed.
+ */
+export function takesConfirmations(substatus: string, confirmed: boolean): boolean {
+  if (substatus === "requires_confirmation") return true;
+  return !confirmed && UNCONFIRMED_WORK_SUBSTATUSES.has(substatus);
+}
+
 /** Resolves `duplicateOfId` (an id or a number) to another issue in the tenant. */
 async function resolveDuplicate(tx: Prisma.TransactionClient, tenantId: string, bugId: string, raw: string): Promise<string> {
   const parsed = parseIssueRef(raw.replace(/^#/, ""));
@@ -243,14 +262,14 @@ export async function giveConfirmation(
     const bug = await tx.bug.findUnique({ where: { id: found.id }, select: bugSelect });
     if (!bug || bug.isDeleted) throw new IssueApiError(404, NOT_FOUND, { error: "not_found", message: NOT_FOUND });
 
-    if (bug.substatus !== "requires_confirmation") {
-      const message = "This issue is not at Requires confirmation, so it takes no confirmations.";
+    const before = await confirmationStateOf(bug.id, tx);
+    const wasConfirmed = before?.confirmed ?? false;
+    if (!takesConfirmations(bug.substatus, wasConfirmed)) {
+      const message = "This issue is not at Requires confirmation and is already confirmed, so it takes no confirmations.";
       throw new IssueApiError(409, message, { error: "not_confirming", message, status: bug.status, substatus: bug.substatus });
     }
 
     const duplicateOfId = input.duplicateOfId ? await resolveDuplicate(tx, bug.tenantId, bug.id, input.duplicateOfId) : null;
-    const before = await confirmationStateOf(bug.id, tx);
-    const wasConfirmed = before?.confirmed ?? false;
 
     // One entry per person per class: a manager agent's and a worker's (or the person's) are separate.
     const weightClass = giver.agent && hasLevel(giver.agent.level, "manager") ? "manager" : "working";
@@ -292,7 +311,9 @@ export async function giveConfirmation(
 
     // A confirmed issue waits for an agent to move it to Open (openConfirmedIssue);
     // in a threshold-only project the confirm that reaches the threshold opens it.
-    const opened = confirmed && isThresholdOnly(await workflowFor(bug.projectId, tx));
+    // An issue whose work started first stays where it is.
+    const opened =
+      confirmed && bug.substatus === "requires_confirmation" && isThresholdOnly(await workflowFor(bug.projectId, tx));
     if (opened) await moveToOpen(tx, bug.id, giver.userId, "threshold");
 
     // Points: the same keys the backfill recomputes (`standingConfirmationAwards`).
