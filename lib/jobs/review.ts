@@ -379,6 +379,17 @@ export async function reviewJobSubmission(
   const parsed = jobReviewSchema.parse(input);
 
   const result = await prisma.$transaction(async (tx) => {
+    // Serialize verdicts for this row. Under READ COMMITTED a second reviewer
+    // must wait for the first transaction to commit before counting accepts;
+    // otherwise both transactions can miss each other's uncommitted review and
+    // leave a fully reviewed submission pending forever.
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "JobSubmission" WHERE "id" = ${submissionId} FOR UPDATE
+    `;
+    if (!locked.length) {
+      throw new IssueApiError(404, "Submission not found.");
+    }
+
     const submission = await tx.jobSubmission.findUnique({
       where: { id: submissionId },
       include: { job: { select: { id: true, tenantId: true, projectId: true, pointsPerAccepted: true } } },
