@@ -28,31 +28,13 @@ export const agentsChipClass =
   "inline-flex items-center rounded-full bg-zk-chip px-2.5 py-0.5 text-xs font-bold text-zk-text2";
 
 const LEVEL_BADGE: Record<AgentLevel, string> = {
-  observer: "bg-zk-chip text-zk-text2",
-  contributor: "bg-zk-ok-bg text-zk-ok-fg",
-  triager: "bg-zk-warn-bg text-zk-warn-fg",
-  reviewer: "bg-zk-info-bg text-zk-info-fg",
-  dispatcher: "bg-[#FDECEF] text-[#B4233F] dark:bg-[#3A1424] dark:text-[#F9A8C0]",
-  merger: "bg-[#FDECEF] text-[#B4233F] dark:bg-[#3A1424] dark:text-[#F9A8C0]",
+  working: "bg-zk-ok-bg text-zk-ok-fg",
+  manager: "bg-[#FDECEF] text-[#B4233F] dark:bg-[#3A1424] dark:text-[#F9A8C0]",
+  merger: "bg-[#7C3AED]/15 text-[#7C3AED] dark:bg-[#7C3AED]/25 dark:text-[#C4B5FD]",
 };
 
 export function levelBadgeClass(level: AgentLevel): string {
   return `inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${LEVEL_BADGE[level]}`;
-}
-
-const AVATAR_COLORS = ["bg-electric-blue-strong", "bg-blue-slate", "bg-[#0F8A6A]", "bg-[#7C3AED]"];
-
-export function agentAvatarColor(seed: string): string {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash + seed.charCodeAt(i) * (i + 1)) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[hash] ?? AVATAR_COLORS[0];
-}
-
-export function agentInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
-  return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
 }
 
 /** Formats a pairing code as ABCD-2345 while typing. */

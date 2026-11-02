@@ -1,0 +1,87 @@
+/* Create an Issue only; shared editor, controls and the app shell are unchanged. */
+.create-issue-page { max-width: 1040px; }
+.create-issue-heading > a { min-height: 40px; gap: 8px; border-radius: 4px; }
+.create-issue-heading > a:focus-visible { outline: 2px solid var(--zk-accent); outline-offset: 4px; }
+.create-issue-heading h1 { margin-top: 12px; font-size: 30px; line-height: 40px; font-weight: 800; letter-spacing: -.025em; }
+.create-issue-heading p { max-width: 640px; font-size: 14px; line-height: 24px; color: var(--zk-text2); }
+.create-issue-card { padding: 28px 32px 32px; border-radius: 24px; }
+.create-issue-form > * { margin-block: 0; }
+.create-issue-form > * + * { margin-block-start: 24px; }
+.create-mode-switch { gap: 8px; margin-bottom: 24px; }
+.create-mode-switch button { min-height: 44px; padding: 0 16px 12px; color: var(--zk-muted); border-bottom: 2px solid transparent; }
+.create-mode-switch button[aria-pressed="true"] { color: var(--zk-accent); border-color: var(--color-electric-blue-strong); }
+.create-mode-switch button:hover { color: var(--zk-text); }
+.create-mode-switch button:focus-visible { outline: 2px solid var(--zk-accent); outline-offset: -3px; border-radius: 6px; }
+.create-fields > *, .create-title-fields > * { margin-block: 0; }
+.create-fields > * + *, .create-title-fields > * + * { margin-block-start: 24px; }
+.create-title-fields { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.create-issue-form label:not(:has(input[type="file"])), .create-issue-form legend { display: block; margin-bottom: 8px; color: var(--zk-text2); font-size: 14px; line-height: 20px; font-weight: 600; }
+.create-issue-form :is(input[type="text"], input:not([type]), select, textarea) { width: 100%; min-height: 44px; border: 1px solid var(--zk-border); border-radius: 12px; padding: 11px 14px; background: var(--zk-surface); color: var(--zk-text); font-size: 14px; line-height: 22px; box-shadow: none; }
+.create-issue-form :is(input, textarea)::placeholder { color: var(--zk-muted); }
+.create-issue-form :is(input:not([type="file"]), select, textarea):focus-visible { outline: 2px solid var(--zk-accent); outline-offset: 2px; }
+.create-issue-form :is(input, select, textarea)[aria-invalid="true"] { border-color: var(--zk-bad-fg); }
+.create-issue-form textarea { resize: vertical; }
+.create-issue-form #proofLinks { min-height: 100px; }
+.create-description > div > div:first-child { border-radius: 12px; box-shadow: none; }
+.create-description > div > div:first-child > div:first-child { border-radius: 12px 12px 0 0; padding: 6px 8px; background: var(--zk-chip); }
+.create-description [role="group"] button, .create-description [role="toolbar"] button { min-width: 32px; min-height: 32px; }
+.create-issue-form .create-description textarea { min-height: 224px; padding: 16px; border: 0; border-radius: 0 0 12px 12px; line-height: 24px; }
+.create-issue-form .create-description textarea:focus-visible { outline: none; }
+.create-description .rich-text { min-height: 224px; line-height: 24px; }
+.create-description p { line-height: 20px; }
+.create-attachments { padding-top: 8px; border-top: 1px solid var(--zk-divider); }
+.create-attachments p { line-height: 20px; color: var(--zk-muted); }
+.create-attachments label:has(input[type="file"]) { min-height: 44px; margin-top: 8px; padding: 10px 16px; border-radius: 12px; gap: 8px; }
+.create-attachments > div > div:first-of-type { align-items: flex-start; flex-direction: column; gap: 10px; }
+.create-attachments span[id] { line-height: 20px; }
+.create-self-assignment { min-height: 44px; gap: 12px; }
+.create-self-assignment input[type="checkbox"] { width: 18px; height: 18px; flex: 0 0 18px; accent-color: var(--color-electric-blue-strong); }
+.create-self-assignment label { margin-bottom: 0; }
+.create-issue-form .create-submit { min-height: 48px; padding: 12px 24px; border-radius: 999px; background: var(--color-electric-blue-strong); color: white; font-size: 14px; font-weight: 700; box-shadow: none; }
+.create-issue-form .create-submit:hover:not(:disabled) { background: var(--color-blue-slate); }
+.create-issue-form .create-submit:focus-visible { outline: 2px solid var(--zk-accent); outline-offset: 4px; }
+@media (max-width: 639px) {
+  .create-issue-card { padding: 20px 16px 24px; border-radius: 20px; }
+  .create-issue-heading h1 { font-size: 26px; line-height: 34px; }
+  .create-mode-switch { gap: 4px; }
+  .create-mode-switch button { padding-left: 12px; padding-right: 12px; }
+  .create-description textarea { min-height: 200px; }
+  .create-issue-form .create-submit { width: 100%; }
+}
+
+/* Detailed report: main column plus a details column on wide screens. */
+.create-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+@media (min-width: 1024px) {
+  .create-layout:not(.create-layout--single) { grid-template-columns: minmax(0, 1fr) 300px; align-items: start; }
+  .create-side { padding: 20px; border: 1px solid var(--zk-border); border-radius: 16px; background: var(--zk-bg); }
+}
+.create-mode-note { line-height: 22px; }
+.create-mode-link { display: inline-flex; align-items: center; min-height: 32px; padding: 0 2px; border-radius: 6px; color: var(--zk-accent); font-weight: 700; text-decoration: none; background: transparent; border: 0; cursor: pointer; }
+.create-mode-link:hover { text-decoration: underline; }
+.create-mode-link:focus-visible { outline: 2px solid var(--zk-accent); outline-offset: 2px; }
+.create-from { line-height: 20px; }
+.create-modal-actions { padding-top: 16px; border-top: 1px solid var(--zk-divider); }
+.create-modal-actions .create-cancel { min-height: 44px; padding: 10px 18px; }
+
+/* Quick report modal: centred dialog, full-screen sheet on phones. */
+.report-modal { width: min(600px, calc(100vw - 32px)); max-height: calc(100dvh - 64px); margin: 64px auto auto; padding: 0; border: 0; border-radius: 20px; background: var(--zk-surface); color: var(--zk-text); box-shadow: 0 24px 64px rgb(21 18 31 / 0.28); overflow: auto; }
+.report-modal::backdrop { background: rgb(21 18 31 / 0.45); }
+.report-modal-header { display: flex; align-items: flex-start; gap: 12px; padding: 24px 24px 0; }
+.report-modal-header h2 { margin: 0; font-size: 20px; line-height: 28px; font-weight: 800; }
+.report-modal-header p { margin: 4px 0 0; color: var(--zk-text2); font-size: 14px; line-height: 22px; }
+.report-modal-close { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin: -10px -10px 0 auto; border: 0; border-radius: 12px; background: transparent; color: var(--zk-muted); cursor: pointer; }
+.report-modal-close:hover { background: var(--zk-chip); color: var(--zk-text); }
+.report-modal-close:focus-visible { outline: 2px solid var(--zk-accent); outline-offset: 2px; }
+.report-modal-body { padding: 20px 24px 24px; }
+.report-modal .create-description textarea, .report-modal .create-description .rich-text { min-height: 140px; }
+.report-modal-confirm { position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; padding: 24px; background: color-mix(in srgb, var(--zk-surface) 92%, transparent); }
+.report-modal-confirm > div { max-width: 380px; padding: 24px; border: 1px solid var(--zk-border); border-radius: 16px; background: var(--zk-surface); box-shadow: 0 12px 32px rgb(21 18 31 / 0.18); }
+.report-modal-confirm h3 { margin: 0 0 8px; font-size: 18px; font-weight: 800; }
+.report-modal-confirm p { margin: 0 0 16px; color: var(--zk-text2); font-size: 14px; line-height: 22px; }
+@media (max-width: 639px) {
+  .report-modal { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; }
+  .report-modal-header { padding: 16px 16px 0; }
+  .report-modal-body { padding: 16px; }
+  .create-modal-actions { position: sticky; bottom: 0; background: var(--zk-surface); padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .create-modal-actions .create-submit { width: 100%; }
+}

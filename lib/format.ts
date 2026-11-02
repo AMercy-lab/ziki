@@ -18,40 +18,30 @@ export function formatDate(value: Date | string, timeZone?: string) {
   }).format(date);
 }
 
-export function formatRelativeTime(value: Date | string, now = new Date()): string {
-  const date = typeof value === "string" ? new Date(value) : value;
-  const elapsedMs = Math.max(0, now.getTime() - date.getTime());
-  const seconds = Math.floor(elapsedMs / 1000);
-  if (seconds < 60) {
-    return "just now";
-  }
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) {
-    return `${minutes} min ago`;
-  }
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${hours} hr${hours === 1 ? "" : "s"} ago`;
-  }
-  const days = Math.floor(hours / 24);
-  return `${days} day${days === 1 ? "" : "s"} ago`;
-}
-
 /**
- * A row's little date (#1061): "now", "5m", "3h", "2d" for the last week,
- * then "Oct 12", with the year once it isn't this year's. The full date goes
- * in a tooltip and for screen readers; this is only the glance.
+ * The one humanized time, used for every date on the site: "just now",
+ * "30 mins ago", "3 hours ago", "yesterday", "4 days ago", "2 weeks ago",
+ * then "Oct 12", with the year once it isn't this year's. A future date
+ * reads the same way ahead: "in 30 mins", "tomorrow", "in 4 days". The full
+ * stamp (formatDate) goes in a tooltip.
  */
-export function formatShortAge(value: Date | string, now = new Date(), timeZone?: string): string {
+export function formatTimeAgo(value: Date | string, now = new Date(), timeZone?: string): string {
   const date = typeof value === "string" ? new Date(value) : value;
-  const seconds = Math.floor(Math.max(0, now.getTime() - date.getTime()) / 1000);
-  if (seconds < 60) return "now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
+  const diffMs = now.getTime() - date.getTime();
+  const future = diffMs < 0;
+  const minutes = Math.floor(Math.abs(diffMs) / 60_000);
+  const say = (n: number, unit: string) => {
+    const amount = `${n} ${unit}${n === 1 ? "" : "s"}`;
+    return future ? `in ${amount}` : `${amount} ago`;
+  };
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return say(minutes, "min");
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
+  if (hours < 24) return say(hours, "hour");
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d`;
+  if (days === 1) return future ? "tomorrow" : "yesterday";
+  if (days < 7) return say(days, "day");
+  if (days < 30) return say(Math.floor(days / 7), "week");
   const tz = timeZone || getDefaultTimeZone();
   const yearOf = (d: Date) => new Intl.DateTimeFormat("en-US", { year: "numeric", timeZone: tz }).format(d);
   return new Intl.DateTimeFormat("en-US", {

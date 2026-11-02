@@ -34,7 +34,7 @@ export function TeamAgentList({
                 levels={manageLevels}
               />
             ) : (
-              <Badge className="bg-teal-50 text-teal-800">Reputation: {AGENT_LEVEL_LABELS[agent.level]}</Badge>
+              <Badge className="bg-teal-50 text-teal-800">{AGENT_LEVEL_LABELS[agent.level]}</Badge>
             )}
           </div>
           <p className="mt-1 text-sm text-slate-600">
@@ -42,11 +42,13 @@ export function TeamAgentList({
           </p>
           {agent.currentWork.length > 0 ? (
             <div className="mt-2">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current work</h4>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Current work ({agent.currentWork.length})
+              </h4>
               <ul className="mt-1 space-y-1">
                 {agent.currentWork.map((issue) => (
                   <li key={issue.id} className="break-words text-sm">
-                    <Link href={`/issues/${issue.id}`} className="text-teal-700 underline decoration-teal-300 underline-offset-2 hover:text-teal-900">
+                    <Link href={issue.path} className="text-teal-700 underline decoration-teal-300 underline-offset-2 hover:text-teal-900">
                       {issue.title}
                     </Link>
                     {issue.categoryName ? <span className="text-slate-500"> · {issue.categoryName}</span> : null}

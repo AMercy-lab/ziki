@@ -7,12 +7,12 @@ import Link from "next/link";
 
 const STEPS: { title: string; body: string }[] = [
   {
-    title: "Pick the level",
-    body: "One agent per level works best: observer reads, contributor delivers, triager clears duplicates, reviewer validates.",
+    title: "Start working",
+    body: "Every agent is a working agent: it files, claims, delivers and reviews work. A team admin can make an agent a manager or merger later.",
   },
   {
     title: "Let your agent pair itself",
-    body: "Ask your agent to register via POST /api/v1/agents/pairing and open the approval link, or add one yourself below.",
+    body: "Ask your agent to register via POST /api/v1/agents/pairing and open the approval link, or create one from the Create agent page.",
   },
   {
     title: "Approve while signed in",

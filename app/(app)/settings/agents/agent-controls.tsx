@@ -2,7 +2,7 @@
 
 import type { AgentLevel } from "@prisma/client";
 import { useState, useTransition } from "react";
-import { deleteAgentAction, regenerateAgentKeyAction, revokeAgentAction, setAgentAreaPreferencesAction, setAgentBurstAction, setAgentLevelAction } from "./actions";
+import { deleteAgentAction, regenerateAgentKeyAction, revokeAgentAction, setAgentBurstAction, setAgentLevelAction } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -40,8 +40,6 @@ export function AgentControls({
   burstUntil = null,
   now,
   canSetBurst = false,
-  areas = [],
-  areaPreferences = [],
   revoked = false,
   personal = false,
 }: {
@@ -61,8 +59,6 @@ export function AgentControls({
   now: string | Date;
   /** Admins may raise the budget. */
   canSetBurst?: boolean;
-  areas?: { id: string; name: string; projectId: string }[];
-  areaPreferences?: { projectId: string; projectAreaId: string }[];
   /** A revoked agent only offers delete. */
   revoked?: boolean;
   /** The automatic personal agent is created again on the next visit. */
@@ -78,16 +74,8 @@ export function AgentControls({
   const [savedUntil, setSavedUntil] = useState<string | null>(initialUntilIso);
   const [expiryChoice, setExpiryChoice] = useState<BurstExpiryChoice>(initialUntilIso ? "keep" : "none");
   const [customUntil, setCustomUntil] = useState("");
-  const [projectId, setProjectId] = useState(currentProjectId || projects[0]?.id || "");
-  const [preferenceProjectId, setPreferenceProjectId] = useState(currentProjectId || projects[0]?.id || "");
-  const [savedPreferences, setSavedPreferences] = useState<Record<string, string[]>>(() => {
-    const grouped: Record<string, string[]> = {};
-    for (const preference of areaPreferences) {
-      (grouped[preference.projectId] ??= []).push(preference.projectAreaId);
-    }
-    return Object.fromEntries(Object.entries(grouped).map(([id, ids]) => [id, [...ids].sort()]));
-  });
-  const [draftPreferences, setDraftPreferences] = useState<Record<string, string[]>>(savedPreferences);
+  // A regenerated key stays on the project the current key is limited to.
+  const projectId = currentProjectId || projects[0]?.id || "";
   const [issued, setIssued] = useState<{ rawKey: string; prefix: string } | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -97,7 +85,7 @@ export function AgentControls({
     startTransition(async () => {
       const result = await setAgentLevelAction(agentId, next);
       if (result.ok) {
-        toast(`${agentName} is now ${AGENT_LEVEL_LABELS[next].toLowerCase()}.`, "success");
+        toast(`${agentName} is now a ${AGENT_LEVEL_LABELS[next].toLowerCase()}.`, "success");
       } else {
         setCurrent(previous);
         toast(result.error, "error");
@@ -204,10 +192,10 @@ export function AgentControls({
         }
         toast(
           !next
-            ? `${agentName} is back to 30 writes an hour.`
+            ? `${agentName} is back to 600 reads an hour.`
             : until
               ? `${agentName} has the high-volume budget until ${new Date(until).toLocaleString()}.`
-              : `${agentName} can now make 400 writes an hour, with no expiry.`,
+              : `${agentName} can now make 4000 reads an hour, with no expiry.`,
           "success",
         );
       } else {
@@ -227,35 +215,6 @@ export function AgentControls({
   const burstExpiresAt = savedUntil ? Date.parse(savedUntil) : null;
   const burstExpired = burstOn && burstExpiresAt !== null && burstExpiresAt <= new Date(now).getTime();
 
-  const projectAreas = areas.filter((area) => area.projectId === preferenceProjectId);
-  const selectedAreaIds = draftPreferences[preferenceProjectId] ?? [];
-  const savedAreaIds = savedPreferences[preferenceProjectId] ?? [];
-  const areaPreferencesChanged = selectedAreaIds.length !== savedAreaIds.length ||
-    selectedAreaIds.some((id) => !savedAreaIds.includes(id));
-
-  function toggleArea(areaId: string, checked: boolean) {
-    setDraftPreferences((currentPreferences) => {
-      const currentIds = currentPreferences[preferenceProjectId] ?? [];
-      const nextIds = checked
-        ? [...new Set([...currentIds, areaId])].sort()
-        : currentIds.filter((id) => id !== areaId);
-      return { ...currentPreferences, [preferenceProjectId]: nextIds };
-    });
-  }
-
-  function saveAreaPreferences() {
-    const nextIds = selectedAreaIds;
-    startTransition(async () => {
-      const result = await setAgentAreaPreferencesAction(agentId, preferenceProjectId, nextIds);
-      if (result.ok) {
-        setSavedPreferences((currentPreferences) => ({ ...currentPreferences, [preferenceProjectId]: [...nextIds] }));
-        toast("Area preferences saved.", "success");
-      } else {
-        toast(result.error, "error");
-      }
-    });
-  }
-
   if (revoked) {
     return (
       <Button type="button" onClick={remove} disabled={pending} className={agentsDangerBtn}>
@@ -265,10 +224,10 @@ export function AgentControls({
   }
 
   return (
-    <div className="flex flex-col gap-3 sm:items-end">
-      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         <label htmlFor={`level-${agentId}`} className="sr-only">
-          Level for {agentName}
+          Agent class for {agentName}
         </label>
         <Select
           id={`level-${agentId}`}
@@ -280,22 +239,6 @@ export function AgentControls({
           {[...new Set([current, ...levels])].map((option) => (
             <option key={option} value={option} disabled={!levels.includes(option)}>
               {AGENT_LEVEL_LABELS[option]}
-            </option>
-          ))}
-        </Select>
-        <label htmlFor={`project-${agentId}`} className="sr-only">
-          Project for the new key
-        </label>
-        <Select
-          id={`project-${agentId}`}
-          value={projectId}
-          disabled={pending || projects.length === 0}
-          onChange={(event) => setProjectId(event.target.value)}
-          className={`${agentsInputClass} w-auto min-w-[8rem]`}
-        >
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
             </option>
           ))}
         </Select>
@@ -376,15 +319,15 @@ export function AgentControls({
       {canSetBurst || burstOn ? (
         <p className="text-xs text-zk-muted" suppressHydrationWarning>
           {!burstOn ? (
-            "Standard budget: 30 writes an hour."
+            "Standard budget: 600 reads an hour."
           ) : burstExpired ? (
-            "High-volume expired; standard budget: 30 writes an hour."
+            "High-volume expired; standard budget: 600 reads an hour."
           ) : savedUntil ? (
             <>
-              High-volume until <LocalTime date={savedUntil} /> (400 writes an hour).
+              High-volume (4000 reads an hour), ends <LocalTime date={savedUntil} />.
             </>
           ) : (
-            "High-volume active with no expiry (400 writes an hour)."
+            "High-volume active with no expiry (4000 reads an hour)."
           )}
         </p>
       ) : null}
@@ -410,66 +353,6 @@ export function AgentControls({
           </div>
         </div>
       ) : null}
-      <details className="w-full text-left sm:max-w-md">
-        <summary className="cursor-pointer text-xs font-bold text-zk-accent hover:underline">
-          Preferred areas{selectedAreaIds.length ? ` (${selectedAreaIds.length})` : ""}
-        </summary>
-        <div className="mt-2 space-y-3 rounded-[16px] border border-zk-border bg-zk-surface p-3">
-          <p className="text-xs text-zk-muted">Pick the areas this agent should look at first.</p>
-          <label className="block text-xs font-semibold text-zk-text" htmlFor={`area-project-${agentId}`}>
-            Project
-          </label>
-          <Select
-            id={`area-project-${agentId}`}
-            value={preferenceProjectId}
-            disabled={pending || projects.length === 0}
-            onChange={(event) => setPreferenceProjectId(event.target.value)}
-            className={agentsInputClass}
-          >
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </Select>
-          {projectAreas.length ? (
-            <fieldset>
-              <legend className="sr-only">Prefer this agent for</legend>
-              <div className="flex flex-wrap gap-2">
-                {projectAreas.map((area) => {
-                  const on = selectedAreaIds.includes(area.id);
-                  return (
-                    <button
-                      key={area.id}
-                      type="button"
-                      disabled={pending}
-                      aria-pressed={on}
-                      onClick={() => toggleArea(area.id, !on)}
-                      className={`h-[34px] rounded-full px-3.5 text-[13px] font-semibold transition ${
-                        on
-                          ? "border border-electric-blue-strong bg-electric-blue-strong text-white"
-                          : "border border-zk-border bg-zk-surface text-zk-text hover:border-electric-blue/50"
-                      }`}
-                    >
-                      {area.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </fieldset>
-          ) : (
-            <p className="text-xs text-zk-muted">This project has no areas yet.</p>
-          )}
-          <Button
-            type="button"
-            disabled={pending || !areaPreferencesChanged}
-            onClick={saveAreaPreferences}
-            className={agentsSecondaryBtn}
-          >
-            {pending ? "Saving…" : "Save area preferences"}
-          </Button>
-        </div>
-      </details>
     </div>
   );
 }

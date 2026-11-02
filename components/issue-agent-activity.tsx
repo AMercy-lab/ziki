@@ -1,5 +1,3 @@
-import type { Severity } from "@prisma/client";
-import { severityLabel } from "@/lib/labels";
 import { LocalTime } from "@/components/local-time";
 import { ClaimDeadline } from "@/components/claim-deadline";
 import { ExpandableText } from "@/components/expandable-text";
@@ -16,7 +14,6 @@ export type AgentDecision =
       agentName: string;
       /** The person the agent acted for. */
       personName: string;
-      severity: Severity | null;
     }
   | {
       id: string;
@@ -40,10 +37,50 @@ export type AgentDecision =
       /** #606: the agent's owner, while the claim is paused on their answer. */
       waitingOnName?: string | null;
     }
+  | {
+      id: string;
+      at: Date | string;
+      /** #1446: a claim that was released or taken back. */
+      kind: "claim_released";
+      agentName: string;
+      personName: string;
+    }
+  | {
+      id: string;
+      at: Date | string;
+      /** #delivered-step: the agent holding the claim delivered its work. */
+      kind: "delivered";
+      agentName: string;
+      personName: string;
+    }
   | { id: string; at: Date | string; kind: "verdict"; agentName: string; personName: string; goodToMerge: boolean }
-  | { id: string; at: Date | string; kind: "accepted"; agentName: string };
+  | {
+      id: string;
+      at: Date | string;
+      kind: "accepted";
+      agentName: string;
+      /** #1446: the merger agent merged and deployed it, not just accepted it. */
+      merged?: boolean;
+    }
+  | {
+      id: string;
+      at: Date | string;
+      /** #1446: the merger agent's deployment checks or merge failed. */
+      kind: "deploy_failed";
+      agentName: string;
+      reason: string | null;
+    }
+  | {
+      id: string;
+      at: Date | string;
+      /** #1429: a manager agent sent the fix back. Never an accept. */
+      kind: "merge_rejected";
+      agentName: string;
+      /** What the manager agent asked to change. */
+      notes: string | null;
+    };
 
-function timeOf(decision: AgentDecision): number {
+export function timeOf(decision: AgentDecision): number {
   return new Date(decision.at).getTime();
 }
 
@@ -53,7 +90,7 @@ type VerdictVisual = {
   iconWrap: string;
 };
 
-function verdictVisual(decision: AgentDecision): VerdictVisual {
+export function verdictVisual(decision: AgentDecision): VerdictVisual {
   switch (decision.kind) {
     case "rejected":
       return {
@@ -87,30 +124,54 @@ function verdictVisual(decision: AgentDecision): VerdictVisual {
           };
     case "accepted":
       return {
-        label: "Good to merge",
+        label: decision.merged ? "Deployed" : "Good to merge",
         chip: "bg-zk-ok-bg text-zk-ok-fg",
         iconWrap: "bg-zk-ok-bg text-zk-ok-fg",
+      };
+    case "merge_rejected":
+      return {
+        label: "Not ready to merge",
+        chip: "bg-zk-warn-bg text-zk-warn-fg",
+        iconWrap: "bg-zk-warn-bg text-zk-warn-fg",
+      };
+    case "delivered":
+      return {
+        label: "Work delivered",
+        chip: "bg-zk-ok-bg text-zk-ok-fg",
+        iconWrap: "bg-zk-ok-bg text-zk-ok-fg",
+      };
+    case "claim_released":
+      return {
+        label: "Claim released",
+        chip: "bg-zk-bad-bg text-zk-bad-fg",
+        iconWrap: "bg-zk-bad-bg text-zk-bad-fg",
+      };
+    case "deploy_failed":
+      return {
+        label: "Deployment failed",
+        chip: "bg-zk-bad-bg text-zk-bad-fg",
+        iconWrap: "bg-zk-bad-bg text-zk-bad-fg",
       };
   }
 }
 
-function VerdictGlyph({ kind, goodToMerge }: { kind: AgentDecision["kind"]; goodToMerge?: boolean }) {
+export function VerdictGlyph({ kind, goodToMerge }: { kind: AgentDecision["kind"]; goodToMerge?: boolean }) {
   const common = "h-[15px] w-[15px]";
-  if (kind === "rejected") {
+  if (kind === "rejected" || kind === "claim_released") {
     return (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={common} aria-hidden>
         <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
       </svg>
     );
   }
-  if (kind === "claimed") {
+  if (kind === "claimed" || kind === "delivered") {
     return (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={common} aria-hidden>
         <path d="M12 5v14M5 12h14" strokeLinecap="round" />
       </svg>
     );
   }
-  if (kind === "verdict" && !goodToMerge) {
+  if ((kind === "verdict" && !goodToMerge) || kind === "merge_rejected" || kind === "deploy_failed") {
     return (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={common} aria-hidden>
         <path d="M12 9v4M12 17h.01" strokeLinecap="round" />
@@ -134,19 +195,12 @@ function VerdictGlyph({ kind, goodToMerge }: { kind: AgentDecision["kind"]; good
   );
 }
 
-function sentence(decision: AgentDecision) {
+export function decisionSentence(decision: AgentDecision) {
   switch (decision.kind) {
     case "confirmed":
       return (
         <>
           <strong className="font-bold text-zk-text">{decision.agentName}</strong> confirmed this issue as real
-          {decision.severity ? (
-            <>
-              {" "}
-              and set the severity to{" "}
-              <strong className="font-bold text-zk-text">{severityLabel[decision.severity]}</strong>
-            </>
-          ) : null}
           {decision.personName ? <> on behalf of {decision.personName}</> : null}.
         </>
       );
@@ -184,10 +238,42 @@ function sentence(decision: AgentDecision) {
         </>
       );
     case "accepted":
-      return (
+      return decision.merged ? (
+        <>
+          <strong className="font-bold text-zk-text">{decision.agentName}</strong> merged and deployed the fix.
+        </>
+      ) : (
         <>
           <strong className="font-bold text-zk-text">{decision.agentName}</strong> accepted the fix and marked this
           issue resolved.
+        </>
+      );
+    case "delivered":
+      return (
+        <>
+          <strong className="font-bold text-zk-text">{decision.agentName}</strong> delivered the work for{" "}
+          {decision.personName}.
+        </>
+      );
+    case "claim_released":
+      return (
+        <>
+          The claim by <strong className="font-bold text-zk-text">{decision.agentName}</strong> for{" "}
+          {decision.personName} was released.
+        </>
+      );
+    case "deploy_failed":
+      return (
+        <>
+          <strong className="font-bold text-zk-text">{decision.agentName}</strong> couldn&apos;t deploy the fix
+          {decision.reason ? <>: {decision.reason}</> : "."}
+        </>
+      );
+    case "merge_rejected":
+      return (
+        <>
+          <strong className="font-bold text-zk-text">{decision.agentName}</strong> rejected the fix and asked for
+          changes before it can merge.
         </>
       );
   }
@@ -197,23 +283,34 @@ function sentence(decision: AgentDecision) {
  * The agent decisions on an issue, oldest first. Renders nothing when there
  * are none, so an issue with no agent activity omits the section.
  */
-export function IssueAgentActivity({ decisions }: { decisions: ReadonlyArray<AgentDecision> }) {
+export function IssueAgentActivity({
+  decisions,
+  bare = false,
+  highlightId = null,
+}: {
+  decisions: ReadonlyArray<AgentDecision>;
+  /** Just the timeline, without its own box (inside the summary's "Show all"). */
+  bare?: boolean;
+  /** The decision a summary card was clicked for; its entry is tinted. */
+  highlightId?: string | null;
+}) {
   if (decisions.length === 0) return null;
 
   const ordered = [...decisions].sort((a, b) => timeOf(a) - timeOf(b) || a.id.localeCompare(b.id));
 
-  return (
-    <section
-      aria-label="Agent decisions"
-      className="rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-[22px]"
-    >
-      <h2 className="sr-only">Agent decisions</h2>
+  const timeline = (
       <ol className="flex flex-col gap-1">
         {ordered.map((decision, index) => {
           const visual = verdictVisual(decision);
           const isLast = index === ordered.length - 1;
           return (
-            <li key={decision.id} className="flex gap-3.5">
+            <li
+              key={decision.id}
+              id={`agent-decision-${decision.id}`}
+              className={`flex gap-3.5 rounded-xl motion-safe:transition-colors ${
+                highlightId === decision.id ? "-mx-2 bg-zk-tint px-2 pt-2" : ""
+              }`}
+            >
               <div className="flex flex-col items-center">
                 <span
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${visual.iconWrap}`}
@@ -235,8 +332,8 @@ export function IssueAgentActivity({ decisions }: { decisions: ReadonlyArray<Age
                   </span>
                   <LocalTime className="text-xs text-zk-muted" date={decision.at} />
                 </div>
-                <p className="mt-1.5 text-sm leading-snug text-zk-text2">{sentence(decision)}</p>
-                {decision.kind === "rejected" && decision.notes ? (
+                <p className="mt-1.5 text-sm leading-snug text-zk-text2">{decisionSentence(decision)}</p>
+                {(decision.kind === "rejected" || decision.kind === "merge_rejected") && decision.notes ? (
                   <ExpandableText maxLines={3} expandText="View more" collapseText="View less">
                     <blockquote className="mt-1.5 whitespace-pre-wrap break-words rounded-r-[10px] border-l-[3px] border-zk-border bg-zk-chip px-3.5 py-2.5 text-[13px] leading-relaxed text-zk-text2">
                       {decision.notes}
@@ -248,6 +345,16 @@ export function IssueAgentActivity({ decisions }: { decisions: ReadonlyArray<Age
           );
         })}
       </ol>
+  );
+
+  if (bare) return timeline;
+  return (
+    <section
+      aria-label="Agent decisions"
+      className="rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-[22px]"
+    >
+      <h2 className="sr-only">Agent decisions</h2>
+      {timeline}
     </section>
   );
 }

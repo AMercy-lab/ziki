@@ -51,7 +51,7 @@ const nextConfig: NextConfig = {
           "frame-ancestors 'none'",
           "base-uri 'self'",
           "object-src 'none'",
-          "form-action 'self'",
+          "form-action 'self' https://github.com",
         ].join("; "),
       },
     ];
@@ -126,6 +126,7 @@ const nextConfig: NextConfig = {
           ? config.resolve.alias
           : {}),
         "@/lib/points/backfill-on-start": false,
+        "@/lib/cron/scheduler": false,
       };
     }
     return config;

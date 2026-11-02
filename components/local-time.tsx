@@ -1,11 +1,13 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import { formatDate, getDefaultTimeZone } from "@/lib/format";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { formatDate, formatTimeAgo, getDefaultTimeZone } from "@/lib/format";
 
 type LocalTimeProps = {
   date: Date | string;
   className?: string;
+  /** Show the full stamp ("Nov 1, 2026, 2:02 PM"), with how long ago in the tooltip. */
+  absolute?: boolean;
 };
 
 export function getClientTimeZone(): string {
@@ -22,12 +24,22 @@ export function getServerTimeZone(): string {
 
 const emptySubscribe = () => () => {};
 
-export function LocalTime({ date, className }: LocalTimeProps) {
+/**
+ * A date, humanized ("30 mins ago", "yesterday", "Oct 12"), with the full
+ * stamp in its tooltip. It moves on each minute. The text depends on "now",
+ * so the client's render may differ from the server's by a minute.
+ */
+export function LocalTime({ date, className, absolute = false }: LocalTimeProps) {
   const isClient = useSyncExternalStore(
     emptySubscribe,
     () => true,
     () => false,
   );
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   const timeZone = isClient ? getClientTimeZone() : getServerTimeZone();
   const formatted = formatDate(date, timeZone);
@@ -39,8 +51,13 @@ export function LocalTime({ date, className }: LocalTimeProps) {
         : "";
 
   return (
-    <time dateTime={iso} className={className} title={`${formatted} (${timeZone})`}>
-      {formatted}
+    <time
+      dateTime={iso}
+      className={className}
+      title={absolute ? formatTimeAgo(date, now, timeZone) : `${formatted} (${timeZone})`}
+      suppressHydrationWarning
+    >
+      {absolute ? formatted : formatTimeAgo(date, now, timeZone)}
     </time>
   );
 }

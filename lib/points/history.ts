@@ -33,7 +33,7 @@ export type PointsSeries = {
   total: number;
 };
 
-/** Same 500-pt goal the product uses; weekly chart treats it as a week target. */
+/** Same points goal the product uses; weekly chart treats it as a week target. */
 export const WEEKLY_POINTS_TARGET = TARGET_POINTS;
 
 const DAY_MS = 24 * 60 * 60 * 1000;

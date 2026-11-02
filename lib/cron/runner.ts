@@ -3,10 +3,11 @@ import { logger } from "@/lib/logger";
 import { sweepExpiredOffers } from "@/lib/agent-api/offer";
 import { sweepJobReviewOffers } from "@/lib/jobs/review";
 import { sweepStaleClaims } from "@/lib/agent-api/availability";
-import { sweepLevelPromotions } from "@/lib/agents/promotion";
 import { dispatchDueDeliveries } from "@/lib/webhooks/deliver";
 import { pruneAgentRows, type AgentRetentionCounts } from "@/lib/agent-retention";
 import { sweepOrphanedAttachments } from "@/lib/attachment-retention";
+import { sweepOrphanedIssues } from "@/lib/orphaned-issues";
+import { sweepUndraftedIdeas } from "@/lib/cron/draft-structuring";
 
 export const FAILURE_ALERT_THRESHOLD = 3;
 const consecutiveFailures = new Map<string, number>();
@@ -43,8 +44,16 @@ export type PlatformSweepsResult = {
   sweeps: {
     offers: { status: "ok" | "error"; expired?: number; error?: string };
     jobReviewOffers: { status: "ok" | "error"; expired?: number; offered?: number; error?: string };
-    claims: { status: "ok" | "error"; released?: number; offered?: number; error?: string };
-    promotions: { status: "ok" | "error"; promoted?: number; demoted?: number; error?: string };
+    claims: { status: "ok" | "error"; released?: number; error?: string };
+    orphanedIssues: { status: "ok" | "error"; reopened?: number; error?: string };
+    draftStructuring: {
+      status: "ok" | "error";
+      structured?: number;
+      flagged?: number;
+      skipped?: number;
+      failed?: number;
+      error?: string;
+    };
     deliveries: { status: "ok" | "error"; processed?: number; error?: string };
     retention: {
       status: "ok" | "error";
@@ -61,7 +70,7 @@ let sweepInProgress = false;
  * - Offer expiry (due-date sweep)
  * - Job-review offer expiry and recovery
  * - Stale claim release (inactivity & deadline)
- * - Level promotions and silence demotions
+ * - Reopen unassigned in-progress issues without live claims or linked fixes
  * - Webhook dispatch (lease-guarded)
  * - Retention prunes (agent rows & orphaned attachments)
  *
@@ -81,7 +90,8 @@ export async function runPlatformSweeps(): Promise<PlatformSweepsResult | { skip
         offers: { status: "ok" },
         jobReviewOffers: { status: "ok" },
         claims: { status: "ok" },
-        promotions: { status: "ok" },
+        orphanedIssues: { status: "ok" },
+        draftStructuring: { status: "ok" },
         deliveries: { status: "ok" },
         retention: { status: "ok" },
       },
@@ -114,20 +124,39 @@ export async function runPlatformSweeps(): Promise<PlatformSweepsResult | { skip
     try {
       const res = await sweepStaleClaims();
       recordSweepSuccess("claims");
-      result.sweeps.claims = { status: "ok", released: res.released, offered: res.offered };
+      result.sweeps.claims = { status: "ok", released: res.released };
     } catch (err) {
       recordSweepFailure("claims", err);
       result.sweeps.claims = { status: "error", error: err instanceof Error ? err.message : String(err) };
     }
 
-    // 3. Level Promotions / Demotions
+    // 2b. Issues that have no claim for the stale-claim sweep to find (#623).
     try {
-      const res = await sweepLevelPromotions();
-      recordSweepSuccess("promotions");
-      result.sweeps.promotions = { status: "ok", promoted: res.promoted, demoted: res.demoted };
+      const res = await sweepOrphanedIssues();
+      recordSweepSuccess("orphanedIssues");
+      result.sweeps.orphanedIssues = { status: "ok", reopened: res.reopened };
     } catch (err) {
-      recordSweepFailure("promotions", err);
-      result.sweeps.promotions = { status: "error", error: err instanceof Error ? err.message : String(err) };
+      recordSweepFailure("orphanedIssues", err);
+      result.sweeps.orphanedIssues = { status: "error", error: err instanceof Error ? err.message : String(err) };
+    }
+
+    // 2c. Draft Idea Auto-Structuring (#682, #685)
+    try {
+      const res = await sweepUndraftedIdeas();
+      recordSweepSuccess("draftStructuring");
+      result.sweeps.draftStructuring = {
+        status: "ok",
+        structured: res.structured,
+        flagged: res.flagged,
+        skipped: res.skipped,
+        failed: res.failed,
+      };
+    } catch (err) {
+      recordSweepFailure("draftStructuring", err);
+      result.sweeps.draftStructuring = {
+        status: "error",
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
 
     // 4. Webhook Deliveries
@@ -162,7 +191,8 @@ export async function runPlatformSweeps(): Promise<PlatformSweepsResult | { skip
       offers: result.sweeps.offers,
       jobReviewOffers: result.sweeps.jobReviewOffers,
       claims: result.sweeps.claims,
-      promotions: result.sweeps.promotions,
+      orphanedIssues: result.sweeps.orphanedIssues,
+      draftStructuring: result.sweeps.draftStructuring,
       deliveries: result.sweeps.deliveries,
       retention: result.sweeps.retention,
     });

@@ -1,11 +1,13 @@
 import { randomInt } from "node:crypto";
 import { cookies } from "next/headers";
+import { awardSignupBonus } from "@/lib/points/signup-bonus";
 import { unstable_rethrow } from "next/navigation";
 import type { MembershipRole, Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { isSuperAdmin, type AppRole } from "@/lib/roles";
 import { ZEDU_SLUG } from "@/lib/tenant";
 import { appCookieOptions } from "@/lib/cookie-options";
+import { unreservedProjectSlug } from "@/lib/project-slug";
 
 /**
  * Picking, creating and owning tenants (#444).
@@ -47,7 +49,7 @@ const MEMBERSHIP_ROLE_ORDER: Record<MembershipRole, number> = {
 /**
  * Pair memberships with the people they point at. A membership whose user
  * row is gone is skipped: joining it in one query makes Prisma throw
- * "Field user is required" and the whole tenant page fails.
+ * "Field user is required" and the whole members page (/org/members) fails.
  */
 export function tenantMembersFrom<TUser extends { id: string; name: string | null }>(
   memberships: { role: MembershipRole; createdAt: Date; userId: string }[],
@@ -146,14 +148,22 @@ export async function setActiveTenantCookie(tenantId: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /** Only the tenants the person belongs to, by name. Never anyone else's. */
-export async function tenantsForUser(db: Db, userId: string): Promise<TenantChoice[]> {
+export async function tenantsForUser(
+  db: Db,
+  userId: string,
+  userRole?: AppRole | null,
+): Promise<TenantChoice[]> {
   try {
     const memberships = await db.membership.findMany({
       where: { userId },
       select: tenantChoiceSelect,
       orderBy: { tenant: { name: "asc" } },
     });
-    return memberships.map(toChoice);
+    const choices = memberships.map(toChoice);
+    if (isSuperAdmin(userRole)) {
+      return choices.map((c) => ({ ...c, role: "owner" as const }));
+    }
+    return choices;
   } catch (error) {
     if (!archivedAtMissing(error)) {
       console.error("[tenants] tenantsForUser failed", error);
@@ -166,7 +176,11 @@ export async function tenantsForUser(db: Db, userId: string): Promise<TenantChoi
         select: tenantIdentitySelect,
         orderBy: { tenant: { name: "asc" } },
       });
-      return memberships.map(choiceWithoutArchive);
+      const choices = memberships.map(choiceWithoutArchive);
+      if (isSuperAdmin(userRole)) {
+        return choices.map((c) => ({ ...c, role: "owner" as const }));
+      }
+      return choices;
     } catch (retryError) {
       console.error("[tenants] tenantsForUser failed", retryError);
       return [];
@@ -185,13 +199,13 @@ export async function tenantsForUser(db: Db, userId: string): Promise<TenantChoi
 export function landingPath(
   memberTenantIds: ReadonlyArray<string>,
   pickedTenantId: string | null,
-): "/issues" | "/tenants" {
-  if (memberTenantIds.length === 1) return "/issues";
-  if (pickedTenantId && memberTenantIds.includes(pickedTenantId)) return "/issues";
+): "/home" | "/tenants" {
+  if (memberTenantIds.length === 1) return "/home";
+  if (pickedTenantId && memberTenantIds.includes(pickedTenantId)) return "/home";
   return "/tenants";
 }
 
-export async function homePathFor(db: Db, userId: string): Promise<"/issues" | "/tenants"> {
+export async function homePathFor(db: Db, userId: string): Promise<"/home" | "/tenants"> {
   try {
     const memberships = await db.membership.findMany({
       where: { userId },
@@ -203,7 +217,7 @@ export async function homePathFor(db: Db, userId: string): Promise<"/issues" | "
     );
   } catch (error) {
     console.error("[tenants] homePathFor failed", error);
-    return "/issues";
+    return "/home";
   }
 }
 
@@ -236,37 +250,6 @@ export async function memberTenantById(
       console.error("[tenants] memberTenantById failed", retryError);
       return null;
     }
-  }
-}
-
-/**
- * A tenant the person belongs to, by slug. A tenant that exists but isn't
- * theirs gets the same `null` as one that doesn't exist, and its name is
- * never read: guessing slugs reveals nothing.
- */
-export async function memberTenantBySlug(
-  db: Db,
-  userId: string,
-  slug: string,
-): Promise<TenantChoice | null> {
-  if (!isTenantSlug(slug)) return null;
-  try {
-    const membership = await db.membership.findFirst({
-      where: { userId, tenant: { slug } },
-      select: tenantChoiceSelect,
-    });
-    return membership ? toChoice(membership) : null;
-  } catch (error) {
-    // This is the lookup the tenant page does not catch. A missing
-    // archivedAt column used to 500 /tenants/[slug] while the picker
-    // degraded. Treat the tenant as not archived and keep the page up.
-    if (!archivedAtMissing(error)) throw error;
-    console.error("[tenants] archivedAt is missing; loading the tenant without it", error);
-    const membership = await db.membership.findFirst({
-      where: { userId, tenant: { slug } },
-      select: tenantIdentitySelect,
-    });
-    return membership ? choiceWithoutArchive(membership) : null;
   }
 }
 
@@ -309,12 +292,8 @@ export const createTenantSchema = z.object({
     .pipe(nameRules("Project name", { optional: true })),
 });
 
-/** Slugs that would collide with the routes under /tenants. */
+/** Slugs kept back because they read as route names, such as /tenants/invite. */
 const RESERVED_TENANT_SLUGS: ReadonlySet<string> = new Set(["invite", "new"]);
-
-export function isTenantSlug(value: string): boolean {
-  return value.length <= TENANT_SLUG_MAX && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
-}
 
 /**
  * A URL-safe slug from a display name, by the same rules as project slugs
@@ -436,7 +415,8 @@ export async function createTenant(
           slug,
           name,
           memberships: { create: { userId: creator.id, role: "owner" } },
-          projects: { create: { slug: slugFromName(projectName, "project"), name: projectName } },
+          // A project slug is the first segment of its issue URLs, so never a top-level route name.
+          projects: { create: { slug: unreservedProjectSlug(slugFromName(projectName, "project")), name: projectName } },
           // Same three names as DEFAULT_PLATFORMS. Inlined so this file does not
           // import lib/categories, which reads the active tenant from here.
           categories: {
@@ -447,6 +427,7 @@ export async function createTenant(
       });
       const projectId = tenant.projects[0]?.id;
       if (!projectId) throw new Error("A new tenant was created without its first project.");
+      await awardSignupBonus(db, creator.id, tenant.id);
       return { ok: true, tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name }, projectId };
     } catch (error) {
       // Only the slug is unique on a brand-new tenant: try another one.
@@ -544,15 +525,15 @@ export async function deleteTenant(
 
   const counts = await db.tenant.findUnique({
     where: { id: tenant.id },
-    select: { _count: { select: { bugs: true, agents: true, memberships: true } } },
+    select: { _count: { select: { bugs: true, ideas: true, agents: true, memberships: true } } },
   });
   if (!counts) return { ok: false, error: "That organization no longer exists." };
 
-  const { bugs, agents, memberships } = counts._count;
-  if (bugs > 0 || agents > 0 || memberships > 1) {
+  const { bugs, ideas, agents, memberships } = counts._count;
+  if (bugs > 0 || ideas > 0 || agents > 0 || memberships > 1) {
     return {
       ok: false,
-      error: "This organization still has issues, agents or other members. Archive it instead.",
+      error: "This organization still has issues, ideas, agents or other members. Archive it instead.",
     };
   }
 
@@ -573,6 +554,27 @@ export async function deleteTenant(
 // ---------------------------------------------------------------------------
 // Zedu's first owner
 // ---------------------------------------------------------------------------
+
+/**
+ * Ensure a user has an owner membership in the primary Zedu tenant (#536).
+ * Any super admin automatically gets owner privileges.
+ */
+export async function ensureZeduOwnerMembership(
+  userId: string,
+  db: Db,
+): Promise<void> {
+  const tenant = await db.tenant.upsert({
+    where: { slug: ZEDU_SLUG },
+    update: {},
+    create: { slug: ZEDU_SLUG, name: "Ziki" },
+  });
+
+  await db.membership.upsert({
+    where: { tenantId_userId: { tenantId: tenant.id, userId } },
+    update: { role: "owner" },
+    create: { tenantId: tenant.id, userId, role: "owner" },
+  });
+}
 
 /**
  * Everyone moved into Zedu by the migration is a member, never an owner

@@ -12,6 +12,7 @@ import { isPasswordAuthEnabled } from "@/lib/auth-mode";
 import { upsertGoogleUser } from "@/lib/google-user";
 import { resolveSessionUserId } from "@/lib/session-user";
 import { isSuperAdminEmail } from "@/lib/super-admin";
+import { ensureZeduOwnerMembership } from "@/lib/tenants";
 import { logger } from "@/lib/logger";
 
 /** Route handler that clears an invalid session (see app/session-expired/route.ts). */
@@ -100,6 +101,14 @@ export async function requireUser(): Promise<SessionAppUser> {
     dbUser.role === "super_admin" || isSuperAdminEmail(dbUser.email);
   const isRealAdmin = isRealSuperAdmin || dbUser.role === "admin";
 
+  if (isRealSuperAdmin) {
+    try {
+      await ensureZeduOwnerMembership(dbUser.id, prisma);
+    } catch (error) {
+      logger.error("[auth] failed to ensure super admin zedu owner membership", error);
+    }
+  }
+
   if (dbUser.role !== "super_admin" && isSuperAdminEmail(dbUser.email)) {
     try {
       await prisma.user.update({
@@ -136,28 +145,28 @@ export async function requireUser(): Promise<SessionAppUser> {
   };
 }
 
-/** Require one of the given roles. Redirects unauthorized users to /issues. */
+/** Require one of the given roles. Redirects unauthorized users to /home. */
 export async function requireRole(
   roles: Role | Role[],
 ): Promise<SessionAppUser> {
   const user = await requireUser();
   const allowed = Array.isArray(roles) ? roles : [roles];
   if (!allowed.includes(user.role)) {
-    redirect("/issues");
+    redirect("/home");
   }
   return user;
 }
 
-/** Admin or super_admin. Redirects non-admins to /issues. */
+/** Admin or super_admin. Redirects non-admins to /home. */
 export async function requireAdmin(): Promise<SessionAppUser> {
   const user = await requireUser();
   if (!isAdmin(user.role)) {
-    redirect("/issues");
+    redirect("/home");
   }
   return user;
 }
 
-/** Super admin only. Redirects everyone else to /issues. */
+/** Super admin only. Redirects everyone else to /home. */
 export async function requireSuperAdmin(): Promise<SessionAppUser> {
   return requireRole("super_admin");
 }

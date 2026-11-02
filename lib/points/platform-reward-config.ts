@@ -3,6 +3,8 @@ import {
   CONFIRMATION_REVIEWER_POINTS,
   DISPATCHER_POINTS,
   DUPLICATE_MARKER_POINTS,
+  POINT_AWARD_MAX,
+  POINT_TARGET_MAX,
   REPORTER_POINTS,
   REVIEWER_POINTS,
   SOLVER_POINTS,
@@ -11,12 +13,7 @@ import {
 } from "./rules";
 
 const hardCodedValues = {
-  solver: {
-    low: SOLVER_POINTS.low,
-    medium: SOLVER_POINTS.medium,
-    high: SOLVER_POINTS.high,
-    critical: SOLVER_POINTS.critical,
-  },
+  solver: SOLVER_POINTS,
   reporter: REPORTER_POINTS,
   reviewer: REVIEWER_POINTS,
   confirmationReviewer: CONFIRMATION_REVIEWER_POINTS,
@@ -29,26 +26,19 @@ const hardCodedValues = {
 
 export const platformRewardConfigSchema = z
   .object({
-    solver: z
-      .object({
-        low: z.coerce.number().int().min(0).max(10000),
-        medium: z.coerce.number().int().min(0).max(10000),
-        high: z.coerce.number().int().min(0).max(10000),
-        critical: z.coerce.number().int().min(0).max(10000),
-      })
-      .default({ ...hardCodedValues.solver }),
-    reporter: z.coerce.number().int().min(0).max(10000).default(REPORTER_POINTS),
-    reviewer: z.coerce.number().int().min(0).max(10000).default(REVIEWER_POINTS),
+    solver: z.coerce.number().int().min(0).max(POINT_AWARD_MAX).default(SOLVER_POINTS),
+    reporter: z.coerce.number().int().min(0).max(POINT_AWARD_MAX).default(REPORTER_POINTS),
+    reviewer: z.coerce.number().int().min(0).max(POINT_AWARD_MAX).default(REVIEWER_POINTS),
     confirmationReviewer: z.coerce
       .number()
       .int()
       .min(0)
-      .max(10000)
+      .max(POINT_AWARD_MAX)
       .default(CONFIRMATION_REVIEWER_POINTS),
-    triagerClear: z.coerce.number().int().min(0).max(10000).default(TRIAGER_CLEAR_POINTS),
-    duplicateMarker: z.coerce.number().int().min(0).max(10000).default(DUPLICATE_MARKER_POINTS),
-    dispatcher: z.coerce.number().int().min(0).max(10000).default(DISPATCHER_POINTS),
-    target: z.coerce.number().int().min(1).max(1_000_000).default(TARGET_POINTS),
+    triagerClear: z.coerce.number().int().min(0).max(POINT_AWARD_MAX).default(TRIAGER_CLEAR_POINTS),
+    duplicateMarker: z.coerce.number().int().min(0).max(POINT_AWARD_MAX).default(DUPLICATE_MARKER_POINTS),
+    dispatcher: z.coerce.number().int().min(0).max(POINT_AWARD_MAX).default(DISPATCHER_POINTS),
+    target: z.coerce.number().int().min(1).max(POINT_TARGET_MAX).default(TARGET_POINTS),
     guidelines: z.string().trim().max(2000).optional().nullable().default(null),
   })
   .default({ ...hardCodedValues });
@@ -58,7 +48,7 @@ export type PlatformRewardConfig = z.infer<typeof platformRewardConfigSchema>;
 /** Hard-coded ledger amounts — ultimate fallback when DB config is missing. */
 export function hardCodedPlatformRewards(): PlatformRewardConfig {
   return {
-    solver: { ...hardCodedValues.solver },
+    solver: hardCodedValues.solver,
     reporter: hardCodedValues.reporter,
     reviewer: hardCodedValues.reviewer,
     confirmationReviewer: hardCodedValues.confirmationReviewer,
@@ -85,12 +75,7 @@ export function parsePlatformRewardConfigFromFormData(formData: FormData): Platf
     return Number.isFinite(value) ? value : fallback;
   };
   return platformRewardConfigSchema.parse({
-    solver: {
-      low: num("solverPointsLow", hard.solver.low),
-      medium: num("solverPointsMedium", hard.solver.medium),
-      high: num("solverPointsHigh", hard.solver.high),
-      critical: num("solverPointsCritical", hard.solver.critical),
-    },
+    solver: num("solverPoints", hard.solver),
     reporter: num("reporterPoints", hard.reporter),
     reviewer: num("reviewerPoints", hard.reviewer),
     confirmationReviewer: num("confirmationReviewerPoints", hard.confirmationReviewer),

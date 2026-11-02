@@ -1,14 +1,9 @@
 import type { ReactNode } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { BASE_PATH } from "@/lib/base-path";
+import { ZikiMark } from "@/components/ziki-mark";
 import { REPORT_FORM_URL } from "@/lib/report-form";
 import "./auth-split-frame.css";
-
-function brandAsset(file: string) {
-  return BASE_PATH ? `${BASE_PATH}/brand/${file}` : `/brand/${file}`;
-}
 
 function CheckIcon() {
   return (
@@ -32,7 +27,7 @@ function BrandPanel() {
   return (
     <section
       aria-label="About Ziki"
-      className="relative flex min-h-[min(100vh,720px)] flex-[1_1_560px] flex-col gap-10 overflow-hidden bg-deep-ocean px-8 py-12 text-white sm:px-14"
+      className="relative flex w-full flex-col gap-10 overflow-hidden bg-deep-ocean px-8 py-12 text-white sm:px-14 lg:min-h-[min(100vh,720px)] lg:flex-[1_1_560px]"
     >
       <div
         aria-hidden="true"
@@ -53,15 +48,7 @@ function BrandPanel() {
       />
 
       <div className="relative flex items-center justify-between gap-4">
-        <Image
-          src={brandAsset("ziki-logo-dark.png")}
-          alt="Ziki"
-          width={120}
-          height={40}
-          className="h-10 w-[120px] object-contain"
-          unoptimized
-          priority
-        />
+        <ZikiMark title="Ziki" className="h-10 w-10 text-white" />
         <Link
           href="/"
           className="inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-[#C9D6EF] hover:underline"
@@ -168,13 +155,13 @@ function BrandPanel() {
           </span>
           <div className="flex flex-col gap-0.5">
             <span className="text-[13px] font-bold">Agent claimed #400</span>
-            <span className="text-xs text-[#5F6577]">Contributor · just now</span>
+            <span className="text-xs text-[#5F6577]">Working agent · just now</span>
           </div>
         </div>
       </div>
 
       <div className="relative flex flex-wrap gap-6 text-sm text-[#C9D6EF]">
-        {["Report", "Vote", "Track", "Earn points"].map((label) => (
+        {["Report", "Prioritize", "Track", "Earn points"].map((label) => (
           <span key={label} className="inline-flex items-center gap-2">
             <CheckIcon />
             {label}
@@ -188,15 +175,7 @@ function BrandPanel() {
 function AuthCardMark() {
   return (
     <span className="flex size-[52px] items-center justify-center overflow-hidden rounded-2xl bg-deep-ocean">
-      <Image
-        src={brandAsset("ziki-mark.png")}
-        alt=""
-        width={30}
-        height={26}
-        className="h-[26px] w-[30px] object-contain"
-        unoptimized
-        priority
-      />
+      <ZikiMark className="h-[30px] w-[30px] text-white" />
     </span>
   );
 }
@@ -233,7 +212,7 @@ function AgentDocsCallout() {
         <div className="flex flex-wrap gap-x-4 gap-y-2 text-[13px] font-bold">
           <Link
             href="/llms.txt"
-            className="inline-flex min-h-7 items-center gap-1 font-mono text-zk-text underline hover:text-zk-accent"
+            className="inline-flex min-h-7 max-w-full flex-wrap items-center gap-1 font-mono text-zk-text underline decoration-zk-border underline-offset-2 hover:text-zk-accent hover:decoration-zk-text"
           >
             /llms.txt spec
             <svg
@@ -317,11 +296,11 @@ export function AuthSplitFrame({
   mark?: boolean;
 }) {
   return (
-    <div className="zk-motion ziki-auth-frame flex min-h-screen flex-wrap bg-zk-bg text-zk-text">
+    <div className="zk-motion ziki-auth-frame flex min-h-screen flex-col bg-zk-bg text-zk-text lg:flex-row">
       <BrandPanel />
       <section
         aria-label={panelLabel}
-        className="relative flex flex-[1_1_480px] flex-col items-center justify-center gap-7 px-6 py-10 sm:px-8"
+        className="relative flex w-full flex-col items-center justify-center gap-7 px-6 py-10 sm:px-8 lg:flex-[1_1_480px]"
       >
         <div className="absolute top-6 right-6">
           <ThemeToggle />

@@ -3,6 +3,8 @@ import { ThemeSettings } from "@/components/theme-settings";
 import { parseTheme } from "@/lib/theme";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth-helpers";
+import { firstProjectSlugFor } from "@/lib/project-route";
+import { orgPath } from "@/lib/project-paths";
 import { prisma } from "@/lib/prisma";
 import { NotificationSettings } from "@/components/notification-settings";
 import { WalletAddressForm } from "@/components/wallet-address-form";
@@ -77,9 +79,10 @@ function LinkRow({ href, label, external }: { href: string; label: string; exter
 
 /** The settings index: themed appearance, sign-in security, and links into the nested settings surfaces. */
 export default async function SettingsPage(props: {
-  searchParams?: Promise<{ section?: string | string[] }>;
+  searchParams?: Promise<{ section?: string | string[] | undefined }>;
 }) {
   const user = await requireUser();
+  const projectSlug = await firstProjectSlugFor(user.id);
   const params = props.searchParams ? await props.searchParams : {};
   const section = parseSection(params.section);
   const agentsEnabled = isAgentPlatformEnabled();
@@ -136,7 +139,7 @@ export default async function SettingsPage(props: {
     <div className="settings-page settings-design mx-auto flex w-full max-w-5xl flex-col gap-6 pb-10">
       <div className="flex flex-col gap-2.5">
         <Link
-          href="/issues"
+          href="/home"
           className="inline-flex min-h-8 items-center gap-1.5 self-start text-sm font-semibold text-zk-accent hover:underline"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -202,7 +205,7 @@ export default async function SettingsPage(props: {
                     See how others see you
                   </Link>
                 </div>
-                <DisplayNameForm initialName={displayName} />
+                <DisplayNameForm initialName={displayName} initialImage={user.image} />
                 <p className="text-sm">
                   <Link href="/settings/profile" className="font-semibold text-zk-accent hover:underline">
                     Open profile page
@@ -292,8 +295,8 @@ export default async function SettingsPage(props: {
                   <div className="flex flex-col gap-0.5">
                     <LinkRow href="/settings/agents/connect" label="Connect your agent" />
                     <LinkRow href="/settings/agents/pair" label="Approve a pairing code" />
-                    <LinkRow href="/settings/agents" label="Manage agents" />
-                    <LinkRow href="/settings/agents" label="Create agent" />
+                    <LinkRow href="/agents" label="Manage agents" />
+                    <LinkRow href="/settings/connect" label="Create agent" />
                     <LinkRow href="/settings/webhooks" label="Webhooks" />
                     <LinkRow href="/settings/audit" label="Agent audit log" />
                   </div>
@@ -313,7 +316,8 @@ export default async function SettingsPage(props: {
                   Workspace members and their active agents.
                 </p>
                 <div className="flex flex-col gap-0.5">
-                  <LinkRow href="/settings/team" label="View team" />
+                  {projectSlug ? <LinkRow href={orgPath(projectSlug, "members")} label="Organization members" /> : null}
+                  <LinkRow href="/workers" label="View ranking" />
                 </div>
               </section>
 
@@ -330,6 +334,7 @@ export default async function SettingsPage(props: {
                   Developer documentation, cURL references and machine-readable specs for AI agents and automated tools.
                 </p>
                 <div className="flex flex-col gap-0.5">
+                  {projectSlug ? <LinkRow href={orgPath(projectSlug, "projects")} label="Project settings & workflows" /> : null}
                   <LinkRow href="/docs" label="API documentation" />
                   <LinkRow href="/llms.txt" label="AI specs (/llms.txt)" external />
                 </div>
