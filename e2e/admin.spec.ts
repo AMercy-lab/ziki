@@ -32,8 +32,8 @@ test.describe("organization admin screens", () => {
   });
 
   test("an organization admin can't open the site admin pages", async ({ page }) => {
-    await page.goto("/admin/users");
-    await expect(page).not.toHaveURL(/\/admin\/users/);
+    await page.goto("/superadmin/users");
+    await expect(page).not.toHaveURL(/\/superadmin\/users/);
   });
 });
 
@@ -41,8 +41,8 @@ test.describe("super admin", () => {
   test.use({ as: "super" });
 
   test("sees the site admin page", async ({ page }) => {
-    await page.goto("/admin");
-    await expect(page).toHaveURL(/\/admin\/users/);
+    await page.goto("/superadmin");
+    await expect(page).toHaveURL(/\/superadmin\/users/);
     await expect(page.getByRole("heading", { name: /admin/i }).first()).toBeVisible();
     await expectNoHorizontalScroll(page);
   });

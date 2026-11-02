@@ -1,7 +1,7 @@
 import type { AppRole } from "@/lib/roles";
 
 /** Site staff pages: site roles and platform points. Super admins only. */
-export const SITE_ADMIN_HREF = "/admin/users";
+export const SITE_ADMIN_HREF = "/superadmin/users";
 
 /** Manage agents: the person's own agents, on a page of its own outside Settings. */
 export const MANAGE_AGENTS_HREF = "/agents";
@@ -36,9 +36,9 @@ export function isNavItemActive(pathname: string | null, href: string): boolean 
       path.startsWith("/redesigns/")
     );
   }
-  // Site admin covers every page under /admin, not only the users list it opens on.
+  // Site admin covers every page under /superadmin, not only the users list it opens on.
   if (href === SITE_ADMIN_HREF) {
-    return path === "/admin" || path.startsWith("/admin/");
+    return path === "/superadmin" || path.startsWith("/superadmin/");
   }
   return path === href || path.startsWith(`${href}/`);
 }

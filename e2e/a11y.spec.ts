@@ -70,7 +70,7 @@ test.describe("accessibility", () => {
     test.use({ as: "super" });
 
     test("the site admin screen", async ({ page }) => {
-      await page.goto("/admin/users");
+      await page.goto("/superadmin/users");
       await expectNoA11yViolations(page);
     });
   });
