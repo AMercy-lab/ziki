@@ -32,6 +32,10 @@ export function isPublicPath(
     pathWithoutBase === "/" ||
     pathWithoutBase === "" ||
     pathWithoutBase === "/llms.txt" ||
+    // The public marketing pages beside the homepage.
+    pathWithoutBase === "/how-it-works" ||
+    pathWithoutBase === "/for-agents" ||
+    pathWithoutBase === "/developers" ||
     isAuthPage ||
     isPasswordResetPage ||
     isIssuePreview ||

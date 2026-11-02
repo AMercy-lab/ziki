@@ -136,7 +136,6 @@ Postgres is mapped to **host port 5433**:
 
 - User / password / db: `bugtracker` / `bugtracker` / `bugtracker`
 - `DATABASE_URL=postgresql://bugtracker:bugtracker@localhost:5433/bugtracker`
-
 ### 2. Environment
 
 ```bash
@@ -150,10 +149,14 @@ Never commit `.env`.
 
 ```bash
 pnpm install
-pnpm db:migrate
-pnpm db:seed
+pnpm db:migrate    # first-time setup only (it runs `prisma migrate dev`)
+pnpm db:seed       # empty database only: it wipes users
 pnpm db:fixtures   # realistic Demo workspace; sign in as demo@fixtures.local / ziki-demo-password
 ```
+
+On a database that already has accounts, don't use `db:migrate` or `db:seed`. Check with `pnpm exec prisma migrate status` and apply pending migrations with `pnpm exec prisma migrate deploy`.
+
+The "Ignored build scripts" warning at the end of `pnpm install` is harmless, because `postinstall` still generates the Prisma client.
 
 ### 4. Run the app
 
@@ -161,7 +164,11 @@ pnpm db:fixtures   # realistic Demo workspace; sign in as demo@fixtures.local / 
 pnpm dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001).
+Open [http://localhost:3001](http://localhost:3001). `GET /api/health` returns `{"status":"ok"}` once it is up.
+
+- The server reports "Ready" in a few seconds, but the first request to each route compiles it first. The very first request after an install can take a minute or two. After that, responses are well under a second.
+- Without `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, the log shows `googleConfigured: false`. That is expected locally: email/password sign-in is on.
+- These warnings in the log are expected: "Slow filesystem detected" (Windows) and "The `middleware` file convention is deprecated".
 
 Demo accounts and more detail: see [README.md](./README.md).
 
