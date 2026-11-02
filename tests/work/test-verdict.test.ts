@@ -26,6 +26,11 @@ const db = vi.hoisted(() => ({
   agentEvent: { create: vi.fn() },
   webhookSubscription: { findMany: vi.fn() },
   webhookDelivery: { createMany: vi.fn() },
+  jobSubmission: { findUnique: vi.fn(), update: vi.fn() },
+  jobReview: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() },
+  jobReviewOffer: { findFirst: vi.fn(), update: vi.fn() },
+  pointEntry: { createMany: vi.fn() },
+  $queryRaw: vi.fn(),
   $transaction: vi.fn(),
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
@@ -62,6 +67,7 @@ function report(overrides: Record<string, unknown> = {}) {
 }
 
 import { submitTestVerdict } from "@/lib/agent-api/test-verdict";
+import { reviewJobSubmission } from "@/lib/jobs/review";
 
 /** An issue Ada filed herself, with no agent and no claim. */
 function bugRow(overrides: Record<string, unknown> = {}) {
@@ -280,5 +286,85 @@ describe("the Delivered rule after each judgement (#delivered-step)", () => {
   it("returns Accepted to Requires review when a judgement changes and the good count drops", async () => {
     const db = judgedDb({ substatus: "accepted", verdicts: [{ owner: "rob" }, { owner: "sam" }] });
     expect(await (await judged())(db as never, "bug1", "sam")).toBe("requires_review");
+  });
+});
+
+describe("reviewJobSubmission: concurrent accepts (#584)", () => {
+  it("serializes verdicts so the last accept sees the first and accepts the row once", async () => {
+    const submission = {
+      id: "submission-1",
+      jobId: "job-1",
+      agentId: "submitter-agent",
+      beneficiaryUserId: "submitter",
+      reviewsNeeded: 2,
+      status: "pending",
+      reviewedAt: null as Date | null,
+      job: { id: "job-1", tenantId: "tenant_zedu", projectId: "p1", pointsPerAccepted: 25 },
+    };
+    const committedReviews: Array<Record<string, unknown>> = [];
+    let awardCount = 0;
+    let lockTail = Promise.resolve();
+
+    db.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
+      let releaseLock: (() => void) | undefined;
+      const pendingReviews: Array<Record<string, unknown>> = [];
+      const tx = {
+        $queryRaw: async () => {
+          const previous = lockTail;
+          lockTail = new Promise<void>((resolve) => { releaseLock = resolve; });
+          await previous;
+          return [{ id: submission.id }];
+        },
+        jobSubmission: {
+          findUnique: async () => ({ ...submission }),
+          update: async ({ data }: { data: Partial<typeof submission> }) => {
+            Object.assign(submission, data);
+            return { ...submission };
+          },
+        },
+        jobReview: {
+          findFirst: async ({ where }: { where: { agentId: string } }) =>
+            [...committedReviews, ...pendingReviews].find((row) => row.agentId === where.agentId) ?? null,
+          findMany: async () => [...committedReviews, ...pendingReviews],
+          create: async ({ data }: { data: Record<string, unknown> }) => {
+            const row = { id: `review-${committedReviews.length + pendingReviews.length + 1}`, ...data };
+            pendingReviews.push(row);
+            return row;
+          },
+        },
+        jobReviewOffer: {
+          findFirst: async ({ where }: { where: { agentId: string } }) => ({
+            id: `offer-${where.agentId}`,
+            deadlineAt: new Date(Date.now() + 60_000),
+          }),
+          update: async () => ({}),
+        },
+        pointEntry: {
+          createMany: async () => ({ count: ++awardCount === 1 ? 1 : 0 }),
+        },
+        agentAuditEvent: { create: async () => ({}) },
+        agentEvent: { create: async () => ({ id: "job-review-event" }) },
+        webhookSubscription: { findMany: async () => [] },
+        webhookDelivery: { createMany: async () => ({ count: 0 }) },
+      };
+
+      try {
+        const result = await callback(tx);
+        committedReviews.push(...pendingReviews);
+        return result;
+      } finally {
+        releaseLock?.();
+      }
+    });
+
+    const [first, second] = await Promise.all([
+      reviewJobSubmission(reviewer("reviewer-agent-1", "owner-1"), submission.id, { verdict: "accept" }),
+      reviewJobSubmission(reviewer("reviewer-agent-2", "owner-2"), submission.id, { verdict: "accept" }),
+    ]);
+
+    expect([first.submission.status, second.submission.status].sort()).toEqual(["accepted", "pending"]);
+    expect(submission.status).toBe("accepted");
+    expect(committedReviews).toHaveLength(2);
+    expect(awardCount).toBe(1);
   });
 });
