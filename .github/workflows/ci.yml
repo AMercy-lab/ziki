@@ -59,6 +59,15 @@ jobs:
           pnpm test
           pnpm build
 
+      # Next.js keeps its build cache in .next/cache; restoring it reuses work from earlier builds.
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-ci-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            next-ci-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            next-ci-${{ runner.os }}-
       - name: Build
         env:
           DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
@@ -197,6 +206,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The browser download is cached by Playwright version; --with-deps still installs the system libraries.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
       - name: Install Chromium for Playwright
         run: pnpm exec playwright install --with-deps chromium
 
@@ -205,7 +221,19 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm e2e:seed
 
+      # Next.js keeps its build cache in .next/cache; restoring it reuses work from earlier builds.
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-e2e-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            next-e2e-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            next-e2e-${{ runner.os }}-
       - name: Build
+        # The ci job type-checks this commit; skip next build's duplicate check (next.config.ts).
+        env:
+          SKIP_BUILD_TYPECHECK: "1"
         run: pnpm build
 
       - name: Run end-to-end tests
