@@ -9,7 +9,7 @@ import { POINT_AWARD_MAX, POINT_TARGET_MAX } from "@/lib/points/rules";
 import {
   savePlatformRewardsAction,
   type PlatformRewardsActionResult,
-} from "@/app/(app)/admin/rewards/actions";
+} from "@/app/(app)/superadmin/rewards/actions";
 
 /**
  * Super-admin editor for site-wide ledger amounts. Empty/missing platform

@@ -100,7 +100,7 @@ export default auth((req) => {
     );
   }
 
-  // /admin role checks live in the pages and actions (requireAdmin /
+  // /superadmin role checks live in the pages and actions (requireAdmin /
   // requireSuperAdmin), which read the current role from the database. The
   // JWT role is only refreshed at sign-in, so checking it here bounced newly
   // promoted admins until they signed out and back in (#121).

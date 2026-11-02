@@ -18,7 +18,7 @@ export default async function AdminRewardsPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <p className="text-sm">
-          <Link href="/admin/users" className="font-medium text-teal-700 hover:underline">
+          <Link href="/superadmin/users" className="font-medium text-teal-700 hover:underline">
             ← Site admin
           </Link>
         </p>

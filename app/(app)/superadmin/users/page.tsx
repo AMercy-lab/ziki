@@ -65,7 +65,7 @@ export default async function AdminUsersPage({
             and admins on its Organization page.
           </p>
           <p className="mt-2 text-sm">
-            <Link href="/admin/rewards" className="font-medium text-zk-accent hover:underline">
+            <Link href="/superadmin/rewards" className="font-medium text-zk-accent hover:underline">
               Platform points
             </Link>
           </p>
@@ -120,7 +120,7 @@ export default async function AdminUsersPage({
           <div className="px-4 py-12 text-center">
             <p className="font-medium text-zk-text">No account matching &ldquo;{query}&rdquo;</p>
             <Link
-              href="/admin/users"
+              href="/superadmin/users"
               className="mt-3 inline-flex text-sm font-medium text-zk-accent hover:underline"
             >
               Clear search
@@ -138,7 +138,7 @@ export default async function AdminUsersPage({
         from={pagination.from}
         to={pagination.to}
         queryParams={{ q: query || undefined }}
-        basePath="/admin/users"
+        basePath="/superadmin/users"
         itemLabel="user"
       />
     </div>

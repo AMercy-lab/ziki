@@ -21,7 +21,7 @@ export async function savePlatformRewardsAction(
   try {
     const config = parsePlatformRewardConfigFromFormData(formData);
     await savePlatformRewardConfig(prisma, config, actor.id);
-    revalidatePath("/admin/rewards");
+    revalidatePath("/superadmin/rewards");
     revalidatePath("/workers");
     revalidatePath("/[project]/org", "layout");
     revalidatePath("/", "layout");

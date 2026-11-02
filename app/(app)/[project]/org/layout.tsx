@@ -9,7 +9,7 @@ import { requireProject } from "@/lib/project-route";
  * The organization admin area (/<slug>/org, #project-urls): everything an organization's owners and
  * admins manage, each in one place. It always shows the organization this
  * device is working in. Every member can open it; only owners and admins (and
- * the site super admin) see controls. Site-wide staff pages stay under /admin.
+ * the site super admin) see controls. Site-wide staff pages stay under /superadmin.
  */
 export default async function OrgLayout({ children, params }: { children: React.ReactNode; params: Promise<{ project: string }> }) {
   const { project } = await params;
