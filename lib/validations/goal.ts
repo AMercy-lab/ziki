@@ -35,7 +35,7 @@ const credits = (label: string, max: number, min: number) =>
   z.preprocess(
     strictCoerceInteger,
     z
-      .number({ invalid_type_error: `${label} must be a number` })
+      .number({ message: `${label} must be a number` })
       .int(`${label} must be a whole number of credits`)
       .min(min, `${label} must be at least ${min}`)
       .max(max, `${label} must be at most ${max}`),
@@ -93,7 +93,7 @@ const splitTargetSchema = z
     /** Weight (`proportional`) or percentage share (`milestone`). */
     weight: z.preprocess(
       strictCoerceInteger,
-      z.number({ invalid_type_error: "Weight must be a number" }).int().min(0).max(1_000_000),
+      z.number({ message: "Weight must be a number" }).int().min(0).max(1_000_000),
     ).optional(),
     /** Explicit slice for `manual` splits. */
     amount: credits("amount", MAX_POOL_CREDITS, 1).optional(),
