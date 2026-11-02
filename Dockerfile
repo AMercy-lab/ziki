@@ -1,15 +1,20 @@
+# syntax=docker/dockerfile:1
+# BuildKit cache mounts (below) keep the pnpm store and the Next.js build cache
+# on the build server between deploys, so a deploy does not start cold.
 FROM node:22-alpine AS deps
 RUN apk add --no-cache openssl libc6-compat
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@10.14.0 --activate
 COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=ziki-pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile --store-dir /pnpm/store
 # pnpm does not hoist @prisma/engines to node_modules/@prisma/engines.
 # Copying that path fails the image build ("not found") and Coolify keeps
 # the previous container. Install the CLI into its own tree so migrate can
 # resolve the engine and its dependencies.
-RUN PRISMA_VERSION="$(node -p "require('./node_modules/prisma/package.json').version")" \
+RUN --mount=type=cache,id=ziki-npm-cache,target=/root/.npm \
+    PRISMA_VERSION="$(node -p "require('./node_modules/prisma/package.json').version")" \
     && mkdir -p /opt/prisma-cli \
     && npm init -y --prefix /opt/prisma-cli >/dev/null \
     && npm install --prefix /opt/prisma-cli --omit=dev --no-package-lock --no-audit --no-fund "prisma@${PRISMA_VERSION}"
@@ -21,8 +26,11 @@ RUN corepack enable && corepack prepare pnpm@10.14.0 --activate
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# CI already type-checked this commit before the deploy was triggered (next.config.ts).
+ENV SKIP_BUILD_TYPECHECK=1
 # `output: "standalone"` (next.config.ts) emits the server plus only traced deps.
-RUN pnpm run build
+# .next/cache holds Next.js's build cache (webpack, incremental type info); mounting it keeps it between deploys.
+RUN --mount=type=cache,id=ziki-next-cache,target=/app/.next/cache pnpm run build
 
 FROM node:22-alpine AS runner
 # openssl + libc6-compat for Prisma, tzdata for TZ, wget for the healthcheck.
