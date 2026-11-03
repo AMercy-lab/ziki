@@ -146,7 +146,7 @@ export default async function AppLayout({
         </main>
       </div>
       {/* The page's foot stays clear of the agents strip, so everything scrolls above it. */}
-      {dockAgents.length ? <div aria-hidden="true" className="hidden shrink-0 lg:block" style={{ height: AGENTS_DOCK_HEIGHT }} /> : null}
+      <div aria-hidden="true" className="hidden shrink-0 lg:block" style={{ height: AGENTS_DOCK_HEIGHT }} />
       <AgentsDock agents={dockAgents} />
       <FocusMainOnNavigate />
       <KeyboardShortcuts

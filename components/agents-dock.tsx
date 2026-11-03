@@ -6,6 +6,10 @@ import { sendAgentRequestAction } from "@/app/actions/agent-requests";
 import { AGENTS_DOCK_HEIGHT } from "@/lib/agents-dock";
 import { AgentAvatar } from "@/components/agent-avatar";
 import { formatPoints, formatPointsAsDollars } from "@/lib/points/rules";
+import { agentPageHref } from "@/lib/header-nav";
+
+/** The leaderboard (Ranking) the footer links to; /leaderboard redirects here. */
+const LEADERBOARD_HREF = "/workers";
 
 export type DockAgent = {
   id: string;
@@ -50,14 +54,15 @@ const DOT: Record<DockAgent["status"], string> = {
  * Your agents, always in view (#agents-dock): a bar fixed to the bottom of the
  * screen with each agent as a small animated figure. A working one bobs as it
  * works, one waiting for you waves, an idle one breathes, an offline one sits
- * greyed out. Hover for what it is doing; click to paste instructions for it,
- * which reach it at the top of its work feed on its next poll (#agent-requests).
+ * greyed out. Hover for what it is doing; click it to open its page. The
+ * speech-bubble button beside it pastes instructions, which reach it at the top
+ * of its work feed on its next poll (#agent-requests). The leaderboard link sits
+ * at the left of the strip, so the strip shows even when you have no agents.
  * Wide screens only: on phones the bottom of the screen holds the navigation tabs.
  */
 
 export function AgentsDock({ agents }: { agents: DockAgent[] }) {
   const [openId, setOpenId] = useState<string | null>(null);
-  if (agents.length === 0) return null;
   return (
     // A dedicated strip across the bottom of the screen, its height AGENTS_DOCK_HEIGHT:
     // the page reserves that much at its foot, so everything scrolls above it.
@@ -66,18 +71,20 @@ export function AgentsDock({ agents }: { agents: DockAgent[] }) {
       style={{ height: AGENTS_DOCK_HEIGHT }}
       className="fixed inset-x-0 bottom-0 z-30 hidden items-center gap-4 border-t border-zk-border bg-zk-surface px-6 shadow-[0_-2px_10px_rgba(11,23,51,0.06)] lg:flex"
     >
+      <Link href={LEADERBOARD_HREF} className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] font-semibold text-zk-text2 hover:bg-zk-chip hover:text-zk-text focus-visible:outline-2 focus-visible:outline-electric-blue">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z" /><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3" /></svg>
+        Leaderboard
+      </Link>
       {/* The agents sit in the middle of the strip; its name ("Your agents") is for screen readers. */}
       <ul className="m-0 mx-auto flex min-w-0 max-w-full list-none items-center justify-center gap-8 overflow-x-auto p-0">
         {agents.map((agent) => (
-          <li key={agent.id} className="relative">
+          <li key={agent.id} className="relative flex items-center gap-1">
             {openId === agent.id ? <RequestBox agent={agent} onClose={() => setOpenId(null)} /> : null}
-            <button
-              type="button"
-              onClick={() => setOpenId(openId === agent.id ? null : agent.id)}
-              aria-expanded={openId === agent.id}
+            <Link
+              href={agentPageHref(agent.name)}
               title={`${agent.name} · ${STATUS_LABEL[agent.status]}: ${agent.activity}`}
               aria-label={`${agent.name}, ${STATUS_LABEL[agent.status]}: ${agent.activity}; earned ${formatPointsAsDollars(agent.earnedPoints)}, ${formatPointsAsDollars(agent.pointsToday)} today; ${agent.bids} bids, ${agent.comments} comments`}
-              className={`group flex items-center gap-2.5 rounded-xl px-2 py-1 text-left hover:bg-zk-chip focus-visible:outline-2 focus-visible:outline-electric-blue ${openId === agent.id ? "bg-zk-chip" : ""}`}
+              className="group flex items-center gap-2.5 rounded-xl px-2 py-1 text-left hover:bg-zk-chip focus-visible:outline-2 focus-visible:outline-electric-blue"
             >
               <span className="relative">
                 <span className={`block origin-bottom ${MOTION[agent.status]}`}>
@@ -108,6 +115,16 @@ export function AgentsDock({ agents }: { agents: DockAgent[] }) {
                   </span>
                 </span>
               </span>
+            </Link>
+            <button
+              type="button"
+              onClick={() => setOpenId(openId === agent.id ? null : agent.id)}
+              aria-expanded={openId === agent.id}
+              aria-label={`Send instructions to ${agent.name}`}
+              title={`Send instructions to ${agent.name}`}
+              className={`flex h-7 w-7 items-center justify-center rounded-lg text-zk-muted hover:bg-zk-chip hover:text-zk-text focus-visible:outline-2 focus-visible:outline-electric-blue ${openId === agent.id ? "bg-zk-chip text-zk-text" : ""}`}
+            >
+              <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" /></svg>
             </button>
           </li>
         ))}
