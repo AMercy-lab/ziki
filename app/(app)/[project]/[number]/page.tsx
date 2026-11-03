@@ -121,6 +121,8 @@ import {
 } from "./issue-ui";
 import "./issue-detail.css";
 import { stateLabel } from "@/lib/labels";
+import { IssueRewardPanel } from "@/components/issue-reward-panel";
+import { rewardEstimatesFor } from "@/lib/agent-api/reward-estimates";
 
 type BugPageProps = {
   params: Promise<{ project: string; number: string }>;
@@ -737,6 +739,11 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
 
   // #idea-table: the idea this issue was converted from.
   const sourceIdea = bug.idea;
+  // #rewards: what solving it pays, and every estimate behind it (planning poker).
+  const [rewardRow, rewardEstimates] = await Promise.all([
+    prisma.bug.findUnique({ where: { id: bug.id }, select: { reward: true, rewardFixedAt: true } }),
+    loadOptional<Awaited<ReturnType<typeof rewardEstimatesFor>>>("reward estimates", [], () => rewardEstimatesFor(bug.id)),
+  ]);
   const confirmationsData = await loadOptional<(ConfirmationsData & { confirmed?: boolean }) | null>("confirmations", null, () =>
     // #confirmation-files: other confirmers' files show once the viewer has confirmed (admins always).
     listConfirmations({ tenantId: bug.tenantId, projectId: bug.projectId }, bug.id, { userId: user.id, admin: canChooseRedesign }),
@@ -1440,6 +1447,17 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
               </form>
             ) : null}
           </section>
+          {/* #rewards: the reward, your estimate, and everyone's. */}
+          {rewardRow ? (
+            <IssueRewardPanel
+              bugId={bug.id}
+              reward={Number(rewardRow.reward)}
+              fixed={Boolean(rewardRow.rewardFixedAt)}
+              estimates={rewardEstimates}
+              viewerId={user.id}
+              canEstimate={!bug.isDeleted && bug.status !== "closed"}
+            />
+          ) : null}
 
           {/* People, compact: one row each, label on the left. */}
           <section className="flex flex-col gap-2 rounded-[20px] border border-zk-border bg-zk-surface px-4 py-3.5">

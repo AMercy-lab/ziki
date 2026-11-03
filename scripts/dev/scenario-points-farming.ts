@@ -179,7 +179,7 @@ async function main() {
         userId: entry.userId,
         agentId: entry.agentId,
         role: entry.role,
-        // The amounts above are the old point figures; the ledger is in Ƶ (#z-currency), 100 points to Ƶ1.
+        // The amounts above are the old point figures; the ledger is in $ (#z-currency), 100 points to $1.
         points: entry.points / 100,
         sourceKey: entry.sourceKey,
         bugId: entry.bugId ?? null,

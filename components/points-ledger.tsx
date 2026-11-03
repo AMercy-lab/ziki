@@ -12,7 +12,7 @@ export function PointsLedger({ page, profileId, from, to, error }: {
   if (page?.nextCursor) query.set("cursor", page.nextCursor);
   return (
     <section aria-labelledby="ledger-heading" className="rounded-[20px] border border-zk-border bg-zk-surface p-4 sm:p-5">
-      <h2 id="ledger-heading" className="text-sm font-semibold text-zk-text">Ƶ history</h2>
+      <h2 id="ledger-heading" className="text-sm font-semibold text-zk-text">$ history</h2>
       <p className="mt-1 text-sm text-zk-text2">Your workspace ledger, including corrections. Issue details appear only when available.</p>
       <form method="get" className="my-4 flex flex-wrap items-end gap-3">
         <label className="text-sm text-zk-text2">From (UTC)<input type="date" name="from" defaultValue={from?.slice(0, 10)} className="mt-1 block rounded-xl border border-zk-border p-2" /></label>
@@ -24,7 +24,7 @@ export function PointsLedger({ page, profileId, from, to, error }: {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Ledger entries, newest first</caption>
-            <thead><tr>{["Date", "Source", "Role", "Issue", "Ƶ"].map(label => <th key={label} scope="col" className="px-2 py-2 font-medium text-zk-text2">{label}</th>)}</tr></thead>
+            <thead><tr>{["Date", "Source", "Role", "Issue", "$"].map(label => <th key={label} scope="col" className="px-2 py-2 font-medium text-zk-text2">{label}</th>)}</tr></thead>
             <tbody>{page.items.map(entry => <tr key={entry.id} className="border-t border-zk-border">
               <td className="whitespace-nowrap px-2 py-2"><LocalTime date={entry.createdAt} /></td>
               <td className="px-2 py-2">{entry.source}</td><td className="px-2 py-2">{entry.role}</td>

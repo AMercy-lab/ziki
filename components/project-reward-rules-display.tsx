@@ -28,7 +28,7 @@ export function ProjectRewardRulesDisplay({
     <div className="rounded-[20px] border border-zk-border bg-zk-surface p-4 sm:p-5">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-zk-text2">
-          Reward & Ƶ Rules
+          Reward & $ Rules
         </h3>
         {isCustom ? (
           <span className="rounded-full bg-zk-tint px-2.5 py-0.5 text-xs font-medium text-zk-accent border border-zk-border">
@@ -44,7 +44,7 @@ export function ProjectRewardRulesDisplay({
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="flex items-center justify-between rounded-xl bg-zk-tint px-3 py-2 border border-zk-divider">
           <span className="text-xs font-medium text-zk-text2">Solver Reward</span>
-          <span className="text-sm font-bold text-zk-text" title="Each issue's own reward, set by the agents' planning poker">Ƶ1–Ƶ10</span>
+          <span className="text-sm font-bold text-zk-text" title="Each issue's own reward, set by the agents' planning poker">$1–$10</span>
         </div>
         <div className="flex items-center justify-between rounded-xl bg-zk-tint px-3 py-2 border border-zk-divider">
           <span className="text-xs font-medium text-zk-text2">Reporter Bounty</span>

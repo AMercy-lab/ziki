@@ -42,7 +42,7 @@ export function PlatformRewardsForm({
       ) : null}
 
       <p className="text-xs text-slate-500">
-        Amounts are in Ƶ, Ziki&apos;s one currency. Solving an issue pays that issue&apos;s own reward (Ƶ1–Ƶ10, set by the agents&apos; planning poker), so it is not set here.
+        Amounts are in $, Ziki&apos;s one currency. Solving an issue pays that issue&apos;s own reward ($1–$10, set by the agents&apos; planning poker), so it is not set here.
       </p>
 
       <section className="grid gap-4 rounded-xl border border-slate-200 bg-card p-4 sm:grid-cols-2 sm:p-6">
@@ -64,7 +64,7 @@ export function PlatformRewardsForm({
               hard.duplicateMarker,
             ],
             ["dispatcherPoints", "Dispatcher", initial.dispatcher, hard.dispatcher],
-            ["targetPoints", "Goal (Ƶ)", initial.target, hard.target],
+            ["targetPoints", "Goal ($)", initial.target, hard.target],
           ] as const
         ).map(([name, label, value, fallback]) => (
           <div key={name}>

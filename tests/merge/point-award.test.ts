@@ -55,7 +55,7 @@ describe("points ledger (#428)", () => {
     expect(rows).toEqual([]);
   });
 
-  it("pays the solver the issue's reward, in Ƶ, Ƶ1 before any estimate (#rewards)", () => {
+  it("pays the solver the issue's reward, in $, $1 before any estimate (#rewards)", () => {
     expect(solverAward({ ...issue, reward: 6.5 })).toEqual({
       tenantId: "tenant-zedu",
       userId: "user-1",
@@ -65,7 +65,7 @@ describe("points ledger (#428)", () => {
       sourceKey: "solver:bug-1:user-1",
     });
     expect(solverAward(issue)?.points).toBe(1);
-    // Never outside Ƶ1–Ƶ10.
+    // Never outside $1–$10.
     expect(solverAward({ ...issue, reward: 40 })?.points).toBe(10);
   });
 

@@ -573,7 +573,7 @@ export async function IssuesList({
         },
         category: { select: { id: true, name: true } },
         area: { select: { id: true, name: true } },
-        // #rewards: what solving it pays, in Ƶ, and whether the estimating is done.
+        // #rewards: what solving it pays, in $, and whether the estimating is done.
         reward: true,
         rewardEstimateCount: true,
         rewardFixedAt: true,
@@ -1059,8 +1059,10 @@ export async function IssuesList({
               <div>
                 <div className="issues-table-heading">
                   {/* Each column sorts the list on the server; the choice is kept in a cookie (#column-sort). */}
-                  {/* #rewards: what solving each issue pays, in Ƶ. */}
-                  <span className="w-[76px] shrink-0 text-center">Reward</span>
+                  {/* #rewards: what solving each issue pays, in $; sorts highest first, then lowest. */}
+                  <span className="issues-vote w-[76px] shrink-0">
+                    <SortHeader label="Reward" current={currentSort} first="reward" second="reward_low" cookie={ISSUE_SORT_COOKIE} />
+                  </span>
                   <span className="min-w-0 flex-1">
                     <SortHeader label="Issue" current={currentSort} first="title" second="title_desc" firstDescending={false} cookie={ISSUE_SORT_COOKIE} />
                   </span>

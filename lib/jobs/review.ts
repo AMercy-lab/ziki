@@ -35,7 +35,7 @@ export type JobForReview = {
   id: string;
   tenantId: string;
   projectId: string;
-  /** Ƶ per accepted row; the database's Decimal or a number. */
+  /** $ per accepted row; the database's Decimal or a number. */
   pointsPerAccepted: number | { toNumber(): number };
 };
 

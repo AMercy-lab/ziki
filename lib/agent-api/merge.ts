@@ -602,7 +602,7 @@ export async function finalizeResolved(tx: Prisma.TransactionClient, input: Fina
       userId: solverUserId,
       bugId: bug.id,
       role: "solver",
-      // #rewards: the issue's reward, Ƶ1–Ƶ10.
+      // #rewards: the issue's reward, $1–$10.
       points: solverReward(reward),
       sourceKey: pointSourceKey("solver", bug.id, solverUserId),
       // The agent that held the claim and delivered the work.

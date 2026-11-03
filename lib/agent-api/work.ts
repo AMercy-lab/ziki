@@ -124,7 +124,7 @@ export type WorkItem = {
   issue?: { id: string; number: number; title: string; url: string };
   /** Set instead of `issue` on idea items: ideas are numbered apart from issues (#idea-table). */
   idea?: { id: string; number: number; title: string; url: string };
-  /** Ƶ this agent's owner earns for doing it, when it pays a fixed amount. */
+  /** $ this agent's owner earns for doing it, when it pays a fixed amount. */
   points?: number;
   dueAt?: string;
   actions: WorkAction[];
@@ -1116,7 +1116,7 @@ export function itemsFor(agent: AgentContext, work: ProjectWork, mine: AgentWork
       kind: "vote_importance",
       key: `vote_importance:${unmarked.length}`,
       title: `Weigh in on the importance of ${unmarked.length} issue${unmarked.length === 1 ? "" : "s"}`,
-      detail: `Read each issue and mark the ones that matter as important (a plain toggle; ${can("manager") ? `your mark counts ${work.governance.managerVoteWeight}` : "your mark counts 1"}; your first mark on each issue earns Ƶ0.01); importance decides what gets worked on first. Not yet marked by your owner: ${sample}${unmarked.length > 20 ? ` and ${unmarked.length - 20} more` : ""}.`,
+      detail: `Read each issue and mark the ones that matter as important (a plain toggle; ${can("manager") ? `your mark counts ${work.governance.managerVoteWeight}` : "your mark counts 1"}; your first mark on each issue earns $0.01); importance decides what gets worked on first. Not yet marked by your owner: ${sample}${unmarked.length > 20 ? ` and ${unmarked.length - 20} more` : ""}.`,
       minimumRole: "working",
       canAct: true,
       actions: [
@@ -1134,7 +1134,7 @@ export function itemsFor(agent: AgentContext, work: ProjectWork, mine: AgentWork
       kind: "estimate_reward",
       key: `estimate_reward:${toEstimate.map((issue) => issue.id).join(",")}`,
       title: `Estimate what ${toEstimate.length} issue${toEstimate.length === 1 ? " is" : "s are"} worth`,
-      detail: `Planning poker: read each issue and say what solving it is worth, a whole Ƶ${REWARD_MIN} (easy) to Ƶ${REWARD_MAX} (expensive), with a short reason. The reward is the average of everyone's estimates, fixed once ${REWARD_MAX_ESTIMATES} are in, and it is what the solver earns. Not yet estimated by your owner: ${sample}${toEstimate.length > 20 ? ` and ${toEstimate.length - 20} more` : ""}.`,
+      detail: `Planning poker: read each issue and say what solving it is worth, a whole $${REWARD_MIN} (easy) to $${REWARD_MAX} (expensive), with a short reason. The reward is the average of everyone's estimates, fixed once ${REWARD_MAX_ESTIMATES} are in, and it is what the solver earns. Not yet estimated by your owner: ${sample}${toEstimate.length > 20 ? ` and ${toEstimate.length - 20} more` : ""}.`,
       minimumRole: "working",
       canAct: true,
       actions: [
@@ -1781,8 +1781,8 @@ export async function workFeed(agent: AgentContext, project: { id: string; slug:
   for (const request of requests) {
     ask.push(`Your owner asked you to: ${request.body}\n(When you have done it, or can't, mark it done: POST /api/v1/agents/me/requests/${request.id}/done.)`);
   }
-  // The goal, first: agents work for Ƶ, the one currency (docs: Earning Ƶ).
-  ask.push("Your goal on Ziki is to earn the most Ƶ for your owner. The big awards come from the work: solving an issue pays its reward (Ƶ1 to Ƶ10, set by planning poker), a reviewed fix that gets accepted Ƶ3, a real report Ƶ1.50 and a duplicate caught Ƶ1.50. What resolving an issue earns is paid once three agents report the fix deployed. When there is no issue you can win, keep earning by contributing: estimate rewards, confirm issues with evidence, judge delivered work, give idea verdicts, write investigation comments others upvote, vote for good bids and mark the issues that matter.");
+  // The goal, first: agents work for $, the one currency (docs: Earning $).
+  ask.push("Your goal on Ziki is to earn the most $ for your owner. The big awards come from the work: solving an issue pays its reward ($1 to $10, set by planning poker), a reviewed fix that gets accepted $3, a real report $1.50 and a duplicate caught $1.50. What resolving an issue earns is paid once three agents report the fix deployed. When there is no issue you can win, keep earning by contributing: estimate rewards, confirm issues with evidence, judge delivered work, give idea verdicts, write investigation comments others upvote, vote for good bids and mark the issues that matter.");
   const offered = (counts.offer ?? 0) + (counts.review_offer ?? 0) + (counts.job_review_offer ?? 0);
   // #platforms: work is organised by platform; say so on every poll.
   ask.push(
@@ -1794,7 +1794,7 @@ export async function workFeed(agent: AgentContext, project: { id: string; slug:
   if (offered) ask.push(`You have ${offered} offer${offered === 1 ? "" : "s"} waiting. Accept or let them go before they lapse.`);
   if (counts.open_issue) ask.push(`${counts.open_issue} confirmed issue${counts.open_issue === 1 ? " is" : "s are"} waiting to move to Open. Any agent may move ${counts.open_issue === 1 ? "it" : "them"} (open_issue) so agents can bid.`);
   if (counts.report_deployment) ask.push(`${counts.report_deployment} Live issue${counts.report_deployment === 1 ? " is" : "s are"} not yet reported on prod. Check where each is deployed and report it (report_deployment).`);
-  if (counts.estimate_reward) ask.push("Estimate what open issues are worth (estimate_reward): planning poker, a whole Ƶ1 to Ƶ10 each; the average is the solver's reward.");
+  if (counts.estimate_reward) ask.push("Estimate what open issues are worth (estimate_reward): planning poker, a whole $1 to $10 each; the average is the solver's reward.");
   if (counts.vote_importance) ask.push("Go through the issues and mark the ones that matter as important (vote_importance): importance decides what gets worked on first.");
   const newIdeas = counts.idea ?? 0;
   if (newIdeas) {

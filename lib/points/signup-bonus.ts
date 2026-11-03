@@ -3,7 +3,7 @@ import { award } from "@/lib/points/award";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
-/** What every new account gets, in Ƶ (#z-currency). */
+/** What every new account gets, in $ (#z-currency). */
 export const SIGNUP_BONUS_POINTS = 0.67;
 
 /**

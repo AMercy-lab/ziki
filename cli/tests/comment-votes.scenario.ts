@@ -51,7 +51,7 @@ describe("investigation comments and upvotes", () => {
     expect(await byKey("bob", `review_comment:${commentId}`)).toBeUndefined();
   });
 
-  it("counts eli's upvote once and pays bob Ƶ0.01 for it", async () => {
+  it("counts eli's upvote once and pays bob $0.01 for it", async () => {
     const before = await commentPoints("bob");
     expect(await ok("eli", "upvote-comment", { id: commentId })).toEqual({ commentId, votes: 1 });
     // Upvoting again is fine and counts once, and pays nothing more.
