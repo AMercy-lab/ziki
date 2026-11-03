@@ -9,6 +9,8 @@ import { formatPoints } from "@/lib/points/rules";
 import { pointBalance } from "@/lib/points/balance";
 import { decodePointCursor, pointEntries, pointEntriesQuerySchema } from "@/lib/points/entries";
 import { PointsLedger } from "@/components/points-ledger";
+import { PointsSources } from "@/components/points-sources";
+import { pointSources } from "@/lib/points/sources";
 import { PointsSummary } from "@/components/points-summary";
 import { requireUser } from "@/lib/auth-helpers";
 import { canViewProfile, canViewWallet } from "@/lib/profile-access";
@@ -122,8 +124,13 @@ export default async function ProfilePage({ params, searchParams }: ProfileProps
   const assignedWork = tenantId && tenantMembership
     ? await teamAssignedWorkForMember(prisma, tenantId, person.id, agents)
     : [];
-  const manageLevels = tenantId && viewer.id !== person.id && (await isTenantAdmin(viewer, tenantId))
+  const viewerIsAdmin = tenantId ? await isTenantAdmin(viewer, tenantId) : false;
+  const manageLevels = tenantId && viewer.id !== person.id && viewerIsAdmin
     ? settableLevels({ isOwner: false, isTenantAdmin: true })
+    : null;
+  // #points-sources: where their points came from, for the person and the workspace's admins (to spot farming).
+  const sources = tenantId && (viewer.id === person.id || viewerIsAdmin)
+    ? await pointSources(prisma, { tenantId, userId: person.id })
     : null;
 
   return (
@@ -188,6 +195,8 @@ export default async function ProfilePage({ params, searchParams }: ProfileProps
           ) : null}
         </section>
       ) : null}
+
+      {sources ? <PointsSources sources={sources} name={person.name ?? "this person"} /> : null}
 
       {tenantId && viewer.id === person.id ? (
         <PointsLedger page={ledger} profileId={person.id} from={ledgerQuery.success ? ledgerQuery.data.from : undefined} to={ledgerQuery.success ? ledgerQuery.data.to : undefined} error={ledgerError} />
