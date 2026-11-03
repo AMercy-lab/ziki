@@ -5,6 +5,10 @@ export const BUG_SORT_OPTIONS = [
   "recently_updated",
   "importance",
   "least_important",
+  "title",
+  "title_desc",
+  "status",
+  "status_desc",
 ] as const;
 export type BugSortOption = (typeof BUG_SORT_OPTIONS)[number];
 
@@ -16,6 +20,10 @@ export const bugSortLabels: Record<BugSortOption, string> = {
   recently_updated: "Recently Updated",
   importance: "Most important",
   least_important: "Least important",
+  title: "Title (A–Z)",
+  title_desc: "Title (Z–A)",
+  status: "Status (earliest step first)",
+  status_desc: "Status (latest step first)",
 };
 
 export const bugSortDescriptions: Record<BugSortOption, string> = {
@@ -23,6 +31,10 @@ export const bugSortDescriptions: Record<BugSortOption, string> = {
   recently_updated: "recently updated",
   importance: "most important",
   least_important: "least important",
+  title: "title, A to Z",
+  title_desc: "title, Z to A",
+  status: "status, earliest step first",
+  status_desc: "status, latest step first",
 };
 
 /** Sort key for bug lists: most important first, then most recently updated. */
@@ -62,6 +74,9 @@ export function parseBugSort(
   if (normalized === "least_important" || normalized === "least_importance" || normalized === "importance_asc") {
     return "least_important";
   }
+  if (normalized === "title" || normalized === "title_desc" || normalized === "status" || normalized === "status_desc") {
+    return normalized;
+  }
   return fallback;
 }
 
@@ -88,6 +103,15 @@ export function getBugOrderBy(
           { updatedAt: "desc" },
           { createdAt: "desc" },
         ];
+      case "title":
+        return [{ title: "asc" }, { id: "asc" }];
+      case "title_desc":
+        return [{ title: "desc" }, { id: "desc" }];
+      // The Substatus enum is declared in workflow order, so the database sorts by step.
+      case "status":
+        return [{ substatus: "asc" }, { updatedAt: "desc" }, { id: "desc" }];
+      case "status_desc":
+        return [{ substatus: "desc" }, { updatedAt: "desc" }, { id: "desc" }];
     }
   })();
 
@@ -163,7 +187,19 @@ export type BugSortableItem = {
   boostedAt?: Date | string | null;
   createdAt: Date | string;
   updatedAt?: Date | string;
+  title?: string;
+  substatus?: string;
 };
+
+/** The Substatus enum's order (prisma/schema.prisma), which is the workflow order. */
+const SUBSTATUS_RANK = [
+  "requires_confirmation", "open", "in_progress", "requires_review", "accepted",
+  "ready_to_merge", "error", "on_dev", "on_staging", "on_prod", "closed",
+];
+function substatusRank(value?: string): number {
+  const rank = value ? SUBSTATUS_RANK.indexOf(value) : -1;
+  return rank === -1 ? SUBSTATUS_RANK.length : rank;
+}
 
 export function sortBugsByPopularity<T extends BugPopularitySortKey>(
   bugs: T[],
@@ -193,6 +229,16 @@ export function sortBugs<T extends BugSortableItem>(
           { voteCount: a.voteCount, updatedAt: a.updatedAt ?? a.createdAt },
           { voteCount: b.voteCount, updatedAt: b.updatedAt ?? b.createdAt },
         );
+      case "title":
+      case "title_desc": {
+        const diff = (a.title ?? "").localeCompare(b.title ?? "");
+        return (sort === "title" ? diff : -diff) || compareBugsByNewest(a, b);
+      }
+      case "status":
+      case "status_desc": {
+        const diff = substatusRank(a.substatus) - substatusRank(b.substatus);
+        return (sort === "status" ? diff : -diff) || compareBugsByRecentlyUpdated(a, b);
+      }
     }
   });
 }
