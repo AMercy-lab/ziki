@@ -51,7 +51,8 @@
 /* Labels of more than one word take two lines, so the bar stays narrow at the same height. */
 /* Ideas, at the start of the status bar. */
 .issues-table { border: 1px solid var(--zk-border); border-radius: 10px; overflow: hidden; }
-.issues-table-heading { display: flex; align-items: center; gap: 16px; padding: 9px 18px; background: var(--zk-bg); border-bottom: 1px solid var(--issues-rule); font-size: 13px; line-height: 20px; color: var(--zk-muted); }
+/* The heading's bottom edge is stronger than the row dividers, so the header and body read apart in both themes. */
+.issues-table-heading { display: flex; align-items: center; gap: 16px; padding: 9px 18px; background: var(--zk-bg); border-bottom: 1px solid color-mix(in srgb, var(--zk-muted) 22%, transparent); font-size: 13px; line-height: 20px; color: var(--zk-muted); }
 /* Compact rows: about 60px, down from 88px. */
 .issues-row { min-height: 60px; gap: 16px; padding: 9px 18px; }
 .issues-row:hover { background: var(--zk-bg); }

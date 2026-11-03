@@ -32,6 +32,7 @@ import {
   normalizeMentions,
 } from "@/lib/mentions";
 import { resolveTenantMentions, tenantMemberWhere } from "@/lib/tenant-mentions";
+import { structureIdea } from "@/lib/idea-structuring";
 import {
   commentSchema,
   createBugSchema,
@@ -265,8 +266,12 @@ export async function createBugAction(
   const areaId = parsed.data.areaId && parsed.data.areaId.length > 0
     ? parsed.data.areaId
     : null;
+  // #idea-intake: Claude writes what they typed up as a clear idea (title and the standard
+  // headings) before it is saved. Without the key, or if that fails, it is saved as typed.
+  const structured = await structureIdea({ title: parsed.data.title, description: parsed.data.description });
+  const ideaTitle = structured?.title ?? parsed.data.title;
   // #502: mentions resolve only to members of the idea's tenant.
-  const description = await resolveTenantMentions(prisma, tenantId, parsed.data.description);
+  const description = await resolveTenantMentions(prisma, tenantId, structured?.description ?? parsed.data.description);
 
   if (categoryId) {
     const category = await prisma.category.findFirst({
@@ -295,7 +300,7 @@ export async function createBugAction(
           projectId,
           beneficiaryUserId: userId,
           reporterId: userId,
-          title: parsed.data.title,
+          title: ideaTitle,
           description,
           typeId,
           proofLinks: parsed.data.proofLinks,

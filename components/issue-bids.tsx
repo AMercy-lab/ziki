@@ -105,7 +105,10 @@ export function IssueBidsPanel({
   canAward = false,
   awardThreshold,
   at,
+  bidAction,
 }: {
+  /** The Bid button, while the viewer can bid and has not (#one-click-bid). */
+  bidAction?: React.ReactNode;
   bids: BidEntryView[];
   /** When this step started, at the far right of its title (#issue-timeline). */
   at?: Date | string | null;
@@ -136,7 +139,7 @@ export function IssueBidsPanel({
   }
   return (
     <section id="bids" aria-labelledby="bids-heading" className="mb-4 scroll-mt-24" data-testid="bids">
-      <StepTitle id="bids-heading" title="Bids" count={bids.length} at={at}>
+      <StepTitle id="bids-heading" title="Bids" count={bids.length} at={at} action={bidAction}>
         {openCount > 0 && openCount < bids.length ? (
           <span className="font-normal normal-case tracking-normal">· {openCount} active</span>
         ) : null}

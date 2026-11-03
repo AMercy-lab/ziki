@@ -54,6 +54,7 @@ import {
 import { IssueEscalations, type TicketEscalation } from "@/components/issue-escalations";
 import { listBugEscalations } from "@/lib/agent-questions";
 import { IssueBidsPanel, type BidEntryView } from "@/components/issue-bids";
+import { BidButton } from "@/components/bid-button";
 import { awardingAgentOf } from "@/lib/bid-award-permission";
 import { bidHistoryEntries } from "@/lib/agent-api/bid";
 import { markAtCapacity } from "@/lib/agent-api/capacity";
@@ -684,6 +685,23 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     (bug.substatus === "open" || bug.substatus === "requires_confirmation") && !bug.isDeleted
       ? await loadOptional("award permission", false, async () => Boolean(await awardingAgentOf(user.id, bug.tenantId)))
       : false;
+  // One-click bid: while the issue takes bids, nobody is working on it, and you have no open bid on it,
+  // the Bids step shows a Bid button with your agents to choose from.
+  const bidAgents =
+    (bug.substatus === "open" || bug.substatus === "requires_confirmation") && !bug.isDeleted
+      ? await loadOptional("bid agents", [] as { id: string; name: string }[], async () => {
+          const [workedOn, myOpenBid] = await Promise.all([
+            prisma.issueClaim.count({ where: { bugId: bug.id, releasedAt: null, status: "active" } }),
+            prisma.issueBid.count({ where: { bugId: bug.id, beneficiaryUserId: user.id, withdrawnAt: null, awardedAt: null } }),
+          ]);
+          if (workedOn > 0 || myOpenBid > 0) return [];
+          return prisma.agent.findMany({
+            where: { tenantId: bug.tenantId, ownerUserId: user.id, revokedAt: null },
+            orderBy: { name: "asc" },
+            select: { id: true, name: true },
+          });
+        })
+      : [];
   // #603: the tenant's active agents, offered in the comment @mention list
   // as "Mark's Claude · Mark Essien" alongside people.
   const mentionAgents = canTriage
@@ -1254,9 +1272,10 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                         <AwardStep award={awardClaim} />
                       </TimelineStep>
                     ) : null}
-                    {pastConfirmation || bidList.length > 0 ? (
+                    {pastConfirmation || bidList.length > 0 || bidAgents.length > 0 ? (
                       <TimelineStep>
                         <IssueBidsPanel
+                          bidAction={bidAgents.length > 0 ? <BidButton bugId={bug.id} agents={bidAgents} /> : undefined}
                           bids={bidList}
                           at={firstAt(bidList)}
                           collapsed={bug.status !== "open"}
