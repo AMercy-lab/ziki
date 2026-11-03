@@ -67,6 +67,7 @@ export function ProjectLinks({
   canEdit,
   notesHref,
   settingsHref,
+  askOnLoad,
 }: {
   slug: string;
   siteUrl: string | null;
@@ -76,6 +77,8 @@ export function ProjectLinks({
   notesHref: string;
   /** The project's full settings page. */
   settingsHref: string;
+  /** Whether the panel asks for a missing site by itself here: only on the Ideas tab. Elsewhere only the icon opens it. */
+  askOnLoad: boolean;
 }) {
   const [result, action, pending] = useActionState<ProjectActionResult | undefined, FormData>(saveProjectLinksAction, undefined);
   // Closed until mounted: whether to open depends on the snooze kept in this browser.
@@ -97,18 +100,20 @@ export function ProjectLinks({
     hasSiteRef.current = hasSite;
   }, [hasSite]);
 
-  // On load: open by itself while the site is unset and it wasn't dismissed in the last hour.
+  // On load: on the Ideas tab, open by itself while the site is unset and it wasn't dismissed in the last hour.
+  // Moving to another tab (In progress, Delivered, …) puts it away; the icon still opens it.
   useEffect(() => {
     if (siteUrl) return;
     // The snooze lives in this browser, so it is read after mounting, in a frame callback.
     const frame = requestAnimationFrame(() => {
-      if (snoozedRecently(slug)) setSnoozed(true);
+      if (!askOnLoad) setOpen(false);
+      else if (snoozedRecently(slug)) setSnoozed(true);
       else setOpen(true);
     });
     return () => cancelAnimationFrame(frame);
-    // Only on first load for this project.
+    // Only on first load for this project, and when the tab changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
+  }, [slug, askOnLoad]);
 
   // Find the slot above the list on every render: switching tabs replaces it.
   // Setting the same element again changes nothing, so this settles at once.
@@ -167,7 +172,8 @@ export function ProjectLinks({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result]);
 
-  const showIcon = hasSite || snoozed;
+  // Off the Ideas tab the icon is the way in, so it shows while the site is unset too.
+  const showIcon = hasSite || snoozed || !askOnLoad;
 
   const panel = open ? (
     <section

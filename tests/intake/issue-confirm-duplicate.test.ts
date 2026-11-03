@@ -307,7 +307,7 @@ describe("giveConfirmation (#issue-confirmations)", () => {
 describe("confirmation pay (#confirmation-pay)", () => {
   it("pays the first three confirmers in full, halves the next three, and pays pile-ons nothing", () => {
     const paid = Array.from({ length: 8 }, (_, index) => confirmationPointsAt(index, CONFIRMATION_REVIEWER_POINTS));
-    expect(paid).toEqual([90, 90, 90, 45, 22.5, 11.25, 0, 0]);
+    expect(paid).toEqual([0.9, 0.9, 0.9, 0.45, 0.225, 0.1125, 0, 0]);
     expect(confirmationPointsAt(-1, CONFIRMATION_REVIEWER_POINTS)).toBe(0);
   });
 });

@@ -82,7 +82,8 @@ import {
   NO_TENANT_MESSAGE,
 } from "@/lib/tenant-context";
 import { currentTenantAccess } from "@/lib/tenant-access";
-import { award, awardSolver } from "@/lib/points/award";
+import { award, solverAwardFor } from "@/lib/points/award";
+import { holdPayout } from "@/lib/points/payout";
 import { isConfirmed } from "@/lib/agent-api/confirmations";
 import { correct } from "@/lib/points/correct";
 import { VOTE_POINTS, importanceSourceKey, pointSourceKey } from "@/lib/points/rules";
@@ -798,15 +799,15 @@ export async function updateBugAction(
           }
         }
       }
-      // #428: resolving an issue earns its assignee solver points, once.
+      // #428, #rewards: resolving an issue earns its assignee the issue's reward, once,
+      // held until enough people report the work deployed (#live-payout).
       if (data.status === "resolved" && existing.status !== "resolved") {
-        await awardSolver(tx, {
+        const solver = await solverAwardFor(tx, {
           id: bugId,
           tenantId: existing.tenantId,
-          projectId: existing.projectId,
-          pullRequestUrl: existing.pullRequestUrl,
           assigneeId: data.assigneeId !== undefined ? data.assigneeId : existing.assigneeId,
         });
+        if (solver) await holdPayout(tx, bugId, [solver]);
       }
       if (pending.length > 0) {
         await tx.bugActivity.createMany({

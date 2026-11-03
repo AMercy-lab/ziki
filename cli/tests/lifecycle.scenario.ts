@@ -45,7 +45,7 @@ describe("a report from idea to merge", () => {
 
   it("scores good minus bad, and a newer verdict replaces the person's earlier one", async () => {
     const bad = await ok("bob", "give-idea-verdict", { id, opinion: "bad", summary: "Not needed.", description: "Saving already works for me." });
-    expect(bad).toMatchObject({ ideaScore: -1, replaced: false, pointsAwarded: 1 });
+    expect(bad).toMatchObject({ ideaScore: -1, replaced: false, pointsAwarded: 0.01 });
     const changed = await ok("bob", "give-idea-verdict", { id, opinion: "good", summary: "I was wrong. It fails on Firefox.", description: "Reproduced on Firefox 131." });
     expect(changed).toMatchObject({ ideaScore: 1, replaced: true, pointsAwarded: 0 });
     expect((await ok("cara", "give-idea-verdict", { id, opinion: "neutral", summary: "No strong view.", description: "Fine either way." })).ideaScore).toBe(1);

@@ -90,6 +90,7 @@ import {
 import { PlatformMenu, type PlatformTab } from "@/components/platform-tabs";
 import { IssueRowStatus } from "@/components/issue-row-status";
 import { BidsVoteBadge, ImportanceVoteBadge } from "@/components/vote-badge";
+import { RewardBadge } from "@/components/reward-badge";
 import { mergePathOf } from "@/lib/merge-history";
 import { IssuesToolsToggle } from "@/components/issues-tools-toggle";
 import { LoadError } from "@/components/load-error";
@@ -572,6 +573,10 @@ export async function IssuesList({
         },
         category: { select: { id: true, name: true } },
         area: { select: { id: true, name: true } },
+        // #rewards: what solving it pays, in Ƶ, and whether the estimating is done.
+        reward: true,
+        rewardEstimateCount: true,
+        rewardFixedAt: true,
         _count: {
           select: {
             comments: true,
@@ -883,9 +888,6 @@ export async function IssuesList({
 
   // The stage the page is on, and the status inside it, for the stage bar and the list on the left.
   const currentStatus = ideasView === "rejected" ? REJECTED_IDEAS_STATUS : isIdeasView ? IDEAS_STATUS : statusParam;
-  // Requires confirmation: the left column counts confirmations, and the importance votes sit at the end of the row.
-  // The Open tab holds both of its substatuses (#substatus): each row shows its confirmations.
-  const confirmationsView = currentStatus === "open" && !isDeletedView;
   const stageIndex = isDeletedView ? -1 : STAGE_GROUPS.findIndex((group) => (group.statuses as readonly string[]).includes(currentStatus ?? ""));
   const statusCount = (value: string) =>
     value === IDEAS_STATUS ? ideasCount : value === REJECTED_IDEAS_STATUS ? rejectedIdeasCount : value === ERROR_STATUS ? errorCount : value === POSSIBLY_DELIVERED ? possiblyDeliveredCount : countForStatus(value);
@@ -1057,24 +1059,15 @@ export async function IssuesList({
               <div>
                 <div className="issues-table-heading">
                   {/* Each column sorts the list on the server; the choice is kept in a cookie (#column-sort). */}
-                  {confirmationsView ? (
-                    <span className="w-[52px] shrink-0 text-center">Bids</span>
-                  ) : (
-                    <span className="flex w-[76px] shrink-0 justify-center">
-                      <SortHeader label="Importance" current={currentSort} first="importance" second="least_important" cookie={ISSUE_SORT_COOKIE} />
-                    </span>
-                  )}
+                  {/* #rewards: what solving each issue pays, in Ƶ. */}
+                  <span className="w-[76px] shrink-0 text-center">Reward</span>
                   <span className="min-w-0 flex-1">
                     <SortHeader label="Issue" current={currentSort} first="title" second="title_desc" firstDescending={false} cookie={ISSUE_SORT_COOKIE} />
                   </span>
-                  <span className="issues-status-cell">
-                    <SortHeader label="Status" current={currentSort} first="status" second="status_desc" firstDescending={false} cookie={ISSUE_SORT_COOKIE} />
+                  <span className="issues-status-cell justify-center">Bids</span>
+                  <span className="issues-vote-end">
+                    <SortHeader label="Importance" current={currentSort} first="importance" second="least_important" cookie={ISSUE_SORT_COOKIE} />
                   </span>
-                  {confirmationsView ? (
-                    <span className="issues-vote-end">
-                      <SortHeader label="Importance" current={currentSort} first="importance" second="least_important" cookie={ISSUE_SORT_COOKIE} />
-                    </span>
-                  ) : null}
                   <span className="w-10" aria-hidden="true" />
                 </div>
                 <ul>
@@ -1109,13 +1102,9 @@ export async function IssuesList({
                           index < bugs.length - 1 ? "border-b border-zk-divider" : ""
                         }`}
                       >
-                        {confirmationsView ? (
-                          <div className="w-[52px] shrink-0">
-                            <BidsVoteBadge count={bug._count.bids} />
-                          </div>
-                        ) : (
-                          <div className="issues-vote w-[76px] shrink-0">{importance}</div>
-                        )}
+                        <div className="issues-vote w-[76px] shrink-0">
+                          <RewardBadge reward={Number(bug.reward)} estimates={bug.rewardEstimateCount} fixed={Boolean(bug.rewardFixedAt)} />
+                        </div>
                         <Link
                           href={issueHref(bug)}
                           data-issue-link=""
@@ -1166,20 +1155,17 @@ export async function IssuesList({
                               ) : null}
                               {bug.category ? <span>{bug.category.name}</span> : null}
                               <RowAge date={currentSort === "newest" ? bug.createdAt : bug.updatedAt} sort={currentSort === "newest" ? "newest" : "updated"} />
-                              {/* Below md (768px) the status column is hidden, so the status rides at the end of this line. */}
-                              <span className="inline-flex min-w-0 md:sr-only">{rowStatus}</span>
+                              {/* The status rides at the end of this line; the column beside the title holds the bids. */}
+                              <span className="inline-flex min-w-0">{rowStatus}</span>
                             </span>
                             {snippets.has(bug.id) ? <SearchSnippet snippet={snippets.get(bug.id)!} /> : null}
                             {signals.has(bug.id) ? <DeliverySignalsLine signals={signals.get(bug.id)!} /> : null}
                           </span>
                         </Link>
-                        <span className="issues-status-cell" aria-hidden="true">{rowStatus}</span>
-                        {confirmationsView ? (
-                          // A plain number here: the box in the first column is the confirmations.
-                          <div className="issues-vote issues-vote-end shrink-0 text-center font-mono text-[13px] font-semibold tabular-nums text-zk-text2" aria-label={`Importance ${bug.voteCount}`} title={`Importance ${bug.voteCount}`} data-testid="importance-count">
-                            {bug.voteCount}
-                          </div>
-                        ) : null}
+                        <span className="issues-status-cell justify-center">
+                          <BidsVoteBadge count={bug._count.bids} />
+                        </span>
+                        <div className="issues-vote issues-vote-end shrink-0">{importance}</div>
                         <span
                           className={`w-10 shrink-0 items-center justify-end gap-2 ${
                             isWatchingView && !bug.isDeleted ? "flex" : "hidden lg:flex"
@@ -1269,6 +1255,7 @@ export async function IssuesList({
             canEdit={canEditProjectLinks}
             notesHref={`/${encodeURIComponent(slug)}/notes`}
             settingsHref={`/projects/${encodeURIComponent(slug)}/settings`}
+            askOnLoad={isIdeasView}
           />
         ) : null}
       </div>

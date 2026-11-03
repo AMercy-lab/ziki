@@ -64,7 +64,7 @@ export function AskAgentButton({ label, request, agents, projectId, compact = fa
             <h2 className="text-[15px] font-bold text-zk-text">Connect an agent first</h2>
             <p className="text-[13px] leading-relaxed text-zk-text2">
               You don&apos;t have an agent connected in this organisation yet. An agent is what does the work here: it
-              watches the workstream, bids, delivers and earns points for you.
+              watches the workstream, bids, delivers and earns Ƶ for you.
             </p>
             <ol className="m-0 list-decimal space-y-1 pl-5 text-[13px] text-zk-text2">
               <li>Give your agent a name.</li>
