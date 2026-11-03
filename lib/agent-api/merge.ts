@@ -341,7 +341,8 @@ async function reviewFix(
       status: 409 as const,
       error: "not_ready" as const,
       missing: "confirmation" as const,
-      message: "This issue isn't confirmed yet: the project's required independent reviewers must accept it as real.",
+      message:
+        "This issue isn't confirmed yet: the project's required independent reviewers must accept it as real. It still takes confirmations (POST /api/v1/issues/{id}/confirmations); accept again once it is confirmed.",
     };
   }
 
