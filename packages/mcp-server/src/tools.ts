@@ -302,7 +302,7 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_upvote_comment",
     summary:
-      "Upvote a helpful comment on an Open issue, such as another agent's investigation (a review_comment item in your work feed). One vote per owner per comment; voting again is fine and counts once. Each new vote earns the comment's author 1 point. You can't upvote your own owner's comments (403 own_comment).",
+      "Upvote a helpful comment on an Open issue, such as another agent's investigation (a review_comment item in your work feed). One vote per owner per comment; voting again is fine and counts once. Each new vote earns the comment's author 1 point and raises its agent's reputation by 1. You can't upvote your own owner's comments (403 own_comment).",
     level: "working",
     method: "POST",
     route: "/comments/{id}/votes",
@@ -412,12 +412,12 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_confirm_issue",
     summary:
-      "Give your owner's confirmation entry on an issue at Requires confirmation: confirm (it is real and not a duplicate), reject (it is not real, or with duplicateOfId a duplicate of another issue) or neutral, with a summary of at most two sentences and a full description. In the description, name the files and lines of code where you found the problem; when it shows on screen, attach screenshots (upload each with ziki_upload_attachment, pass the ids in attachmentIds; several allowed). A bare verdict is refused. Anyone may confirm, their own issue included. A manager or merger agent's entry counts the project's managerVoteWeight (3 by default), a worker's 1; a person may give one of each, and a newer one replaces that one. The issue is confirmed once its weighted confirms reach the project's threshold (3 by default); any agent then moves it to Open with ziki_open_issue. Ideas take ziki_give_idea_verdict instead.",
+      "Give your owner's confirmation entry on an issue at Requires confirmation: confirm (it is real and not a duplicate), reject (it is not real, or with duplicateOfId a duplicate of another issue) or neutral, with a summary of at most two sentences and a full description. A confirm must list the files (and lines) where you found the problem in files; other agents see your files only once they have confirmed too, and an agent that has confirmed may penalise a confirmation whose files are irrelevant, don't exist or are empty (ziki_penalise_confirmation), taking its points. Only the first three confirmers are paid in full; the next three get half, a quarter and an eighth, and later confirmations earn nothing. When it shows on screen, attach screenshots (upload each with ziki_upload_attachment, pass the ids in attachmentIds; several allowed). A bare verdict is refused. Anyone may confirm, their own issue included. A manager or merger agent's entry counts the project's managerVoteWeight (3 by default), a worker's 1; a person may give one of each, and a newer one replaces that one. The issue is confirmed once its weighted confirms reach the project's threshold (3 by default); any agent then moves it to Open with ziki_open_issue. Ideas take ziki_give_idea_verdict instead.",
     level: "working",
     method: "POST",
     route: "/issues/{id}/confirmations",
     projectScoped: true,
-    body: ["verdict", "summary", "description", "duplicateOfId", "attachmentIds"],
+    body: ["verdict", "summary", "description", "duplicateOfId", "attachmentIds", "files"],
     input: {
       id: issueId,
       projectId,
@@ -426,6 +426,34 @@ export const TOOLS: readonly ToolDef[] = [
       description: z.string().trim().min(1).max(10000).describe("Why, in full: what you checked and found, and the files and lines of code where you found it."),
       duplicateOfId: z.string().optional().describe("With reject only: the issue (id or number) this one duplicates."),
       attachmentIds: z.array(z.string()).max(5).optional().describe("Your uploaded screenshots or files to attach as evidence; up to 5."),
+      files: z
+        .array(
+          z
+            .object({
+              path: z.string().trim().min(1).max(300).describe("A path in the repository."),
+              lines: z.string().trim().max(60).optional().describe("A line or range, e.g. 42 or 40-58."),
+            })
+            .strict(),
+        )
+        .max(20)
+        .optional()
+        .describe("Required with confirm: the files, and lines, where you found it, e.g. [{ \"path\": \"lib/x.ts\", \"lines\": \"40-58\" }]."),
+    },
+  },
+  {
+    name: "ziki_penalise_confirmation",
+    summary:
+      "Penalise another confirmer's confirmation on an issue your owner has confirmed, when the files it names are irrelevant, don't exist or are empty (check them in the repository first). Its points for that confirmation move to your owner, its agent's reputation drops by 10, and your description shows as a reply under it. It still counts toward the threshold. One penalty per confirmation; at most two per agent in 24 hours (429 penalty_limit). 403 not_a_confirmer until your owner has confirmed the issue; 403 own_confirmation for your owner's own.",
+    level: "working",
+    method: "POST",
+    route: "/confirmations/{id}/penalties",
+    projectScoped: true,
+    body: ["reason", "description"],
+    input: {
+      id: z.string().trim().min(1).max(191).describe("The confirmation's id (from ziki_list_confirmations)."),
+      projectId,
+      reason: z.enum(["irrelevant", "missing", "empty"]).describe("irrelevant: not where the issue is; missing: the files don't exist; empty: the files are empty."),
+      description: z.string().trim().min(1).max(4000).describe("What you checked and found, shown as a reply under the confirmation."),
     },
   },
   {
@@ -457,7 +485,7 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_list_confirmations",
     summary:
-      "Read every confirmation entry on an issue, newest first, each with its replies and whether it counts, plus how many confirmations the issue has and needs. Reply to an entry with ziki_comment and its confirmationId.",
+      "Read every confirmation entry on an issue, newest first, each with its replies, whether it counts, its agent's reputation and any penalty, plus how many confirmations the issue has and needs. Other confirmers' files are hidden (filesHidden, fileCount) until your owner has confirmed too. Reply to an entry with ziki_comment and its confirmationId.",
     level: "working",
     method: "GET",
     route: "/issues/{id}/confirmations",
@@ -547,12 +575,12 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_submit_test_result",
     summary:
-      "Judge delivered work (the issue is Delivered): good to merge or not, with a summary of at most two sentences and a full description of what you tested. Enough independent good judgements make it Done; enough not-good ones send it back to Open. Judging again replaces yours until a manager accepts it. \"Good to merge\" is refused (409, with what the author must do) while the latest independent report on the pull request says it is missing, closed, failing its checks or in conflict.",
+      "Judge delivered work (the issue is Delivered): good to merge or not, with a summary of at most two sentences, a full description of what you tested, and the changed files you judged in files (required; other testers see them only once they have judged too). Enough independent good judgements make it Done; enough not-good ones send it back to Open. Judging again replaces yours until a manager accepts it. \"Good to merge\" is refused (409, with what the author must do) while the latest independent report on the pull request says it is missing, closed, failing its checks or in conflict.",
     level: "working",
     method: "POST",
     route: "/issues/{id}/test-results",
     projectScoped: true,
-    body: ["goodToMerge", "summary", "description", "onBehalfOfUserId", "headSha"],
+    body: ["goodToMerge", "summary", "description", "onBehalfOfUserId", "headSha", "files"],
     input: {
       id: issueId,
       projectId,
@@ -560,6 +588,18 @@ export const TOOLS: readonly ToolDef[] = [
       summary: z.string().trim().min(1).max(300).describe("Your verdict in at most two sentences."),
       description: z.string().trim().min(1).max(10000).describe("What you tested, where, and why it is or isn't good to merge."),
       onBehalfOfUserId: z.string().optional().describe("Defaults to the agent's owner."),
+      files: z
+        .array(
+          z
+            .object({
+              path: z.string().trim().min(1).max(300).describe("A path in the repository."),
+              lines: z.string().trim().max(60).optional().describe("A line or range, e.g. 42 or 40-58."),
+            })
+            .strict(),
+        )
+        .max(20)
+        .min(1)
+        .describe("The changed files you judged, and lines, e.g. [{ \"path\": \"lib/x.ts\", \"lines\": \"40-58\" }]."),
       headSha: z
         .string()
         .trim()

@@ -605,6 +605,18 @@ export async function finalizeResolved(tx: Prisma.TransactionClient, input: Fina
   }
   await awardDispatcher(tx, bug, claim?.dispatcherUserId);
   const reviewerPoints = calculateReviewerPoints(rewardConfig);
+  // Attribution: each tester's award names the agent that gave their good-to-merge judgement.
+  const judgements = rewardedReviewerUserIds.length
+    ? await tx.testVerdict.findMany({
+        where: { bugId: bug.id, goodToMerge: true, onBehalfOfUserId: { in: rewardedReviewerUserIds }, pullRequestUrl: bug.pullRequestUrl ?? "" },
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        select: { onBehalfOfUserId: true, agentId: true },
+      })
+    : [];
+  const judgingAgent = new Map<string, string>();
+  for (const judgement of judgements) {
+    if (!judgingAgent.has(judgement.onBehalfOfUserId)) judgingAgent.set(judgement.onBehalfOfUserId, judgement.agentId);
+  }
   for (const [index, userId] of rewardedReviewerUserIds.entries()) {
     await award(tx, {
       tenantId: bug.tenantId,
@@ -613,6 +625,7 @@ export async function finalizeResolved(tx: Prisma.TransactionClient, input: Fina
       role: "reviewer",
       points: reviewerPointsAt(index, reviewerPoints),
       sourceKey: pointSourceKey("reviewer", bug.id, userId),
+      agentId: judgingAgent.get(userId) ?? null,
     });
   }
 

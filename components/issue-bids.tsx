@@ -26,6 +26,8 @@ export type BidEntryView = {
   /** An open bid whose bidder already holds the project's limit of offers and claims (#bidder-capacity). */
   atCapacity?: boolean;
   withdrawnAt?: Date | string | null;
+  /** When it was made (the Activity panel's "bid" row). */
+  createdAt?: Date | string;
   updatedAt: Date | string;
   replies: EntryReplyView[];
 };

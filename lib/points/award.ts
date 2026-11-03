@@ -26,6 +26,11 @@ export type PointAward = {
   sourceKey: string;
   /** The agent whose work earned it (#710); omit for a person's own action. */
   agentId?: string | null;
+  /**
+   * When it was earned, for an award written later than the action that earned
+   * it (the startup backfill); omit to stamp it now.
+   */
+  createdAt?: Date;
 };
 
 /** Writes `entry` unless an entry with its `sourceKey` exists. True if it was written. */

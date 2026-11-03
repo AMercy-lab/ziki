@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CONFIRMATION_REVIEWER_POINTS, reviewerPointsAt } from "@/lib/points/rules";
+import { CONFIRMATION_REVIEWER_POINTS, confirmationPointsAt } from "@/lib/points/rules";
 
 /** Confirmation (#issue-confirmations, #confirmation-weights): weighted confirms, one entry per person per class, the move to Open, and duplicate decisions. */
 type Entry = {
@@ -32,6 +32,7 @@ const db = vi.hoisted(() => ({
   bugActivity: { create: vi.fn() },
   issueConfirmation: { findUnique: vi.fn(), upsert: vi.fn(), findMany: vi.fn() },
   pointEntry: { createMany: vi.fn() },
+  confirmationPenalty: { findMany: vi.fn(async () => []) },
   $queryRaw: vi.fn(),
   $transaction: vi.fn(),
 }));
@@ -57,6 +58,7 @@ const body = (verdict: string, extra: Record<string, unknown> = {}) => ({
   verdict,
   summary: "Reproduced it on staging.",
   description: "Followed the steps; it fails as reported and no other issue matches.",
+  ...(verdict === "confirm" ? { files: [{ path: "lib/save.ts", lines: "42" }] } : {}),
   ...extra,
 });
 
@@ -168,7 +170,8 @@ describe("giveConfirmation (#issue-confirmations)", () => {
       "triager-clear:bug1:bob",
       "triager-clear:bug1:cara",
     ]);
-    expect(state.points.find((p) => p.sourceKey === "reviewer-confirm:bug1:cara")?.points).toBe(reviewerPointsAt(1, CONFIRMATION_REVIEWER_POINTS));
+    // #confirmation-pay: the second confirmer is still among the first three, paid in full.
+    expect(state.points.find((p) => p.sourceKey === "reviewer-confirm:bug1:cara")?.points).toBe(CONFIRMATION_REVIEWER_POINTS);
 
     // Events agents already subscribe to; only the agent's entry is audited.
     expect(publish).toHaveBeenCalledWith(db, expect.objectContaining({ type: "issue.confirmation", actorAgentId: "agent-bob" }));
@@ -298,6 +301,14 @@ describe("giveConfirmation (#issue-confirmations)", () => {
     expect(changed).toMatchObject({ replaced: true, confirmations: 1 });
     expect(state.entries).toHaveLength(1);
     expect(state.entries[0]).toMatchObject({ verdict: "confirm", summary: "I was wrong.", agentId: "agent-bob", undoneAt: null });
+  });
+});
+
+describe("confirmation pay (#confirmation-pay)", () => {
+  it("pays the first three confirmers in full, halves the next three, and pays pile-ons nothing", () => {
+    const paid = Array.from({ length: 8 }, (_, index) => confirmationPointsAt(index, CONFIRMATION_REVIEWER_POINTS));
+    expect(paid).toEqual([90, 90, 90, 45, 22.5, 11.25, 0, 0]);
+    expect(confirmationPointsAt(-1, CONFIRMATION_REVIEWER_POINTS)).toBe(0);
   });
 });
 
