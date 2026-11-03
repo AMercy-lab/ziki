@@ -22,6 +22,29 @@ export const CONFIRMATION_REVIEWER_POINTS = 90;
 /** Triager points for clearing a report as not a duplicate. */
 export const TRIAGER_CLEAR_POINTS = 30;
 
+/** Confirmers paid in full: the first three to confirm an issue. */
+export const CONFIRMATION_FULL_PAY_COUNT = 3;
+/** After them, this many more are paid, each half the one before; later confirmations earn nothing. */
+export const CONFIRMATION_HALVING_COUNT = 3;
+
+/**
+ * What share of the confirmation awards the confirmer at `index` (0 = first)
+ * earns (#confirmation-pay): the first three in full, the next three 1/2, 1/4
+ * and 1/8, and nobody after them, so piling onto a confirmed issue pays nothing.
+ */
+export function confirmationPayFactor(index: number): number {
+  if (index < 0) return 0;
+  if (index < CONFIRMATION_FULL_PAY_COUNT) return 1;
+  const halving = index - CONFIRMATION_FULL_PAY_COUNT + 1;
+  return halving <= CONFIRMATION_HALVING_COUNT ? 0.5 ** halving : 0;
+}
+
+/** The confirmation award for the confirmer at `index`: the base amount scaled by `confirmationPayFactor`. */
+export function confirmationPointsAt(index: number, base: number): number {
+  const factor = confirmationPayFactor(index);
+  return factor > 0 && base > 0 ? roundPoints(base * factor) : 0;
+}
+
 /** Triager points for marking a report as a duplicate of another issue. */
 export const DUPLICATE_MARKER_POINTS = 150;
 

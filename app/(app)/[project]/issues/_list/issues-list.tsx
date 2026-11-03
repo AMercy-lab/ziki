@@ -12,7 +12,6 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getIssueTypes, getPlatforms } from "@/lib/lookups";
 
-import { ProjectNotesLink } from "@/components/project-notes-link";
 import { PipelineSteps } from "@/components/pipeline-steps";
 import { StageSidebar } from "@/components/stage-sidebar";
 import { StatusFilterChips } from "@/components/status-filter-chips";
@@ -22,6 +21,8 @@ import { IDEA_AUTHOR_PARAM, parseIdeaAuthorFilter } from "@/lib/idea-filters";
 import { MY_WORK_PARAM, myWorkWhere, parseMyWorkFilter } from "@/lib/my-work-filter";
 import { IDEA_SORT_COOKIE, ISSUE_SORT_COOKIE, getIdeaOrderBy, parseIdeaSort } from "@/lib/list-sort";
 import { SortHeader } from "@/components/sort-header";
+import { PROJECT_LINKS_SLOT_ID, ProjectLinks } from "@/components/project-links";
+import { isTenantAdmin } from "@/lib/agents/membership";
 import type { AppRole } from "@/lib/roles";
 import { IssueFilters } from "@/components/issue-filters";
 import { RowAge, RowAssignee } from "@/components/issue-row-meta";
@@ -618,6 +619,11 @@ export async function IssuesList({
   // Rejected ideas (#idea-rejected), with the same scope and search as new
   // ones. Archived ideas (#idea-archive) show here too, labelled Archived.
   const rejectedIdeaWhere: Prisma.IdeaWhereInput = { ...ideaWhere, status: { in: ["rejected", "archived"] } };
+  // #project-links: the project's site and GitHub repository, and whether you can set them.
+  const [projectLinks, canEditProjectLinks] = await Promise.all([
+    loadOrEmpty("project links", () => prisma.project.findUnique({ where: { id: project.id }, select: { siteUrl: true, repoUrl: true } }), null),
+    tenantId && userId ? loadOrEmpty("project admin", () => isTenantAdmin(user, tenantId), false) : Promise.resolve(false),
+  ]);
   // My Work shows only when you have work in this project: issues you bid on or hold, whatever their status.
   const myWorkCount =
     userId && !isDeletedView
@@ -939,6 +945,9 @@ export async function IssuesList({
   const listContent = (
     <div className="space-y-4">
 
+        {/* #project-links: the site/code panel renders here (from ProjectLinks in the top right) while it is open. */}
+        <div id={PROJECT_LINKS_SLOT_ID} className="empty:hidden" />
+
         {milestoneSummary ? (
           <section aria-label={`Milestone ${milestoneSummary.title}`} className="rounded-[20px] border border-zk-border bg-zk-surface p-5">
             <div className="flex flex-wrap items-center gap-2">
@@ -1246,12 +1255,22 @@ export async function IssuesList({
         />
       ) : null}
       <div className="absolute right-0 top-0 flex items-center gap-2">
-        <ProjectNotesLink slug={slug} />
         <PlatformMenu
           iconOnly
           tabs={platformTabs.map((tab) => ({ ...tab, href: platformHref(tab.id) }))}
           current={selectedPlatform}
         />
+        {/* The project's settings icon, at the far right: the site and code URLs, notes, and the settings page. */}
+        {projectLinks && !isDeletedView ? (
+          <ProjectLinks
+            slug={slug}
+            siteUrl={projectLinks.siteUrl}
+            repoUrl={projectLinks.repoUrl}
+            canEdit={canEditProjectLinks}
+            notesHref={`/${encodeURIComponent(slug)}/notes`}
+            settingsHref={`/projects/${encodeURIComponent(slug)}/settings`}
+          />
+        ) : null}
       </div>
     </div>
     {/* The Ideas panel is narrower and centred, so each idea's status sits close to it. */}
