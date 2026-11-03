@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LocalTime } from "@/components/local-time";
-import { formatPoints } from "@/lib/points/rules";
+import { formatZ } from "@/lib/points/rules";
 import { issuePath } from "@/lib/issue-ref";
 import { ideaPath } from "@/lib/project-paths";
 import type { PointSources } from "@/lib/points/sources";
@@ -24,9 +24,9 @@ export function PointsSources({ sources, name }: { sources: PointSources; name: 
   return (
     <section className={`${card} space-y-6`} aria-labelledby="points-sources-heading">
       <div>
-        <h2 id="points-sources-heading" className={heading}>Where the points came from</h2>
+        <h2 id="points-sources-heading" className={heading}>Where the Ƶ came from</h2>
         <p className="mt-1 text-sm text-zk-text2">
-          {formatPoints(sources.total)} points from {sources.entries.toLocaleString()} ledger entries for {name}, corrections included.
+          {formatZ(sources.total)} from {sources.entries.toLocaleString()} ledger entries for {name}, corrections included.
           Shown to {name} and the workspace&apos;s admins.
         </p>
       </div>
@@ -43,7 +43,7 @@ export function PointsSources({ sources, name }: { sources: PointSources; name: 
           ))}
         </ul>
       ) : sources.entries > 0 ? (
-        <p className="rounded-lg bg-zk-ok-bg px-3 py-2 text-[13px] text-zk-ok-fg">Nothing unusual in how these points were earned.</p>
+        <p className="rounded-lg bg-zk-ok-bg px-3 py-2 text-[13px] text-zk-ok-fg">Nothing unusual in how this Ƶ was earned.</p>
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -54,7 +54,7 @@ export function PointsSources({ sources, name }: { sources: PointSources; name: 
               <tr className="border-b border-zk-divider text-left text-zk-muted">
                 <th className="py-1.5 pr-2 font-medium">What earned them</th>
                 <th className="py-1.5 pr-2 text-right font-medium">Times</th>
-                <th className="py-1.5 pr-2 text-right font-medium">Points</th>
+                <th className="py-1.5 pr-2 text-right font-medium">Ƶ</th>
                 <th className="py-1.5 text-right font-medium">Share</th>
               </tr>
             </thead>
@@ -63,7 +63,7 @@ export function PointsSources({ sources, name }: { sources: PointSources; name: 
                 <tr key={row.kind} className="border-b border-zk-divider last:border-0">
                   <td className="py-1.5 pr-2 text-zk-text">{row.label}</td>
                   <td className="py-1.5 pr-2 text-right tabular-nums text-zk-text2">{row.count.toLocaleString()}</td>
-                  <td className="py-1.5 pr-2 text-right tabular-nums text-zk-text">{formatPoints(row.points)}</td>
+                  <td className="py-1.5 pr-2 text-right tabular-nums text-zk-text">{formatZ(row.points)}</td>
                   <td className="py-1.5 text-right tabular-nums text-zk-muted">{row.points > 0 ? share(row.points, positive) : ""}</td>
                 </tr>
               ))}
@@ -78,7 +78,7 @@ export function PointsSources({ sources, name }: { sources: PointSources; name: 
               <tr className="border-b border-zk-divider text-left text-zk-muted">
                 <th className="py-1.5 pr-2 font-medium">Who did the work</th>
                 <th className="py-1.5 pr-2 text-right font-medium">Times</th>
-                <th className="py-1.5 text-right font-medium">Points</th>
+                <th className="py-1.5 text-right font-medium">Ƶ</th>
               </tr>
             </thead>
             <tbody>
@@ -89,7 +89,7 @@ export function PointsSources({ sources, name }: { sources: PointSources; name: 
                     <span className="block text-[11.5px] text-zk-muted">{row.kinds.slice(0, 4).join(" · ")}{row.kinds.length > 4 ? " · …" : ""}</span>
                   </td>
                   <td className="py-1.5 pr-2 text-right tabular-nums text-zk-text2">{row.count.toLocaleString()}</td>
-                  <td className="py-1.5 text-right tabular-nums text-zk-text">{formatPoints(row.points)}</td>
+                  <td className="py-1.5 text-right tabular-nums text-zk-text">{formatZ(row.points)}</td>
                 </tr>
               ))}
             </tbody>
@@ -99,15 +99,15 @@ export function PointsSources({ sources, name }: { sources: PointSources; name: 
 
       <div>
         <h3 className="mb-2 text-[13px] font-semibold text-zk-text">Last 14 days</h3>
-        <ol className="m-0 flex h-24 list-none items-end gap-1 p-0" aria-label="Points per day, last 14 days">
+        <ol className="m-0 flex h-24 list-none items-end gap-1 p-0" aria-label="Ƶ per day, last 14 days">
           {sources.byDay.map((day) => (
-            <li key={day.day} className="flex h-full flex-1 flex-col items-center justify-end gap-1" title={`${day.day}: ${formatPoints(day.points)} points from ${day.count} entries`}>
+            <li key={day.day} className="flex h-full flex-1 flex-col items-center justify-end gap-1" title={`${day.day}: ${formatZ(day.points)} from ${day.count} entries`}>
               <span
                 className="w-full rounded-t bg-electric-blue-strong/70"
                 style={{ height: `${Math.max(day.points > 0 ? 4 : 0, (Math.max(day.points, 0) / maxDay) * 100)}%` }}
               />
               <span className="text-[10px] tabular-nums text-zk-muted">{day.day.slice(8)}</span>
-              <span className="sr-only">{day.day}: {formatPoints(day.points)} points, {day.count} entries</span>
+              <span className="sr-only">{day.day}: {formatZ(day.points)}, {day.count} entries</span>
             </li>
           ))}
         </ol>
@@ -123,7 +123,7 @@ export function PointsSources({ sources, name }: { sources: PointSources; name: 
                 <th className="py-1.5 pr-2 font-medium">What</th>
                 <th className="py-1.5 pr-2 font-medium">Agent</th>
                 <th className="py-1.5 pr-2 font-medium">On</th>
-                <th className="py-1.5 text-right font-medium">Points</th>
+                <th className="py-1.5 text-right font-medium">Ƶ</th>
               </tr>
             </thead>
             <tbody>
@@ -142,7 +142,7 @@ export function PointsSources({ sources, name }: { sources: PointSources; name: 
                     )}
                   </td>
                   <td className={`py-1.5 text-right tabular-nums ${row.points < 0 ? "text-zk-bad-fg" : "text-zk-text"}`}>
-                    {row.points > 0 ? "+" : ""}{formatPoints(row.points)}
+                    {row.points > 0 ? "+" : ""}{formatZ(row.points)}
                   </td>
                 </tr>
               ))}

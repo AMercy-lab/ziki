@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { bugInTenant, currentTenantIdFor } from "@/lib/tenant-context";
 import { pointTotals } from "@/lib/points/leaderboard";
 import { getPlatformRewardConfig } from "@/lib/points/platform-rewards";
-import { formatPoints } from "@/lib/points/rules";
+import { formatZ } from "@/lib/points/rules";
 import { pointBalance } from "@/lib/points/balance";
 import { decodePointCursor, pointEntries, pointEntriesQuerySchema } from "@/lib/points/entries";
 import { PointsLedger } from "@/components/points-ledger";
@@ -176,7 +176,7 @@ export default async function ProfilePage({ params, searchParams }: ProfileProps
           {balance ? (
             <>
               <p className="mt-1 text-2xl font-semibold tabular-nums text-zk-text">
-                {formatPoints(balance.lifetime.points)}
+                {formatZ(balance.lifetime.points)}
                 <span className="ml-1 text-sm font-normal text-zk-text2">
                   point{balance.lifetime.points === 1 ? "" : "s"}
                 </span>

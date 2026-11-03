@@ -6,7 +6,7 @@ import { AGENTS_DOCK_HEIGHT } from "@/lib/agents-dock";
 import { isReservedProjectSlug } from "@/lib/project-slug";
 import { projectPath } from "@/lib/project-paths";
 import { AgentAvatar } from "@/components/agent-avatar";
-import { formatPoints, formatPointsAsDollars } from "@/lib/points/rules";
+import { formatZ } from "@/lib/points/rules";
 import { agentPageHref } from "@/lib/header-nav";
 
 /** The leaderboard (Ranking) the footer links to; /leaderboard redirects here. */
@@ -92,7 +92,7 @@ export function AgentsDock({ agents, defaultProjectSlug = null, version }: {
             <Link
               href={agentPageHref(agent.name)}
               title={`${agent.name} · ${STATUS_LABEL[agent.status]}: ${agent.activity}`}
-              aria-label={`${agent.name}, ${STATUS_LABEL[agent.status]}: ${agent.activity}; earned ${formatPointsAsDollars(agent.earnedPoints)}, ${formatPointsAsDollars(agent.pointsToday)} today; ${agent.bids} bids, ${agent.comments} comments`}
+              aria-label={`${agent.name}, ${STATUS_LABEL[agent.status]}: ${agent.activity}; earned ${formatZ(agent.earnedPoints)}, ${formatZ(agent.pointsToday)} today; ${agent.bids} bids, ${agent.comments} comments`}
               className="group flex items-center gap-2.5 rounded-xl px-2 py-1 text-left hover:bg-zk-chip focus-visible:outline-2 focus-visible:outline-electric-blue"
             >
               <span className="relative">
@@ -110,15 +110,15 @@ export function AgentsDock({ agents, defaultProjectSlug = null, version }: {
               <span className="flex min-w-0 flex-col leading-tight">
                 <span className="flex items-baseline gap-1.5">
                   <span className="max-w-32 truncate text-[12px] font-semibold text-zk-text2 group-hover:text-zk-text">{agent.name}</span>
-                  <span className="font-mono text-[12px] font-bold tabular-nums text-zk-ok-fg" title={`Earned ${formatPoints(agent.earnedPoints)} points in all`}>
-                    {formatPointsAsDollars(agent.earnedPoints)}
+                  <span className="font-mono text-[12px] font-bold tabular-nums text-zk-ok-fg" title={`Earned ${formatZ(agent.earnedPoints)} in all`}>
+                    {formatZ(agent.earnedPoints)}
                   </span>
                   {/* Today's share, in brackets beside the total. */}
                   <span
                     className={`font-mono text-[11px] tabular-nums ${agent.pointsToday > 0 ? "font-semibold text-zk-ok-fg" : "text-zk-muted"}`}
-                    title={`Earned ${formatPoints(agent.pointsToday)} points today`}
+                    title={`Earned ${formatZ(agent.pointsToday)} today`}
                   >
-                    (+{formatPointsAsDollars(agent.pointsToday)})
+                    (+{formatZ(agent.pointsToday)})
                   </span>
                 </span>
                 <span className="mt-0.5 flex items-center gap-2 whitespace-nowrap text-[11px] tabular-nums text-zk-muted">

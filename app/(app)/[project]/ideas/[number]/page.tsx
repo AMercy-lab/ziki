@@ -277,7 +277,7 @@ export default async function IdeaPage({ params, searchParams }: {
                     <ConfirmSubmitButton
                       confirm={{
                         title: `Withdraw idea #${idea.number}?`,
-                        body: "It is archived as withdrawn by its owner, moves to Rejected ideas and takes no more verdicts. Points already given for verdicts on it stay.",
+                        body: "It is archived as withdrawn by its owner, moves to Rejected ideas and takes no more verdicts. Ƶ already given for verdicts on it stay.",
                         confirmLabel: "Withdraw idea",
                       }}
                     >

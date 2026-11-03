@@ -99,20 +99,17 @@ export function nextProjectSlug(
 
 export function parseRewardConfigFromFormData(formData: FormData) {
   const hasCustomRewards =
-    formData.has("solverPoints") ||
     formData.has("reporterPoints") ||
     formData.has("reviewerPoints") ||
     formData.has("rewardGuidelines");
 
   if (!hasCustomRewards) return null;
 
-  const solver = formData.get("solverPoints");
   const reporter = formData.get("reporterPoints");
   const reviewer = formData.get("reviewerPoints");
   const guidelines = String(formData.get("rewardGuidelines") ?? "").trim();
 
   return {
-    solver: solver ? Number(solver) : undefined,
     reporter: reporter ? Number(reporter) : undefined,
     reviewer: reviewer ? Number(reviewer) : undefined,
     guidelines: guidelines || null,

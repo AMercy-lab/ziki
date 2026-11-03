@@ -9,13 +9,14 @@ import { IssueApiError } from "@/lib/agent-api/errors";
 import { publish } from "@/lib/agent-api/events";
 import { isConfirmed } from "@/lib/agent-api/confirmations";
 import { countedMergeVerdicts, deliveredClaim, MANAGER_VERDICT_WEIGHT } from "@/lib/agent-api/merge-verdicts";
-import { award, awardDispatcher } from "@/lib/points/award";
+import type { PointAward } from "@/lib/points/award";
+import { holdPayout } from "@/lib/points/payout";
+import { solverReward } from "@/lib/points/project-rewards";
 import { pointSourceKey, reviewerPointsAt } from "@/lib/points/rules";
 import {
   calculateReviewerPoints,
-  calculateSolverPoints,
 } from "@/lib/points/project-rewards";
-import { getProjectRewardConfig } from "@/lib/points/platform-rewards";
+import { getPlatformRewardConfig, getProjectRewardConfig } from "@/lib/points/platform-rewards";
 import { assertRedesignOpen } from "@/lib/redesigns";
 import { statusChangedSummary } from "@/lib/activity-log";
 import { entryDescription, entryReplySelect, entrySummary, toEntryReplies, type EntryReply } from "@/lib/agent-api/entry-fields";
@@ -590,20 +591,27 @@ export async function finalizeResolved(tx: Prisma.TransactionClient, input: Fina
     data: { status: "released", releasedAt: new Date(), releaseReason: "resolved" },
   });
 
+  // #live-payout: what resolving earns is held until enough people report the work deployed.
   const rewardConfig = await getProjectRewardConfig(tx, bug.projectId);
+  const platform = await getPlatformRewardConfig(tx);
+  const { reward } = await tx.bug.findUniqueOrThrow({ where: { id: bug.id }, select: { reward: true } });
+  const payout: PointAward[] = [];
   if (solverUserId) {
-    await award(tx, {
+    payout.push({
       tenantId: bug.tenantId,
       userId: solverUserId,
       bugId: bug.id,
       role: "solver",
-      points: calculateSolverPoints(rewardConfig),
+      // #rewards: the issue's reward, Ƶ1–Ƶ10.
+      points: solverReward(reward),
       sourceKey: pointSourceKey("solver", bug.id, solverUserId),
       // The agent that held the claim and delivered the work.
       agentId: claim?.agentId ?? null,
     });
   }
-  await awardDispatcher(tx, bug, claim?.dispatcherUserId);
+  if (claim?.dispatcherUserId) {
+    payout.push({ tenantId: bug.tenantId, bugId: bug.id, userId: claim.dispatcherUserId, role: "dispatcher", points: platform.dispatcher, sourceKey: `dispatcher:${bug.id}` });
+  }
   const reviewerPoints = calculateReviewerPoints(rewardConfig);
   // Attribution: each tester's award names the agent that gave their good-to-merge judgement.
   const judgements = rewardedReviewerUserIds.length
@@ -618,7 +626,7 @@ export async function finalizeResolved(tx: Prisma.TransactionClient, input: Fina
     if (!judgingAgent.has(judgement.onBehalfOfUserId)) judgingAgent.set(judgement.onBehalfOfUserId, judgement.agentId);
   }
   for (const [index, userId] of rewardedReviewerUserIds.entries()) {
-    await award(tx, {
+    payout.push({
       tenantId: bug.tenantId,
       userId,
       bugId: bug.id,
@@ -628,6 +636,7 @@ export async function finalizeResolved(tx: Prisma.TransactionClient, input: Fina
       agentId: judgingAgent.get(userId) ?? null,
     });
   }
+  await holdPayout(tx, bug.id, payout);
 
   await audit(
     agent,

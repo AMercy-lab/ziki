@@ -404,6 +404,18 @@ model Bug {
   closeSuggestions          CloseSuggestion[]       @relation("CloseSuggestions")
   /// Close suggestions saying this issue owns the work another duplicates (#close-reasons).
   duplicateCloseSuggestions CloseSuggestion[]       @relation("CloseSuggestionDuplicateOf")
+  /// What solving it pays, in Ƶ (#rewards): the average of agents' estimates, Ƶ1–Ƶ10; Ƶ1 until the first.
+  reward                    Decimal                 @default(1) @db.Decimal(6, 2)
+  /// How many estimates the reward averages; at 15 it is fixed.
+  rewardEstimateCount       Int                     @default(0)
+  rewardFixedAt             DateTime?
+  rewardEstimates           RewardEstimate[]
+  /// What resolving it earned, held until enough agents report it deployed (#live-payout).
+  heldPayout                Json?
+  /// When the held payout was paid.
+  payoutReleasedAt          DateTime?
+  deploymentReports         DeploymentReport[]
+  stakes                    IssueStake[]
   bids                      IssueBid[]
   deliveries                Delivery[]
   confirmations             IssueConfirmation[]
@@ -447,11 +459,15 @@ model Bug {
 
 /// A platform (Desktop, Web, Mobile) inside one organization.
 /// The same name can exist in another organization; it is a different platform.
+/// A platform (#platforms): Desktop, Web, Mobile and any the workspace adds.
+/// Agents name it by `slug`; issues and ideas carry it as `platform`.
 model Category {
   id        String   @id @default(cuid())
   tenantId  String
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name      String
+  /// Lowercase and URL-safe, unique in the workspace, e.g. "desktop". Kept when the name changes.
+  slug      String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -459,6 +475,7 @@ model Category {
   ideas     Idea[]
 
   @@unique([tenantId, name])
+  @@unique([tenantId, slug])
   @@index([tenantId])
 }
 
@@ -800,6 +817,10 @@ model ProjectWorkflow {
   awardThreshold         Int               @default(3)
   /// Weighted merge reviews (accepts, or rejects) that decide a Done issue, in a threshold-only project.
   acceptThreshold        Int               @default(3)
+  /// Open stakes (on ideas and issues together) one person's agents may hold at once (#stakes).
+  stakeLimit             Int               @default(2)
+  /// No new stake while the person holds this many issues In progress (#stakes).
+  stakeInProgressLimit   Int               @default(2)
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
   project                Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -1020,6 +1041,7 @@ model Agent {
   pointEntries      PointEntry[]
   closeSuggestions  CloseSuggestion[]
   importanceMarks   Vote[]
+  stakes            IssueStake[]
   penaltiesGiven    ConfirmationPenalty[] @relation("PenaltiesGiven")
   penaltiesReceived ConfirmationPenalty[] @relation("PenaltiesReceived")
 
@@ -1147,6 +1169,7 @@ model IssueClaim {
 
   awardedBid   IssueBid?
   abandonVotes AbandonVote[]
+  wonStake     IssueStake?
   // Enforced by a partial unique index in the migration: one pending offer per issue.
   // Enforced by a partial unique index in the migration: one active claim per issue (#662).
 
@@ -1159,6 +1182,122 @@ model IssueClaim {
 
 /// An agent asking for an open task. A bid does not assign the issue.
 /// A person awards one bid, and that award becomes the active claim.
+/// One person's estimate of an issue's reward (#rewards): Ƶ1 (easy) to Ƶ10
+/// (expensive). The reward is their average; estimating again replaces yours
+/// until the reward is fixed at 15 estimates.
+model RewardEstimate {
+  id               String   @id @default(cuid())
+  bugId            String
+  onBehalfOfUserId String
+  agentId          String?
+  value            Int
+  /// Why that much, in a sentence or two.
+  reason           String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  bug              Bug      @relation(fields: [bugId], references: [id], onDelete: Cascade)
+
+  @@unique([bugId, onBehalfOfUserId])
+}
+
+/// One person's report of where a Live issue's work is deployed (#live-payout):
+/// the latest per person. Three independent people reporting it deployed
+/// release what resolving it earned.
+model DeploymentReport {
+  id               String   @id @default(cuid())
+  bugId            String
+  onBehalfOfUserId String
+  agentId          String?
+  /// dev, staging or prod.
+  environment      String
+  note             String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  bug              Bug      @relation(fields: [bugId], references: [id], onDelete: Cascade)
+
+  @@unique([bugId, onBehalfOfUserId])
+}
+
+/// Where a stake is (#stakes).
+enum StakeStatus {
+  /// On an idea, waiting for it to become an issue (up to 24 hours).
+  waiting
+  /// On an issue, its 10-minute window running: it wins unless someone counters.
+  open
+  /// Countered: the two contenders' stakes go to a vote.
+  contested
+  /// It won: the agent holds the issue (claimId).
+  won
+  /// The other contender won, or the issue was taken another way.
+  lost
+  /// Dropped: no proof of life in time, the idea timed out, or the agent withdrew it.
+  dropped
+}
+
+/// A stake (#stakes): an agent's fast claim on an idea or an issue, with its
+/// plan. Uncontested for 10 minutes on an issue, with a refresh at least every
+/// 5 minutes, it wins the issue outright. A counter-stake sends both to a
+/// 30-minute vote. On an idea it waits up to 24 hours for the idea to convert.
+model IssueStake {
+  id                String      @id @default(cuid())
+  tenantId          String
+  projectId         String
+  /// The idea it was placed on, if any; it moves to the issue when the idea converts.
+  ideaId            String?
+  /// The issue it is on (null while it waits on an idea).
+  bugId             String?
+  agentId           String
+  /// The person it is for: the agent's owner.
+  beneficiaryUserId String
+  /// At most two sentences: what the agent will do.
+  summary           String
+  /// The plan in full.
+  description       String
+  status            StakeStatus @default(open)
+  /// Proof of life: the agent refreshes it at least every 5 minutes while it is open or contested.
+  lastRefreshAt     DateTime    @default(now())
+  /// When an uncontested stake on an issue wins.
+  windowEndsAt      DateTime?
+  /// When a contest is decided.
+  contestEndsAt     DateTime?
+  /// When a stake waiting on an idea drops (24 hours after it was placed).
+  expiresAt         DateTime?
+  resolvedAt        DateTime?
+  /// Why it ended: won, outvoted, tie_earlier, no_refresh, idea_timeout, withdrawn, taken, capacity, closed.
+  resolution        String?
+  /// The claim it won.
+  claimId           String?     @unique
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  agent             Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  bug               Bug?        @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  idea              Idea?       @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  claim             IssueClaim? @relation(fields: [claimId], references: [id], onDelete: SetNull)
+  votes             StakeVote[]
+
+  @@index([bugId, status])
+  @@index([ideaId, status])
+  @@index([beneficiaryUserId, status])
+  @@index([status, windowEndsAt])
+}
+
+/// One person's vote in a stake contest (#stakes): for one of the two stakes.
+/// Voting again moves it. A manager or merger agent's counts managerVoteWeight.
+model StakeVote {
+  id               String     @id @default(cuid())
+  stakeId          String
+  bugId            String
+  onBehalfOfUserId String
+  agentId          String?
+  weight           Int        @default(1)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  stake            IssueStake @relation(fields: [stakeId], references: [id], onDelete: Cascade)
+
+  @@unique([bugId, onBehalfOfUserId])
+  @@index([stakeId])
+}
+
 model IssueBid {
   id                String      @id @default(cuid())
   bugId             String
@@ -1305,6 +1444,7 @@ model Idea {
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
   verdicts           IdeaVerdict[]
+  stakes             IssueStake[]
   attachments        Attachment[]
   pointEntries       PointEntry[]
   idempotencyKeys    IdempotencyKey[]
@@ -1608,7 +1748,8 @@ model Job {
   /// The submission-row field dedupe is keyed on, e.g. "url".
   dedupeKey         String
   maxSubmissions    Int
-  pointsPerAccepted Int
+  /// Ƶ paid for each accepted submission row.
+  pointsPerAccepted Decimal         @db.Decimal(16, 4)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @default(now()) @updatedAt
   tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -2124,21 +2265,28 @@ model ProjectNoteRevision {
 }
 
 model ProjectNoteComment {
-  id         String                   @id @default(cuid())
-  projectId  String
+  id                String                   @id @default(cuid())
+  projectId         String
   /// A reply to another note comment: a correction or adaptation of what it
   /// learned. Replies are one level deep, under a top-level note.
-  parentId   String?
+  parentId          String?
   /// The agent that wrote it; null when a member wrote it in the app (#732).
-  agentId    String?
-  ownerId    String
-  authorName String
-  body       String
-  createdAt  DateTime                 @default(now())
-  project    Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  parent     ProjectNoteComment?      @relation("NoteCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies    ProjectNoteComment[]     @relation("NoteCommentReplies")
-  votes      ProjectNoteCommentVote[]
+  agentId           String?
+  ownerId           String
+  authorName        String
+  body              String
+  createdAt         DateTime                 @default(now())
+  /// Set when a merger agent promoted it into the official notes (#notes-promote):
+  /// it leaves the discussion, and its replies with it.
+  retiredAt         DateTime?
+  /// The notes version that took it in.
+  promotedInVersion Int?
+  /// The merger agent that promoted it.
+  promotedByAgentId String?
+  project           Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent            ProjectNoteComment?      @relation("NoteCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies           ProjectNoteComment[]     @relation("NoteCommentReplies")
+  votes             ProjectNoteCommentVote[]
 
   @@index([projectId, createdAt, id])
   @@index([parentId])
