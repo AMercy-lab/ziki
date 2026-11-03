@@ -1,6 +1,6 @@
 {
   "name": "issue-tracker",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "scripts": {
     "dev": "next dev --port 3001",
@@ -26,7 +26,8 @@
     "e2e": "playwright test",
     "e2e:seed": "tsx e2e/seed.ts",
     "ziki": "tsx --tsconfig cli/tsconfig.json cli/ziki.ts",
-    "test:cli": "node scripts/cli-tests.mjs"
+    "test:cli": "node scripts/cli-tests.mjs",
+    "db:scenario:points-farming": "tsx --env-file=.env scripts/dev/scenario-points-farming.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
