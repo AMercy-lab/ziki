@@ -102,7 +102,7 @@ type RankedMember = {
   rank: number | null;
   points: number;
   solvedTasks: number;
-  /** Ƶ earned this week (since Monday, UTC). */
+  /** $ earned this week (since Monday, UTC). */
   recentPoints: number;
   role: "Owner" | "Admin" | "Member";
   claims: number;
@@ -176,7 +176,7 @@ export default async function RankingPanel({
       select: { role: true, user: { select: { id: true, name: true, image: true } } },
     });
     const memberIds = members.map(({ user: member }) => member.id);
-    // The leaderboard shows Ƶ earned this week (since Monday, UTC) beside all time.
+    // The leaderboard shows $ earned this week (since Monday, UTC) beside all time.
     const since = startOfWeekUtc();
     [standing, myTotals, ranked, targetPoints, agentsMap, recentPoints, activeClaims] = await Promise.all([
       tenantRankFor(prisma, tenantId, user.id),
@@ -290,7 +290,7 @@ export default async function RankingPanel({
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <p className="max-w-xl text-sm leading-relaxed text-zk-muted">
-          Ƶ earned for solving, reporting and reviewing issues, this week and all time. The goal is {money(targetPoints)}.
+          $ earned for solving, reporting and reviewing issues, this week and all time. The goal is {money(targetPoints)}.
         </p>
         <Link
           href="/points/disputes"

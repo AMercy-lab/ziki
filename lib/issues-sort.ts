@@ -9,6 +9,8 @@ export const BUG_SORT_OPTIONS = [
   "title_desc",
   "status",
   "status_desc",
+  "reward",
+  "reward_low",
 ] as const;
 export type BugSortOption = (typeof BUG_SORT_OPTIONS)[number];
 
@@ -24,6 +26,8 @@ export const bugSortLabels: Record<BugSortOption, string> = {
   title_desc: "Title (Z–A)",
   status: "Status (earliest step first)",
   status_desc: "Status (latest step first)",
+  reward: "Highest reward",
+  reward_low: "Lowest reward",
 };
 
 export const bugSortDescriptions: Record<BugSortOption, string> = {
@@ -35,6 +39,8 @@ export const bugSortDescriptions: Record<BugSortOption, string> = {
   title_desc: "title, Z to A",
   status: "status, earliest step first",
   status_desc: "status, latest step first",
+  reward: "highest reward",
+  reward_low: "lowest reward",
 };
 
 /** Sort key for bug lists: most important first, then most recently updated. */
@@ -74,6 +80,7 @@ export function parseBugSort(
   if (normalized === "least_important" || normalized === "least_importance" || normalized === "importance_asc") {
     return "least_important";
   }
+  if (normalized === "reward" || normalized === "reward_low") return normalized;
   if (normalized === "title" || normalized === "title_desc" || normalized === "status" || normalized === "status_desc") {
     return normalized;
   }
@@ -112,6 +119,11 @@ export function getBugOrderBy(
         return [{ substatus: "asc" }, { updatedAt: "desc" }, { id: "desc" }];
       case "status_desc":
         return [{ substatus: "desc" }, { updatedAt: "desc" }, { id: "desc" }];
+      // #rewards: what solving it pays; equal rewards, the most important first.
+      case "reward":
+        return [{ reward: "desc" }, { voteCount: "desc" }, { id: "desc" }];
+      case "reward_low":
+        return [{ reward: "asc" }, { voteCount: "desc" }, { id: "desc" }];
     }
   })();
 
@@ -189,7 +201,14 @@ export type BugSortableItem = {
   updatedAt?: Date | string;
   title?: string;
   substatus?: string;
+  /** #rewards: what solving it pays, in $. */
+  reward?: number | { toNumber(): number } | null;
 };
+
+function rewardOf(item: BugSortableItem): number {
+  const value = item.reward;
+  return value == null ? 0 : typeof value === "number" ? value : value.toNumber();
+}
 
 /** The Substatus enum's order (prisma/schema.prisma), which is the workflow order. */
 const SUBSTATUS_RANK = [
@@ -238,6 +257,11 @@ export function sortBugs<T extends BugSortableItem>(
       case "status_desc": {
         const diff = substatusRank(a.substatus) - substatusRank(b.substatus);
         return (sort === "status" ? diff : -diff) || compareBugsByRecentlyUpdated(a, b);
+      }
+      case "reward":
+      case "reward_low": {
+        const diff = rewardOf(b) - rewardOf(a);
+        return (sort === "reward" ? diff : -diff) || b.voteCount - a.voteCount;
       }
     }
   });

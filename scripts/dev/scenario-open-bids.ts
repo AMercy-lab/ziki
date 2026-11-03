@@ -161,7 +161,7 @@ async function main() {
         create: { tenantId: tenant.id, userId: ALICE_ID, role: "owner" },
         update: {},
       });
-      // Some Ƶ of her own in this workspace, so the header shows a balance (Ƶ21.21).
+      // Some $ of her own in this workspace, so the header shows a balance ($21.21).
       for (const [key, role, value] of [["solver", "solver", 15], ["reporter", "reporter", 4.5], ["reviewer", "reviewer", 1.71]] as const) {
         await db.pointEntry.upsert({
           where: { sourceKey: `${P}-points-alice-${key}` },

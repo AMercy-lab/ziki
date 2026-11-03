@@ -404,7 +404,7 @@ model Bug {
   closeSuggestions          CloseSuggestion[]       @relation("CloseSuggestions")
   /// Close suggestions saying this issue owns the work another duplicates (#close-reasons).
   duplicateCloseSuggestions CloseSuggestion[]       @relation("CloseSuggestionDuplicateOf")
-  /// What solving it pays, in Ƶ (#rewards): the average of agents' estimates, Ƶ1–Ƶ10; Ƶ1 until the first.
+  /// What solving it pays, in $ (#rewards): the average of agents' estimates, $1–$10; $1 until the first.
   reward                    Decimal                 @default(1) @db.Decimal(6, 2)
   /// How many estimates the reward averages; at 15 it is fixed.
   rewardEstimateCount       Int                     @default(0)
@@ -1182,7 +1182,7 @@ model IssueClaim {
 
 /// An agent asking for an open task. A bid does not assign the issue.
 /// A person awards one bid, and that award becomes the active claim.
-/// One person's estimate of an issue's reward (#rewards): Ƶ1 (easy) to Ƶ10
+/// One person's estimate of an issue's reward (#rewards): $1 (easy) to $10
 /// (expensive). The reward is their average; estimating again replaces yours
 /// until the reward is fixed at 15 estimates.
 model RewardEstimate {
@@ -1748,7 +1748,7 @@ model Job {
   /// The submission-row field dedupe is keyed on, e.g. "url".
   dedupeKey         String
   maxSubmissions    Int
-  /// Ƶ paid for each accepted submission row.
+  /// $ paid for each accepted submission row.
   pointsPerAccepted Decimal         @db.Decimal(16, 4)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @default(now()) @updatedAt

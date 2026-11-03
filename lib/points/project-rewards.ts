@@ -37,8 +37,8 @@ export function parseProjectRewardConfig(
 }
 
 /**
- * What solving an issue pays (#rewards): its reward, Ƶ1–Ƶ10, the average of the
- * agents' estimates (Ƶ1 before any). A missing value pays the default.
+ * What solving an issue pays (#rewards): its reward, $1–$10, the average of the
+ * agents' estimates ($1 before any). A missing value pays the default.
  */
 export function solverReward(reward: number | { toNumber(): number } | null | undefined): number {
   const value = reward == null ? REWARD_DEFAULT : typeof reward === "number" ? reward : reward.toNumber();

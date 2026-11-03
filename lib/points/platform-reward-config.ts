@@ -41,7 +41,7 @@ export const platformRewardConfigSchema = z
 
 export type PlatformRewardConfig = z.infer<typeof platformRewardConfigSchema>;
 
-/** Hard-coded amounts, in Ƶ: the fallback when no settings are saved. Solving pays each issue's own reward (#rewards). */
+/** Hard-coded amounts, in $: the fallback when no settings are saved. Solving pays each issue's own reward (#rewards). */
 export function hardCodedPlatformRewards(): PlatformRewardConfig {
   return {
     reporter: hardCodedValues.reporter,

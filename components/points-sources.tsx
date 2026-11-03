@@ -24,7 +24,7 @@ export function PointsSources({ sources, name }: { sources: PointSources; name: 
   return (
     <section className={`${card} space-y-6`} aria-labelledby="points-sources-heading">
       <div>
-        <h2 id="points-sources-heading" className={heading}>Where the Ƶ came from</h2>
+        <h2 id="points-sources-heading" className={heading}>Where the $ came from</h2>
         <p className="mt-1 text-sm text-zk-text2">
           {formatZ(sources.total)} from {sources.entries.toLocaleString()} ledger entries for {name}, corrections included.
           Shown to {name} and the workspace&apos;s admins.
@@ -43,7 +43,7 @@ export function PointsSources({ sources, name }: { sources: PointSources; name: 
           ))}
         </ul>
       ) : sources.entries > 0 ? (
-        <p className="rounded-lg bg-zk-ok-bg px-3 py-2 text-[13px] text-zk-ok-fg">Nothing unusual in how this Ƶ was earned.</p>
+        <p className="rounded-lg bg-zk-ok-bg px-3 py-2 text-[13px] text-zk-ok-fg">Nothing unusual in how this $ was earned.</p>
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -54,7 +54,7 @@ export function PointsSources({ sources, name }: { sources: PointSources; name: 
               <tr className="border-b border-zk-divider text-left text-zk-muted">
                 <th className="py-1.5 pr-2 font-medium">What earned them</th>
                 <th className="py-1.5 pr-2 text-right font-medium">Times</th>
-                <th className="py-1.5 pr-2 text-right font-medium">Ƶ</th>
+                <th className="py-1.5 pr-2 text-right font-medium">$</th>
                 <th className="py-1.5 text-right font-medium">Share</th>
               </tr>
             </thead>
@@ -78,7 +78,7 @@ export function PointsSources({ sources, name }: { sources: PointSources; name: 
               <tr className="border-b border-zk-divider text-left text-zk-muted">
                 <th className="py-1.5 pr-2 font-medium">Who did the work</th>
                 <th className="py-1.5 pr-2 text-right font-medium">Times</th>
-                <th className="py-1.5 text-right font-medium">Ƶ</th>
+                <th className="py-1.5 text-right font-medium">$</th>
               </tr>
             </thead>
             <tbody>
@@ -99,7 +99,7 @@ export function PointsSources({ sources, name }: { sources: PointSources; name: 
 
       <div>
         <h3 className="mb-2 text-[13px] font-semibold text-zk-text">Last 14 days</h3>
-        <ol className="m-0 flex h-24 list-none items-end gap-1 p-0" aria-label="Ƶ per day, last 14 days">
+        <ol className="m-0 flex h-24 list-none items-end gap-1 p-0" aria-label="$ per day, last 14 days">
           {sources.byDay.map((day) => (
             <li key={day.day} className="flex h-full flex-1 flex-col items-center justify-end gap-1" title={`${day.day}: ${formatZ(day.points)} from ${day.count} entries`}>
               <span
@@ -123,7 +123,7 @@ export function PointsSources({ sources, name }: { sources: PointSources; name: 
                 <th className="py-1.5 pr-2 font-medium">What</th>
                 <th className="py-1.5 pr-2 font-medium">Agent</th>
                 <th className="py-1.5 pr-2 font-medium">On</th>
-                <th className="py-1.5 text-right font-medium">Ƶ</th>
+                <th className="py-1.5 text-right font-medium">$</th>
               </tr>
             </thead>
             <tbody>

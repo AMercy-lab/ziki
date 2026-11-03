@@ -64,7 +64,7 @@ export type ResolvedIssue = {
   tenantId: string;
   /** Who it was assigned to at resolution time; nobody earns the reward without one. */
   assigneeId: string | null;
-  /** The issue's reward, in Ƶ (#rewards). */
+  /** The issue's reward, in $ (#rewards). */
   reward?: number | { toNumber(): number } | null;
   pullRequestUrl?: string | null;
 };

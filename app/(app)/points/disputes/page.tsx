@@ -17,7 +17,7 @@ import { LocalTime } from "@/components/local-time";
 import { DisputeControls } from "./dispute-controls";
 import { CreditAwardsForm } from "./credit-awards-form";
 
-export const metadata = { title: "Ƶ disputes" };
+export const metadata = { title: "$ disputes" };
 
 const statusClass: Record<DisputeView["status"], string> = {
   open: "bg-zk-warn-bg text-zk-warn-fg",
@@ -84,9 +84,9 @@ export default async function PointsDisputesPage() {
   if (!tenantId) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-extrabold tracking-tight text-zk-text">Ƶ disputes</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight text-zk-text">$ disputes</h1>
         <p className="rounded-[20px] border border-zk-border bg-zk-surface p-6 text-sm text-zk-text2">
-          You&apos;re not a member of a workspace yet, so there is no Ƶ to dispute.
+          You&apos;re not a member of a workspace yet, so there is no $ to dispute.
         </p>
       </div>
     );
@@ -103,7 +103,7 @@ export default async function PointsDisputesPage() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-zk-text">Ƶ disputes</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight text-zk-text">$ disputes</h1>
           <p className="text-sm text-zk-text2">
             Say an award is missing or wrong; a workspace admin resolves it. Points are never
             deleted — a correction is a reversing entry.
@@ -121,7 +121,7 @@ export default async function PointsDisputesPage() {
         <section className="space-y-3 rounded-[20px] border border-zk-border bg-zk-surface p-4 sm:p-6">
           <h2 className="text-lg font-semibold text-zk-text">Credit missing awards</h2>
           <p className="text-sm text-zk-text2">
-            The solver&apos;s reward is written when an assigned issue is marked resolved. The reporter&apos;s Ƶ
+            The solver&apos;s reward is written when an assigned issue is marked resolved. The reporter&apos;s $
             are written when two independent reviewers accept the issue as real. Use this when
             that award is missing.
           </p>
@@ -169,7 +169,7 @@ export default async function PointsDisputesPage() {
         <h2 className="text-lg font-semibold text-zk-text">Your ledger entries</h2>
         {entries.length === 0 ? (
           <p className="rounded-[20px] border border-zk-border bg-zk-surface p-6 text-sm text-zk-text2">
-            No Ƶ yet. Resolve an assigned issue to earn the first ones.
+            No $ yet. Resolve an assigned issue to earn the first ones.
           </p>
         ) : (
           <ol className="divide-y divide-zk-divider rounded-[20px] border border-zk-border bg-zk-surface">

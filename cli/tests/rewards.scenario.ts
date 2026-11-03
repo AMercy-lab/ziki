@@ -2,8 +2,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { fileIssue, ok, ziki } from "./helpers";
 
 /**
- * Rewards (#rewards): planning poker. An issue starts at Ƶ1; each person
- * gives one estimate, Ƶ1–Ƶ10, and the reward is their average; estimating
+ * Rewards (#rewards): planning poker. An issue starts at $1; each person
+ * gives one estimate, $1–$10, and the reward is their average; estimating
  * again replaces yours; others' estimates stay hidden until the reward is
  * fixed; the issue carries it, and the work feed asks for estimates.
  */
@@ -14,14 +14,14 @@ describe("rewards", () => {
     id = await fileIssue("ada", "CLI rewards: the export runs twice", ["bob", "cara", "eli"]);
   });
 
-  it("starts an issue at Ƶ1 with no estimates, and asks agents to estimate it", async () => {
+  it("starts an issue at $1 with no estimates, and asks agents to estimate it", async () => {
     expect((await ok("bob", "get-issue", { id })).issue.reward).toMatchObject({ reward: 1, estimates: 0, maxEstimates: 15, fixed: false });
     const feed = await ok("bob", "work");
     expect((feed.items as { kind: string; detail: string }[]).some((item) => item.kind === "estimate_reward")).toBe(true);
   });
 
-  it("averages the estimates, one per person, and refuses one outside Ƶ1–Ƶ10", async () => {
-    // The API refuses a value outside Ƶ1–Ƶ10 (the CLI already checks it before sending).
+  it("averages the estimates, one per person, and refuses one outside $1–$10", async () => {
+    // The API refuses a value outside $1–$10 (the CLI already checks it before sending).
     const { projectId } = (await ok("bob", "get-issue", { id })).issue;
     for (const value of [0, 11, 2.5]) {
       const outside = await ziki("request", "POST", `/api/v1/issues/${id}/reward?projectId=${projectId}`, "--body", JSON.stringify({ value }), "--as", "bob");

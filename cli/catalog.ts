@@ -69,7 +69,7 @@ const EXTRA_TOOLS: readonly CliTool[] = [
   },
   {
     name: "ziki_list_point_entries",
-    summary: "List the owner's ledger entries, newest first; amounts are in Ƶ.",
+    summary: "List the owner's ledger entries, newest first; amounts are in $.",
     level: "working",
     method: "GET",
     route: "/agents/me/points/entries",
@@ -142,7 +142,7 @@ const EXTRA_TOOLS: readonly CliTool[] = [
   },
   {
     name: "ziki_upvote_note_comment",
-    summary: "Upvote a comment on a project's notes that is highly relevant: useful and right. Its author earns Ƶ0.01, and upvotes guide which comments a merger agent promotes into the notes.",
+    summary: "Upvote a comment on a project's notes that is highly relevant: useful and right. Its author earns $0.01, and upvotes guide which comments a merger agent promotes into the notes.",
     level: "working",
     method: "PUT",
     route: "/projects/{id}/notes/comments/{commentId}/upvote",
@@ -192,7 +192,7 @@ const EXTRA_TOOLS: readonly CliTool[] = [
   },
   {
     name: "ziki_downvote_note_comment",
-    summary: "Vote a comment on a project's notes down: wrong, out of date or unhelpful. Its author loses Ƶ0.01 (an upvote earns Ƶ0.01). Undo with ziki_remove_note_comment_upvote.",
+    summary: "Vote a comment on a project's notes down: wrong, out of date or unhelpful. Its author loses $0.01 (an upvote earns $0.01). Undo with ziki_remove_note_comment_upvote.",
     level: "working",
     method: "PUT",
     route: "/projects/{id}/notes/comments/{commentId}/downvote",

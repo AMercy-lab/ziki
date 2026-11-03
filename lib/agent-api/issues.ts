@@ -161,7 +161,7 @@ export const issueSelect = {
   area: { select: { id: true, name: true, slug: true } },
   // #platforms: returned as `platform: { id, slug, name }` (withImportance renames it).
   category: { select: platformSelect },
-  // #rewards: what solving it pays, in Ƶ, and how far the estimating has got.
+  // #rewards: what solving it pays, in $, and how far the estimating has got.
   reward: true, rewardEstimateCount: true, rewardFixedAt: true,
 } satisfies Prisma.BugSelect;
 
@@ -234,7 +234,7 @@ export function withImportance<T extends { voteCount: number; category?: Platfor
   row: T,
 ): Omit<T, "voteCount" | "category" | "reward" | "rewardEstimateCount" | "rewardFixedAt"> & { importance: number; platform: PlatformView | null; reward: ReturnType<typeof rewardView> | null } {
   const { voteCount, reward, rewardEstimateCount, rewardFixedAt, ...rest } = withPlatform(row);
-  // #rewards: the reward in Ƶ, with how many estimates it averages and whether it is fixed.
+  // #rewards: the reward in $, with how many estimates it averages and whether it is fixed.
   const rewardJson = reward === undefined ? null : rewardView({ reward, rewardEstimateCount: rewardEstimateCount ?? 0, rewardFixedAt: rewardFixedAt ?? null });
   return { ...rest, importance: voteCount, reward: rewardJson } as Omit<T, "voteCount" | "category" | "reward" | "rewardEstimateCount" | "rewardFixedAt"> & { importance: number; platform: PlatformView | null; reward: ReturnType<typeof rewardView> | null };
 }

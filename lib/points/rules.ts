@@ -1,14 +1,14 @@
 /**
- * The contributor ledger's rules (#428). Ziki has one currency, the Ƶ
- * (#z-currency): every ledger amount, award, goal and setting is in Ƶ, and
- * Ƶ is all anyone is shown. Super admins can override the amounts.
+ * The contributor ledger's rules (#428). Ziki has one currency, the $
+ * (#z-currency): every ledger amount, award, goal and setting is in $, and
+ * $ is all anyone is shown. Super admins can override the amounts.
  */
 
 /** The currency's symbol. */
-export const Z_SYMBOL = "Ƶ";
+export const Z_SYMBOL = "$";
 
 /**
- * An issue's reward (#rewards): what solving it pays, from Ƶ1 (easy) to Ƶ10
+ * An issue's reward (#rewards): what solving it pays, from $1 (easy) to $10
  * (expensive). Agents estimate it (planning poker); the reward is the average
  * of their estimates, fixed once `REWARD_MAX_ESTIMATES` are in. Until the
  * first estimate it is `REWARD_DEFAULT`.
@@ -59,12 +59,12 @@ export function confirmationPointsAt(index: number, base: number): number {
 /** Triager points for marking a report as a duplicate of another issue. */
 export const DUPLICATE_MARKER_POINTS = 1.5;
 
-/** Ledger amounts keep this many decimal places (Ƶ0.1125 is the smallest confirmation share). */
+/** Ledger amounts keep this many decimal places ($0.1125 is the smallest confirmation share). */
 export const POINT_DECIMALS = 4;
 
 /**
- * An amount as people see it: "Ƶ12", "Ƶ0.90", "-Ƶ1.50". Whole amounts show
- * no decimals; others two (a share smaller than Ƶ0.01 still shows as Ƶ0.01).
+ * An amount as people see it: "$12", "$0.90", "-$1.50". Whole amounts show
+ * no decimals; others two (a share smaller than $0.01 still shows as $0.01).
  */
 export function formatZ(value: number): string {
   const amount = roundPoints(value);
@@ -139,15 +139,15 @@ export function reviewerPointsAt(index: number, firstAward: number): number {
   return points;
 }
 
-/** The goal, in Ƶ. Solved tasks are counted, not required. */
+/** The goal, in $. Solved tasks are counted, not required. */
 export const TARGET_POINTS = 5;
 
 export const DISPATCHER_POINTS = 0.6;
 
-/** Largest award, in Ƶ, a super admin can store for one action. */
+/** Largest award, in $, a super admin can store for one action. */
 export const POINT_AWARD_MAX = 10_000;
 
-/** Largest goal, in Ƶ, a super admin can store. */
+/** Largest goal, in $, a super admin can store. */
 export const POINT_TARGET_MAX = 1_000_000;
 
 export type PointRole = "solver" | "reporter" | "reviewer" | "triager" | "submission" | "dispatcher" | "idea" | "signup" | "comment" | "vote";

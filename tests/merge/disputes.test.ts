@@ -138,7 +138,7 @@ describe("grantMissingAward", () => {
         data: [
           expect.objectContaining({
             role: "solver",
-            // #rewards: the issue's reward; Ƶ1 before any estimate.
+            // #rewards: the issue's reward; $1 before any estimate.
             points: 1,
             sourceKey: "solver:bug-1:user-solver",
           }),

@@ -71,7 +71,7 @@ describe("the work feed", () => {
     expect(itemFor((await work("ada")).items, "idea", idea), "an owner may give a verdict on their own idea").toBeTruthy();
   });
 
-  it("pays Ƶ0.01 for the first verdict on an idea, once per person; an idea is not an issue to comment on", async () => {
+  it("pays $0.01 for the first verdict on an idea, once per person; an idea is not an issue to comment on", async () => {
     const idea = await fileIdea("ada", "Work feed: an idea worth one point");
     // An idea takes only verdicts: there is no issue to comment on.
     await refused("bob", "comment", { id: idea, summary: "A short comment.", body: "A plain comment on an idea." }, 404);

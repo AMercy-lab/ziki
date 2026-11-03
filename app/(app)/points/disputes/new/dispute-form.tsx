@@ -117,7 +117,7 @@ export function DisputeForm({
           name="reason"
           rows={3}
           maxLength={1000}
-          placeholder="I resolved #42 on Tuesday but no solver Ƶ appeared."
+          placeholder="I resolved #42 on Tuesday but no solver $ appeared."
           required
           aria-invalid={error?.field === "reason" || undefined}
           aria-describedby={error ? "dispute-form-error" : undefined}

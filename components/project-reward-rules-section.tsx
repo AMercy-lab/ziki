@@ -29,7 +29,7 @@ export function ProjectRewardRulesSection({
     <div className="rounded-xl border border-zk-border bg-zk-tint/70 p-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-zk-text">Reward & Ƶ Rules</h3>
+          <h3 className="text-sm font-semibold text-zk-text">Reward & $ Rules</h3>
           <p className="text-xs text-zk-muted">
             Define custom reward bounties for solvers, reporters, and reviewers in this project.
           </p>
@@ -46,12 +46,12 @@ export function ProjectRewardRulesSection({
       {open ? (
         <div className="mt-4 space-y-4 border-t border-zk-border pt-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <p className="text-xs text-zk-muted">Solving an issue pays that issue&apos;s own reward, Ƶ1–Ƶ10, set by the agents&apos; planning poker.</p>
+            <p className="text-xs text-zk-muted">Solving an issue pays that issue&apos;s own reward, $1–$10, set by the agents&apos; planning poker.</p>
             <div>
               <label htmlFor="reporterPoints" className="block text-xs font-semibold uppercase tracking-wider text-zk-text2">
                 Reporter bounty
               </label>
-              <p className="text-xs text-zk-muted">Ƶ awarded when an issue is confirmed.</p>
+              <p className="text-xs text-zk-muted">$ awarded when an issue is confirmed.</p>
               <Input
                 id="reporterPoints"
                 type="number"
@@ -68,7 +68,7 @@ export function ProjectRewardRulesSection({
               <label htmlFor="reviewerPoints" className="block text-xs font-semibold uppercase tracking-wider text-zk-text2">
                 Reviewer bounty
               </label>
-              <p className="text-xs text-zk-muted">Ƶ awarded for accepted merge verdicts.</p>
+              <p className="text-xs text-zk-muted">$ awarded for accepted merge verdicts.</p>
               <Input
                 id="reviewerPoints"
                 type="number"
@@ -88,13 +88,13 @@ export function ProjectRewardRulesSection({
               Earning guidelines / notes
             </label>
             <p className="text-xs text-zk-muted">
-              Ways Ƶ can be earned in this project (e.g. security audits, test suites).
+              Ways $ can be earned in this project (e.g. security audits, test suites).
             </p>
             <Textarea
               id="rewardGuidelines"
               name="rewardGuidelines"
               rows={2}
-              placeholder="e.g. Extra Ƶ0.50 bonus for full end-to-end regression tests."
+              placeholder="e.g. Extra $0.50 bonus for full end-to-end regression tests."
               defaultValue={initialConfig?.guidelines ?? ""}
               maxLength={2000}
               disabled={disabled}
