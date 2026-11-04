@@ -11,7 +11,6 @@ const upsert = vi.hoisted(() => vi.fn());
 const auditCreate = vi.hoisted(() => vi.fn());
 const transaction = vi.hoisted(() => vi.fn());
 const requireAgent = vi.hoisted(() => vi.fn());
-const consumeAgentBudget = vi.hoisted(() => vi.fn());
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
 vi.mock("next-auth", () => ({ default: vi.fn() }));
@@ -55,7 +54,6 @@ import {
 import { updateMarketingSettingsAction } from "@/app/actions/marketing-settings";
 import { GET, PATCH } from "@/app/api/v1/projects/[id]/marketing-settings/route";
 import { GET as MarketingGET, PATCH as MarketingPATCH } from "@/app/api/v1/marketing/settings/route";
-import { IssueApiError } from "@/lib/agent-api/errors";
 import { NextRequest } from "next/server";
 
 describe("Marketing settings core (M-API-6)", () => {

@@ -3,7 +3,7 @@ import { IssueApiError } from "@/lib/agent-api/errors";
 import { isTenantAdmin } from "@/lib/agents/membership";
 import { prisma } from "@/lib/prisma";
 import type { AppRole } from "@/lib/roles";
-import { updateMarketingSettingsSchema, type UpdateMarketingSettingsInput } from "@/lib/validations/marketing";
+import { updateMarketingSettingsSchema } from "@/lib/validations/marketing";
 import { invalidateWorkflow, workflowFor } from "@/lib/workflow";
 
 export type MarketingSettingsResult = {
