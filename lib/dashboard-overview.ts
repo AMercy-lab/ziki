@@ -243,6 +243,28 @@ export function classifyAgentStatus({
   return "offline";
 }
 
+/**
+ * Stuck, as the stale-claim sweep reads it (lib/agent-api/availability.ts):
+ * quiet for the working window, or past its deadline, with no pull request
+ * linked yet and no question to its owner pausing the clocks.
+ */
+export function isClaimStalled({
+  quiet,
+  deliverBy,
+  waitingOnOwnerSince,
+  pullRequestUrl,
+  now,
+}: {
+  quiet: boolean;
+  deliverBy: Date | null | undefined;
+  waitingOnOwnerSince: Date | null;
+  pullRequestUrl: string | null;
+  now: Date;
+}): boolean {
+  if (waitingOnOwnerSince || pullRequestUrl) return false;
+  return quiet || isDeliveryOverdue(deliverBy, now);
+}
+
 /** How long an agent has been quiet, in the largest unit that fits: "20 min", "3 h", "2 days". */
 function quietFor(since: Date | null, now: Date): string {
   if (!since) return "a while";
@@ -326,12 +348,10 @@ export async function loadOwnAgents({
     const claimedBug = claim?.bug ?? null;
     const heartbeat = claim?.lastHeartbeatAt ?? claim?.claimedAt ?? null;
     const claimHeld = claim !== null && claimedBug !== null && !claimedBug.isDeleted && claimedBug.status === "in_progress";
-    // Stuck, as the stale-claim sweep reads it (lib/agent-api/availability.ts): quiet for the working window, or
-    // past its deadline, with no pull request linked yet and no question to its owner pausing the clocks.
     const quiet = heartbeat === null || heartbeat.getTime() < workingCutoff;
-    const overdue = isDeliveryOverdue(claim?.deliverBy, now);
     const claimStalled =
-      claimHeld && !claim.waitingOnOwnerSince && !claimedBug.pullRequestUrl && (quiet || overdue);
+      claimHeld &&
+      isClaimStalled({ quiet, deliverBy: claim.deliverBy, waitingOnOwnerSince: claim.waitingOnOwnerSince, pullRequestUrl: claimedBug.pullRequestUrl, now });
     const claimIsLive = claimHeld && !quiet;
 
     const lastSeenAt = latest(
@@ -352,7 +372,7 @@ export async function loadOwnAgents({
     if (status === "waiting") {
       activity = "Waiting for your answer";
     } else if (status === "stuck" && claimedBug) {
-      activity = overdue
+      activity = isDeliveryOverdue(claim?.deliverBy, now)
         ? `Past its deadline on #${claimedBug.number} ${claimedBug.title}`
         : `No word on #${claimedBug.number} for ${quietFor(heartbeat, now)}`;
     } else if (status === "working" && claimedBug) {

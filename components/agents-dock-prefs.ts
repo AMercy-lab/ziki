@@ -46,7 +46,7 @@ let cache: DockPrefs | null = null;
 
 const isLook = (value: unknown): value is DockLook => DOCK_LOOKS.some((look) => look.value === value);
 
-function readPrefs(): DockPrefs {
+export function readPrefs(): DockPrefs {
   if (cache) return cache;
   try {
     const saved = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}") as Partial<Record<keyof DockPrefs, unknown>>;
