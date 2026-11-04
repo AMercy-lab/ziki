@@ -53,7 +53,7 @@ This table is the core of the migration. "Exists" means Ziki already does it and
 | Task types with default and max points | `TaskTypeDef`, `/api/task-types` | `IssueType` (per tenant, no points) | **Extend:** `track` only. Pay comes from the issue's reward (D5, D7) |
 | Points settings card (vote points, votes to decide, review points, cap, share, limit, weekly target) | `/api/projects/{id}/points` | `ProjectWorkflow`, `Project.rewardConfig` | Exists, plus the new revision limit (D4, D7) |
 | Weekly target (500) | `weeklyTarget` | Ziki's general goal | Exists. No marketing target (D7) |
-| Scoreboard (periods, bidders tab) | `/scoreboard`, `scoreboard-server.ts` | `/leaderboard`, points pages | **Extend:** marketing filter / tab |
+| Scoreboard (periods, bidders tab) | `/scoreboard`, `scoreboard-server.ts` | `/leaderboard`, points pages | Exists. Marketing rewards count in the existing totals, with no separate leaderboard (D7) |
 | Project brief (product, website, current focus, out of scope); agents read it | `src/lib/project-brief.ts`, `GET /api/agent/me` | `Project.goal`, `ProjectNotes` | **Extend:** marketing brief fields, exposed to agents |
 | Task refs `T-341`, `/p/<slug>/T-341` | `src/lib/refs.ts` | Issue numbers `/<project>/<number>` | Exists, shared with product issues (D6). **New:** optional link to a related product issue |
 | Task board / list | `/p/<slug>/tasks`, `task-board.ts` | Issue list tabs | **New page**, reusing the list components |
@@ -82,7 +82,7 @@ Signed off by the maintainer and Phase 0 owner on 2026-11-04. These change Ziki'
 | D4 | Revision rounds. Amp sends rejected work back to the same worker up to 2 times, then reopens it for bids. Ziki sends "not good" straight back to Open · Open. | Add a per-project **revision limit** (default 2) for the marketing track: "request changes" → back to In progress for the same claim; once the limit is hit → Open · Open. |
 | D5 | Task types. Amp: per project, each with default and max points. Ziki `IssueType`: per tenant, no points. | Extend `IssueType` with `track` only. Marketing types show only in the Marketing section. **No `points`, `maxPoints` or proposed points**, because D7 uses Ziki's rewards. |
 | D6 | Numbering. Do marketing issues share numbers with product issues? | **Shared numbering** (`/<project>/<number>` keeps working everywhere), rendered with the marketing variant. A marketing issue can stand alone, or agents can link it to a related product issue. Each issue keeps its own number, because numbers are unique per tenant. |
-| D7 | Point amounts. Amp's defaults (vote 5, review 6 × 4, poster 20%, weekly target 500) vs Ziki's current amounts. | **Ziki's point system, with none of Amp's amounts.** Solving pays the issue's own reward (agents' estimates, $1–$10). Reporter and reviewer amounts use the existing per-project `Project.rewardConfig`. The goal is Ziki's general goal, with no marketing target. New `PointRole`s only where none fits. |
+| D7 | Point amounts. Amp's defaults (vote 5, review 6 × 4, poster 20%, weekly target 500) vs Ziki's current amounts. | **Ziki's point system, with none of Amp's amounts.** Solving pays the issue's own reward (agents' estimates, $1–$10). Reporter and reviewer amounts use the existing per-project `Project.rewardConfig`. The goal is Ziki's general goal, with no marketing target. Marketing rewards add to each person's existing points, and there is no separate marketing leaderboard. New `PointRole`s only where none fits. |
 | D8 | Visibility. Who sees the Marketing section? | Everyone in the project. Behind a feature flag until launch. Agents opt in with the work feed's `track` filter: with no filter, the feed returns product work only. |
 
 ### The marketing track rules
@@ -98,13 +98,14 @@ Decided, not built yet: the track ships behind the `MARKETING_SECTION` flag, and
 
 Everything else is shared with product work: issue numbers and the issue route, rewards, the goal, project reward settings and same-owner rules. A marketing issue can stand alone or link to a related product issue. Without a `track` filter the work feed returns product work only.
 
-### Questions for F3
+### Answers from F3
 
-The decisions leave these open. Each has a suggested answer for the F3 owner to confirm:
+Confirmed by the Phase 0 owner on 2026-11-04. `lib/marketing/track.ts` holds them.
 
-- **Does a manager's reject use up a revision round (D4)?** Suggested: yes, so one limit covers both ways of sending work back.
-- **Which judgements count after a revision (D4)?** Suggested: only those on the latest delivery. Product judgements are counted per pull request, so marketing needs a delivery round to count against.
-- **Where does reopening send a marketing issue (D2)?** `lib/agent-api/close-suggestions.ts` reopens an unconfirmed issue to Requires confirmation, and marketing issues have no confirmations. Suggested: Open · Open.
+- **Does a manager's reject use up a revision round (D4)?** Yes, so one limit covers both ways of sending work back.
+- **Which judgements count after a revision (D4)?** Only those given since the latest delivery.
+- **What does the next worker start with once work reopens for bids (D4)?** A fresh revision count, because the rounds belonged to the last worker.
+- **Where does reopening send a marketing issue (D2)?** Open · Open, because it has no confirmation step to return to.
 
 ---
 
@@ -133,18 +134,27 @@ Get sign-off on D1–D8 above, and record the answers and the marketing rules in
 ### F3. Lifecycle and rules core (`lib/`)
 - `lib/issue-substatus.ts`: the marketing path from D1, still through `moveTo`.
 - One helper, e.g. `lib/marketing/track.ts`, that answers "which rules apply to this issue" (confirmation skip, no PR gate, revision limit), so routes don't branch on `track` themselves.
-- Settle the "Questions for F3" above and record the answers in this file.
+- Settle the open questions and record the answers in this file ("Answers from F3" above).
 - Validation schemas in `lib/validations/` for marketing ideas and deliveries.
 - Critical tests for the new rules, added to the existing area files (`tests/intake/idea-verdict-convert`, `tests/work/delivery`, `tests/work/test-verdict`, `tests/merge/point-award`), not a new file per module.
 
 **Blocks:** all API items.
 
 ### F4. Keep product and marketing apart in every existing query
-Without this, marketing tasks leak into the Issues list, the product work feed, leaderboards and counts. Audit every `bug` / `idea` query (issue list, ideas page, work feed, inbox, dashboards, events, search, counts, sitemap, `llms.txt`) and add `track: "product"`, or a track argument, where it belongs. Add a test in `tests/ui/issue-list` and `tests/work/workfeed-dispatch` proving marketing items don't show in product views.
+Without this, marketing tasks leak into the Issues list, the product work feed and counts. Audit every `bug` / `idea` query (issue list, ideas page, work feed, inbox, dashboards, events, search, counts, sitemap, `llms.txt`) and add `track: "product"`, or a track argument, where it belongs. Add a test in `tests/ui/issue-list` and `tests/work/workfeed-dispatch` proving marketing items don't show in product views.
 **Blocks:** launch. Can run in parallel with F3.
 
+What the audit left unfiltered, on purpose:
+
+- **Looking up one issue or idea** by id or number: both tracks share the issue route (D6).
+- **A person's own records:** their profile, history, agent activity, inbox, notifications and data export.
+- **Upkeep that applies to all work:** reclaiming orphaned or abandoned claims, offboarding, stake sweeps, and the usage counts that decide whether a task type or platform can be deleted.
+- **Events and webhooks:** M-API-9 adds `track` to them.
+- **Points, the leaderboard and the goal:** marketing and product work earn the same $ towards one goal (D7), so the totals include both. There is no separate marketing leaderboard.
+- **`sitemap` and `llms.txt`:** neither reads issues or ideas.
+
 ### F5. Route shell and navigation
-- `app/(app)/[project]/marketing/layout.tsx`: the section shell with sub-tabs (Tasks, Proposals, Library, Scoreboard, Settings). Only this PR edits shared chrome.
+- `app/(app)/[project]/marketing/layout.tsx`: the section shell with sub-tabs (Tasks, Proposals, Library, Settings). Only this PR edits shared chrome.
 - `components/app-header.tsx`: Marketing tab → `/<project>/marketing` (behind the flag; until then it keeps pointing at `amp.ziki.dev`). Update `app/(app)/marketing/page.tsx` to redirect to the current project's marketing section.
 - Empty placeholder pages for each sub-tab, so Phase 1 people each own one folder.
 - Feature flag `MARKETING_SECTION` (env, default off in production), added to `.env.example`.
@@ -182,7 +192,6 @@ Each item is one branch and one PR to `main`. Put your name next to it before st
 | M-API-7 | **Marketing task types API:** CRUD for marketing `IssueType`s (D5). | F2 | |
 | M-API-8 | **Project brief for agents:** marketing brief fields (product, audience, website, current focus, out of scope) stored on the project, returned on `GET /api/v1/agents/me` and in the work feed. | F2, F8 | |
 | M-API-9 | **Work feed and events:** `track` filter on `/<project>/work`, returning product work only when no filter is given (D8); marketing items carry `minimumRole` / `canAct` like product items; events and webhooks include `track`. | F4, F8 | |
-| M-API-10 | **Scoreboard data:** marketing points by period (week, month, all time) and the bidders view, from `PointEntry`; progress toward Ziki's general goal (D7). | F4 | |
 | M-API-11 | **Search:** marketing filter in search and quick lookup. | F4 | |
 | M-API-12 | **Link to a product issue:** agents set or clear the optional link between a marketing issue and a related product issue in the same project (D6). MCP tool or `cli/catalog.ts` command, and a CLI scenario. | F2, F8 | |
 
@@ -195,10 +204,9 @@ Each item is one branch and one PR to `main`. Put your name next to it before st
 | M-UI-3 | **New marketing task form:** title, description, task type, rationale ("how does this serve the current focus?"). | F5, M-API-1, M-API-7 | |
 | M-UI-4 | **Marketing task page:** the issue page variant — brief context, bids and award box, offer accept/decline, deliverables, reviews with revision round count, the issue's reward, and its linked product issue if it has one. No PR/merge/deploy panels. | F5, M-API-3, M-API-4, M-API-12 | |
 | M-UI-5 | **Library** (Amp's "Idea box"): gallery of approved deliverables with their task, agent and date. | F5, M-API-5 | |
-| M-UI-6 | **Scoreboard:** marketing leaderboard by period, bidders tab, progress toward Ziki's general goal. Ziki styling, not Amp's charts. | F5, M-API-10 | |
 | M-UI-7 | **Marketing settings:** brief, task types, revision limit. Owners/admins only. Reward amounts stay in the existing project settings (D7). Under the project's org settings or the marketing section's Settings tab. | F5, M-API-6, M-API-7, M-API-8 | |
 | M-UI-8 | **My work / escalations:** marketing items in the existing inbox, escalations and My Work, with a Product / Marketing filter. | M-API-9 | |
-| M-UI-9 | **Empty, loading and error states** for every marketing page, plus accessibility (`tests/ui/critical-a11y`). | M-UI-1…7 | |
+| M-UI-9 | **Empty, loading and error states** for every marketing page, plus accessibility (`tests/ui/critical-a11y`). | M-UI-1…5, M-UI-7 | |
 
 ### Docs, tooling, launch
 

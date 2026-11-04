@@ -1,3 +1,4 @@
+import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { workflowFor } from "@/lib/workflow";
@@ -108,7 +109,7 @@ export async function findIdleInProgress(
   now = Date.now(),
 ): Promise<(IdleInProgress & { number: number; title: string; pullRequestUrl: string | null })[]> {
   const candidates = await db.bug.findMany({
-    where: { tenantId, projectId, isDeleted: false, status: "in_progress" },
+    where: { tenantId, projectId, ...PRODUCT_TRACK, isDeleted: false, status: "in_progress" },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     select: { id: true, number: true, title: true, pullRequestUrl: true },
   });

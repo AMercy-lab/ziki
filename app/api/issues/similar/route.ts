@@ -1,3 +1,4 @@
+import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { bugInTenant, currentTenantIdFor } from "@/lib/tenant-context";
@@ -30,6 +31,7 @@ async function trigramMatches(query: string, tenantId: string | null): Promise<S
            GREATEST(similarity("title", ${query}), word_similarity(${query}, "title")) AS "score"
     FROM "Bug"
     WHERE "isDeleted" = false
+      AND "track" = 'product'
       AND "tenantId" = ${tenantId}
       AND "status"::text = ANY(${SIMILAR_STATUSES as string[]})
       AND ("title" % ${query} OR ${query} <% "title")
@@ -44,6 +46,7 @@ async function plainMatches(query: string, tenantId: string | null): Promise<Sim
   return prisma.bug.findMany({
     where: {
       ...bugInTenant(tenantId),
+      ...PRODUCT_TRACK,
       isDeleted: false,
       status: { in: [...SIMILAR_STATUSES] },
       AND: terms.map((t) => ({ title: { contains: t, mode: "insensitive" as const } })),

@@ -1,3 +1,4 @@
+import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import "server-only";
 import { Prisma, type Status } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -82,6 +83,7 @@ export function firstCloseForTenant(tenantId: string): Prisma.Sql {
       AND a.metadata ->> 'to' IN ('resolved', 'on_dev', 'on_staging', 'on_prod', 'published', 'closed')
       AND bug."tenantId" = ${tenantId}
       AND bug."isDeleted" = false
+      AND bug."track" = 'product'
     GROUP BY a."bugId"
   `;
 }
@@ -95,7 +97,7 @@ export async function loadWorkspaceOverview({
 }): Promise<WorkspaceOverview> {
   if (!tenantId) return EMPTY_OVERVIEW;
 
-  const base: Prisma.BugWhereInput = { ...bugInTenant(tenantId), isDeleted: false };
+  const base: Prisma.BugWhereInput = { ...bugInTenant(tenantId), ...PRODUCT_TRACK, isDeleted: false };
 
   const [
     unresolvedCount,
@@ -175,7 +177,7 @@ export async function loadSidebarCounts({
 }): Promise<SidebarCounts> {
   if (!tenantId) return { unresolved: 0, assigned: 0, reported: 0 };
 
-  const base: Prisma.BugWhereInput = { ...bugInTenant(tenantId), isDeleted: false };
+  const base: Prisma.BugWhereInput = { ...bugInTenant(tenantId), ...PRODUCT_TRACK, isDeleted: false };
   const [unresolved, assigned, reported] = await Promise.all([
     prisma.bug.count({ where: { ...base, status: { in: [...UNRESOLVED_STATUSES] } } }),
     prisma.bug.count({ where: { ...base, assigneeId: userId } }),

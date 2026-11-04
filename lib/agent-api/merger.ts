@@ -1,3 +1,4 @@
+import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import { prisma } from "@/lib/prisma";
 import type { AgentContext } from "@/lib/agents/require-agent";
 import { requireLevel } from "@/lib/agents/levels";
@@ -48,6 +49,7 @@ export async function findReadyToMergeIssues(
 
   // Confirmation from one bulk read, not one isConfirmed() per row (#714).
   const confirmed = await confirmedIssueIds(prisma, {
+    ...PRODUCT_TRACK,
     tenantId: agent.tenantId,
     projectId,
     ...queueWhere(status),
@@ -61,6 +63,7 @@ export async function findReadyToMergeIssues(
       id: { in: [...confirmed] },
       tenantId: agent.tenantId,
       projectId,
+      ...PRODUCT_TRACK,
       isDeleted: false,
       ...queueWhere(status),
       pullRequestUrl: { not: null },

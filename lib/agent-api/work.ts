@@ -1,3 +1,4 @@
+import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import type { AgentContext } from "@/lib/agents/require-agent";
@@ -349,7 +350,7 @@ async function buildProjectWork(tenantId: string, project: { id: string; slug: s
   const caller = neutralCaller(tenantId, project.id);
   // One read decides every converted issue's stage: which still require
   // confirmation, and for what, and which are ready (#714).
-  const confirmations = await openIssueConfirmations(prisma, { tenantId, projectId: project.id });
+  const confirmations = await openIssueConfirmations(prisma, { tenantId, projectId: project.id, ...PRODUCT_TRACK });
   const workflow = await workflowFor(project.id);
   const thresholdOnly = isThresholdOnly(workflow);
   const [tests, ready, toAccept, toMerge, ideas, jobs] = await Promise.all([
@@ -462,7 +463,7 @@ const DEPLOYMENT_REPORT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 async function deploymentWork(tenantId: string, projectId: string, now = Date.now()): Promise<ProjectWork["deployments"]> {
   return prisma.bug.findMany({
     where: {
-      tenantId, projectId, isDeleted: false, status: "resolved", substatus: { in: ["on_dev", "on_staging"] },
+      tenantId, projectId, ...PRODUCT_TRACK, isDeleted: false, status: "resolved", substatus: { in: ["on_dev", "on_staging"] },
       updatedAt: { gte: new Date(now - DEPLOYMENT_REPORT_WINDOW_MS) },
     },
     orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
@@ -478,13 +479,13 @@ async function deploymentWork(tenantId: string, projectId: string, now = Date.no
 async function uncategorizedWork(tenantId: string, projectId: string): Promise<ProjectWork["uncategorized"]> {
   const [issues, ideas, platforms] = await Promise.all([
     prisma.bug.findMany({
-      where: { tenantId, projectId, isDeleted: false, categoryId: null, status: { notIn: ["closed", "resolved"] } },
+      where: { tenantId, projectId, ...PRODUCT_TRACK, isDeleted: false, categoryId: null, status: { notIn: ["closed", "resolved"] } },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 50,
       select: { id: true, number: true, title: true },
     }),
     prisma.idea.findMany({
-      where: { tenantId, projectId, isDeleted: false, categoryId: null, status: "open" },
+      where: { tenantId, projectId, ...PRODUCT_TRACK, isDeleted: false, categoryId: null, status: "open" },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 50,
       select: { id: true, number: true, title: true },
@@ -497,7 +498,7 @@ async function uncategorizedWork(tenantId: string, projectId: string): Promise<P
 /** #rewards: issues not closed whose reward is still being estimated, newest first. */
 async function rewardWork(tenantId: string, projectId: string): Promise<ProjectWork["rewards"]> {
   const rows = await prisma.bug.findMany({
-    where: { tenantId, projectId, isDeleted: false, rewardFixedAt: null, status: { notIn: ["closed", "resolved"] } },
+    where: { tenantId, projectId, ...PRODUCT_TRACK, isDeleted: false, rewardFixedAt: null, status: { notIn: ["closed", "resolved"] } },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: 100,
     select: { id: true, number: true, title: true, reward: true, rewardEstimateCount: true, rewardEstimates: { select: { onBehalfOfUserId: true } } },
@@ -512,7 +513,7 @@ async function rewardWork(tenantId: string, projectId: string): Promise<ProjectW
 
 async function importanceWork(tenantId: string, projectId: string): Promise<ProjectWork["importance"]> {
   const rows = await prisma.bug.findMany({
-    where: { tenantId, projectId, isDeleted: false, status: { in: ["open", "in_progress"] } },
+    where: { tenantId, projectId, ...PRODUCT_TRACK, isDeleted: false, status: { in: ["open", "in_progress"] } },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     select: { id: true, number: true, title: true, votes: { select: { userId: true } } },
   });
@@ -526,7 +527,7 @@ async function importanceWork(tenantId: string, projectId: string): Promise<Proj
  */
 async function openIdeas(tenantId: string, projectId: string, threshold: number): Promise<ProjectWork["ideas"]> {
   return prisma.idea.findMany({
-    where: { tenantId, projectId, isDeleted: false, status: "open", score: { lt: threshold } },
+    where: { tenantId, projectId, ...PRODUCT_TRACK, isDeleted: false, status: "open", score: { lt: threshold } },
     orderBy: [{ score: "desc" }, { createdAt: "asc" }],
     select: { id: true, number: true, title: true, score: true },
   });
@@ -535,7 +536,7 @@ async function openIdeas(tenantId: string, projectId: string, threshold: number)
 /** Open ideas whose score reached the threshold, highest first. */
 async function convertibleIdeas(tenantId: string, projectId: string, threshold: number): Promise<ProjectWork["toConvert"]> {
   return prisma.idea.findMany({
-    where: { tenantId, projectId, isDeleted: false, status: "open", score: { gte: threshold } },
+    where: { tenantId, projectId, ...PRODUCT_TRACK, isDeleted: false, status: "open", score: { gte: threshold } },
     orderBy: [{ score: "desc" }, { createdAt: "asc" }],
     select: { id: true, number: true, title: true, score: true },
   });
@@ -545,7 +546,7 @@ async function convertibleIdeas(tenantId: string, projectId: string, threshold: 
 /** Issues held by an expired offer or by undelivered work past its deadline or silent (#reclaim). */
 async function staleIssues(tenantId: string, projectId: string): Promise<ProjectWork["toReclaim"]> {
   const holds = await prisma.issueClaim.findMany({
-    where: { releasedAt: null, status: { in: ["offered", "active"] }, bug: { tenantId, projectId, isDeleted: false, status: { in: ["open", "in_progress"] } } },
+    where: { releasedAt: null, status: { in: ["offered", "active"] }, bug: { tenantId, projectId, ...PRODUCT_TRACK, isDeleted: false, status: { in: ["open", "in_progress"] } } },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     select: { bug: { select: { id: true, number: true, title: true } } },
   });
@@ -615,6 +616,7 @@ async function pullRequestWork(
     where: {
       tenantId,
       projectId,
+      ...PRODUCT_TRACK,
       isDeleted: false,
       status: { in: ["in_progress", "done", "merge"] },
       pullRequestUrl: { not: null },
@@ -653,7 +655,7 @@ async function pullRequestWork(
  */
 async function closableIssues(tenantId: string, projectId: string, threshold: number, thresholdOnly: boolean): Promise<ProjectWork["toClose"]> {
   const rows = await prisma.closeSuggestion.findMany({
-    where: { bug: { tenantId, projectId, isDeleted: false, status: { notIn: ["closed", "resolved"] } } },
+    where: { bug: { tenantId, projectId, ...PRODUCT_TRACK, isDeleted: false, status: { notIn: ["closed", "resolved"] } } },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     select: {
       reason: true, votes: true, summary: true, onBehalfOfUserId: true,
@@ -687,7 +689,7 @@ async function closableIssues(tenantId: string, projectId: string, threshold: nu
 /** Open bids (not awarded, not withdrawn, from agents not revoked) on Open issues, oldest first (#bid-votes). */
 async function openBids(tenantId: string, projectId: string, managerVoteWeight: number, offerWindowSeconds: number): Promise<OpenBid[]> {
   const rows = await prisma.issueBid.findMany({
-    where: { ...OPEN_BID_WHERE, bug: { tenantId, projectId, isDeleted: false, substatus: { in: ["open", "requires_confirmation"] } } },
+    where: { ...OPEN_BID_WHERE, bug: { tenantId, projectId, ...PRODUCT_TRACK, isDeleted: false, substatus: { in: ["open", "requires_confirmation"] } } },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     select: {
       id: true,
@@ -737,7 +739,7 @@ async function openIssueComments(
         deliveryId: null,
         testVerdictId: null,
         mergeReviewId: null,
-        bug: { tenantId, projectId, isDeleted: false, substatus: "open" },
+        bug: { tenantId, projectId, ...PRODUCT_TRACK, isDeleted: false, substatus: "open" },
       },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       select: {
@@ -820,7 +822,7 @@ async function rejectableIdeas(tenantId: string, projectId: string): Promise<Pro
   const { ideaThreshold } = await workflowFor(projectId);
   const sums = await prisma.ideaVerdict.groupBy({
     by: ["ideaId", "opinion"],
-    where: { idea: { tenantId, projectId, isDeleted: false, status: "open" } },
+    where: { idea: { tenantId, projectId, ...PRODUCT_TRACK, isDeleted: false, status: "open" } },
     _sum: { votes: true },
   });
   const votesByIdea = new Map<string, { opinion: string; votes: number }[]>();
@@ -933,11 +935,11 @@ async function agentWork(agent: AgentContext, projectId: string, offerWindowSeco
   const reviewCutoff = new Date(now - REVIEW_OFFER_TTL_MS);
   const [offers, reviewOffers, jobReviewOffers, claims, unread] = await Promise.all([
     prisma.issueClaim.findMany({
-      where: { agentId: agent.agentId, status: "offered", releasedAt: null, offeredAt: { gt: offerCutoff }, bug: { projectId } },
+      where: { agentId: agent.agentId, status: "offered", releasedAt: null, offeredAt: { gt: offerCutoff }, bug: { projectId, ...PRODUCT_TRACK } },
       select: { id: true, offeredAt: true, bug: { select: { id: true, number: true, title: true } } },
     }),
     prisma.reviewOffer.findMany({
-      where: { agentId: agent.agentId, status: "offered", offeredAt: { gt: reviewCutoff }, bug: { projectId } },
+      where: { agentId: agent.agentId, status: "offered", offeredAt: { gt: reviewCutoff }, bug: { projectId, ...PRODUCT_TRACK } },
       select: { id: true, offeredAt: true, bug: { select: { id: true, number: true, title: true } } },
     }),
     prisma.jobReviewOffer.findMany({
@@ -945,7 +947,7 @@ async function agentWork(agent: AgentContext, projectId: string, offerWindowSeco
       select: { id: true, offeredAt: true, submission: { select: { id: true, job: { select: { brief: true } } } } },
     }),
     prisma.issueClaim.findMany({
-      where: { agentId: agent.agentId, status: "active", releasedAt: null, bug: { projectId } },
+      where: { agentId: agent.agentId, status: "active", releasedAt: null, bug: { projectId, ...PRODUCT_TRACK } },
       select: { id: true, deliverBy: true, bug: { select: { id: true, number: true, title: true, status: true, pullRequestUrl: true } } },
     }),
     prisma.agentInboxItem.count({ where: { agentId: agent.agentId, readAt: null } }),

@@ -1,3 +1,4 @@
+import { trackRules } from "@/lib/marketing/track";
 import { describe, expect, it, vi } from "vitest";
 
 // #pr-reports: whether a pull request was closed without merging is the latest
@@ -154,5 +155,12 @@ describe("payouts wait for the work to be live (#live-payout)", () => {
     // Paid once: a later report pays nothing more.
     expect(await releasePayoutIfLive(db, "bug-1")).toBe(false);
     expect(rows).toHaveLength(2);
+  });
+});
+
+describe("when the reporter is paid", () => {
+  it("is at conversion for marketing, which has no confirmation, and at confirmation for product", () => {
+    expect(trackRules("marketing").reporterPaidOn).toBe("conversion");
+    expect(trackRules("product").reporterPaidOn).toBe("confirmation");
   });
 });

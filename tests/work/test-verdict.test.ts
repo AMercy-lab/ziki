@@ -1,3 +1,4 @@
+import { afterSendBack, judgementCounts } from "@/lib/marketing/track";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /** Judging delivered work (#434, #529, #727, #owner-agents): the agent holding the claim can't judge its own work, anyone else can; one verdict per agent; good to merge needs a ready pull request; weighted judgements move the issue. */
@@ -367,5 +368,38 @@ describe("reviewJobSubmission: concurrent accepts (#584)", () => {
     expect(submission.status).toBe("accepted");
     expect(committedReviews).toHaveLength(2);
     expect(awardCount).toBe(1);
+  });
+});
+
+describe("sending marketing work back", () => {
+  const marketing = (revisionCount: number) => ({ track: "marketing" as const, revisionCount });
+
+  it("returns it to the same worker until the rounds are used up, then reopens it with a fresh count", () => {
+    expect(afterSendBack(marketing(0), 2, "judgement")).toEqual({ substatus: "in_progress", keepsClaim: true, revisionCount: 1 });
+    expect(afterSendBack(marketing(1), 2, "judgement")).toEqual({ substatus: "in_progress", keepsClaim: true, revisionCount: 2 });
+    expect(afterSendBack(marketing(2), 2, "judgement")).toEqual({ substatus: "open", keepsClaim: false, revisionCount: 0 });
+  });
+
+  it("uses up a round when a manager rejects it too", () => {
+    expect(afterSendBack(marketing(0), 2, "manager_reject")).toEqual({ substatus: "in_progress", keepsClaim: true, revisionCount: 1 });
+    expect(afterSendBack(marketing(2), 2, "manager_reject")).toEqual({ substatus: "open", keepsClaim: false, revisionCount: 0 });
+  });
+
+  it("leaves product work as it is: judgements reopen it, a reject returns it", () => {
+    const product = { track: "product" as const, revisionCount: 0 };
+    expect(afterSendBack(product, 2, "judgement")).toEqual({ substatus: "open", keepsClaim: false, revisionCount: 0 });
+    expect(afterSendBack(product, 2, "manager_reject")).toEqual({ substatus: "in_progress", keepsClaim: true, revisionCount: 0 });
+  });
+
+  it("counts only judgements since the latest marketing delivery, and product judgements by pull request", () => {
+    const delivered = new Date("2026-11-04T10:00:00Z");
+    const before = new Date("2026-11-04T09:00:00Z");
+    const after = new Date("2026-11-04T11:00:00Z");
+    const delivery = { updatedAt: delivered, pullRequestUrl: null };
+    expect(judgementCounts("marketing", { updatedAt: before, pullRequestUrl: null }, delivery)).toBe(false);
+    expect(judgementCounts("marketing", { updatedAt: after, pullRequestUrl: null }, delivery)).toBe(true);
+    const pr = "https://github.com/emerjent/ziki/pull/1";
+    expect(judgementCounts("product", { updatedAt: before, pullRequestUrl: pr }, { updatedAt: delivered, pullRequestUrl: pr })).toBe(true);
+    expect(judgementCounts("product", { updatedAt: after, pullRequestUrl: "other" }, { updatedAt: delivered, pullRequestUrl: pr })).toBe(false);
   });
 });
