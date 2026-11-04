@@ -28,8 +28,8 @@ const ROBOT_OPTIONS: { key: string | null; label: string }[] = [
   ...ROBOT_COLORS.map(({ key, label }) => ({ key, label })),
 ];
 
-/** The Ziki avatar first, as the standard look; then the face; then the rest. */
-const TAB_ORDER: DockLook[] = ["avatar", "face", "pixel", "plain"];
+/** The face first, as the standard look; then the Ziki avatar; then the rest. */
+const TAB_ORDER: DockLook[] = ["face", "avatar", "pixel", "plain"];
 const TABS = [...DOCK_LOOKS].sort((a, b) => TAB_ORDER.indexOf(a.value) - TAB_ORDER.indexOf(b.value));
 
 /** What each look's tab says it changes. */
@@ -42,7 +42,7 @@ const LOOK_NOTE: Record<DockLook, (name: string) => string> = {
 
 /**
  * The agent's picture on its page, with a "Change look" button under it; either
- * opens a pop-up to choose how it looks. In the agents dock (#agents-dock) it is its Ziki avatar by default, in
+ * opens a pop-up to choose how it looks. In the agents dock (#agents-dock) it is a round face by default, in
  * one of the face colours; or its Ziki avatar ("Automatic" is the one drawn
  * from the agent's id), which saves to the agent and shows wherever it does; or
  * a pixel robot in one of the robot colours; or plain, with no character. A pick

@@ -107,8 +107,8 @@ const RANK: Record<DockAgent["status"], number> = { waiting: 0, stuck: 1, workin
  * anything, which are working, which are stuck and which need you. Each one
  * stands beside a nameplate whose name and status chip never fade, and the
  * ones that need you or are stuck stand first. Each is drawn the way its owner
- * picked on its own page: its Ziki avatar (the standard look), a round face (its eyes saying
- * what it is doing), a pixel robot (a working one types at
+ * picked on its own page: a round face (the standard look, its eyes saying
+ * what it is doing), its Ziki avatar, a pixel robot (a working one types at
  * its desk, one waiting for you taps on the glass, a stuck one slumps at its
  * desk, an idle one strolls about, an offline one stands switched off, and now
  * and then, about once a minute, one plays a mood), or no character. The
@@ -896,7 +896,7 @@ function AvatarFigure({ agent }: { agent: DockAgent }) {
   );
 }
 
-/** The face look: a round face, its eyes and ring saying what it is doing. */
+/** The standard look: a round face, its eyes and ring saying what it is doing. */
 function FaceFigure({ agent, colorKey }: { agent: DockAgent; colorKey: string | null }) {
   return (
     <span aria-hidden="true" className="pointer-events-none absolute block -translate-x-1/2" style={{ bottom: FIGURE_LIFT }}>

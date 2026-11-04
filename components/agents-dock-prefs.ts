@@ -11,8 +11,8 @@ import { type RobotColor, faceColor, robotColor } from "@/lib/agents/dock-colors
  */
 
 /**
- * How an agent stands in the dock: its Ziki avatar (the standard look), a round
- * face, a pixel robot, or no character at all.
+ * How an agent stands in the dock: a round face (the standard look), its Ziki
+ * avatar, a pixel robot, or no character at all.
  */
 export type DockLook = "face" | "avatar" | "pixel" | "plain";
 
@@ -23,7 +23,7 @@ export const DOCK_LOOKS: { value: DockLook; label: string; hint: string }[] = [
   { value: "plain", label: "Plain", hint: "Its name and status only." },
 ];
 
-export const DEFAULT_LOOK: DockLook = "avatar";
+export const DEFAULT_LOOK: DockLook = "face";
 
 /**
  * `colors` holds a robot colour key and `faceColors` a face colour key
