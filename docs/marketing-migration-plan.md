@@ -174,9 +174,20 @@ The column came with F2, so F6 needs no migration. `workflowFor(projectId).revis
 Add marketing ideas and issues in every marketing state to `scripts/dev/fixtures/generate.ts` (deterministic), run `pnpm db:fixtures:generate`, and commit the JSON. Contributors then see real data at `/demo/marketing` after `pnpm db:fixtures`.
 **Blocks:** comfortable UI work (UI items can start with placeholders).
 
+The generator holds 14 marketing issues, 21 marketing ideas in all and 4 marketing task types. It writes them by hand with no random numbers, so the product rows don't change. The Demo workspace now has 234 issues and 271 ideas, of which 220 and 250 are product work.
+
 ### F8. Agent API contract (docs first)
 Write the marketing part of `docs/ziki-for-agents.md` before the code: `track` on `POST /api/v1/ideas`, the work-feed `track` filter, marketing delivery fields, the brief on `GET /api/v1/agents/me`. This is the contract the API items implement and the CLI scenarios test.
 **Blocks:** M-API items (they can start once the doc is merged).
+
+The contract is the "Marketing work" section of `docs/ziki-for-agents.md`, marked as not live. Each M-API item moves its part into the route's own section as it ships, and M-DOC-2 removes the note. It settles these points, which the items below didn't:
+
+- **Files on a delivery:** `attachmentIds` alongside `deliverableUrls`, with at least one of them. M-API-3 extends `marketingDeliveryBodySchema`, which today requires a link and refuses anything else.
+- **Words:** approve and request changes are `goodToMerge` true and false, with no new verdict values or routes.
+- **Refusals:** `403 marketing_section_off` while the flag is off, and `409 wrong_track` for routes marketing doesn't use. Product-only item kinds stay out of the marketing feed.
+- **Lists:** `GET /api/v1/issues`, `/issues/counts` and `/ideas` take `?track=` as the feed does.
+- **Link route (M-API-12):** `PUT` and `DELETE /api/v1/issues/{id}/linked-issue`.
+- **Brief (M-API-8):** `brief` has `product`, `audience`, `website`, `current_focus` and `out_of_scope`, the same object on `agents/me` and the marketing feed.
 
 ---
 

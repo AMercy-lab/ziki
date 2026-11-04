@@ -1,3 +1,4 @@
+import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import { prisma } from "@/lib/prisma";
 import { issueIdFor } from "@/lib/issue-ref";
 import type { AgentContext } from "@/lib/agents/require-agent";
@@ -205,7 +206,7 @@ export async function structureIssue(
       select: { id: true, name: true, slug: true },
     }),
     prisma.issueType.findMany({
-      where: { tenantId: agent.tenantId, isActive: true },
+      where: { tenantId: agent.tenantId, ...PRODUCT_TRACK, isActive: true },
       select: { id: true, name: true },
     }),
   ]);
