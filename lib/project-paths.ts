@@ -59,6 +59,11 @@ export function orgPath(slug: string, section = ""): string {
   return projectPath(slug, section ? `/org/${section}` : "/org");
 }
 
+/** `/<slug>/marketing`, or one of its sub-tabs. */
+export function marketingPath(slug: string, section = ""): string {
+  return projectPath(slug, section ? `/marketing/${section}` : "/marketing");
+}
+
 /** Filing a new report (it starts as an idea). */
 export function newIssuePath(slug: string, query?: URLSearchParams | string): string {
   return withQuery(projectPath(slug, "/issues/new"), query);

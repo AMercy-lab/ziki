@@ -31,6 +31,7 @@ vi.mock("@/lib/prisma", () => ({
 import { updateProjectWorkflowAction } from "@/app/(app)/projects/[slug]/settings/workflow-actions";
 import {
   DEFAULT_PROJECT_WORKFLOW,
+  revisionLimitSchema,
   workflowSettingsSchema,
   workflowValues } from "@/lib/workflow-config";
 
@@ -154,6 +155,13 @@ describe("updateProjectWorkflowAction (#595)", () => {
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
+  it("leaves the marketing revision limit alone when the product settings are saved", async () => {
+    await expect(updateProjectWorkflowAction(undefined, form())).resolves.toEqual({ ok: true });
+    const saved = upsert.mock.calls[0][0];
+    expect(saved.update).not.toHaveProperty("revisionLimit");
+    expect(saved.create).not.toHaveProperty("revisionLimit");
+  });
+
   it("does not touch a project outside the tenant", async () => {
     findFirst.mockResolvedValue(null);
     await expect(updateProjectWorkflowAction(undefined, form())).resolves.toMatchObject({
@@ -198,4 +206,25 @@ describe("workflowSettingsSchema (#595)", () => {
     }
   });
 
+});
+
+describe("the marketing revision limit", () => {
+  it("is 2 until a project sets its own", () => {
+    expect(workflowValues(null).revisionLimit).toBe(2);
+    expect(workflowValues({ revisionLimit: 4 }).revisionLimit).toBe(4);
+  });
+
+  it("refuses a limit outside 1 to 10", () => {
+    for (const value of [0, 11, 1.5]) expect(revisionLimitSchema.safeParse(value).success).toBe(false);
+    for (const value of [1, 10]) expect(revisionLimitSchema.safeParse(value).success).toBe(true);
+  });
+
+  it("reads the project's stored limit", async () => {
+    const { workflowFor } = await vi.importActual<typeof import("@/lib/workflow")>("@/lib/workflow");
+    const stored = { projectWorkflow: { findUnique: vi.fn(async () => ({ revisionLimit: 5 })) } };
+    await expect(workflowFor("project-1", stored as never)).resolves.toMatchObject({ revisionLimit: 5 });
+    expect(stored.projectWorkflow.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ select: expect.objectContaining({ revisionLimit: true }) }),
+    );
+  });
 });
