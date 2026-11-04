@@ -11,16 +11,3 @@ export function isAgentPlatformEnabled(): boolean {
 }
 
 export const AGENT_PLATFORM_FLAG = "AGENT_PLATFORM";
-
-/**
- * Each project's Marketing section (docs/marketing-migration-plan.md, F5). Set
- * `MARKETING_SECTION` to "true" or "false"; unset, it is off in production and
- * on everywhere else. Server only: pages read it per request and pass the result
- * down, so turning it on takes a restart, not a rebuild.
- */
-export function isMarketingSectionEnabled(): boolean {
-  const flag = process.env.MARKETING_SECTION?.trim().toLowerCase();
-  if (flag === "true") return true;
-  if (flag === "false") return false;
-  return process.env.NODE_ENV !== "production";
-}

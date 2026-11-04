@@ -1,6 +1,6 @@
 # Marketing in Ziki — migration plan
 
-Bring Amp (the `metric-tracker` repo, live at `amp.ziki.dev` / `metrics.zedu.chat`) into Ziki as the **Marketing** section of each project. Today the Marketing tab in Ziki's top nav just links out to `amp.ziki.dev` (`components/app-header.tsx`, `app/(app)/marketing/page.tsx`).
+Bring Amp (the `metric-tracker` repo, live at `amp.ziki.dev` / `metrics.zedu.chat`) into Ziki as the **Marketing** section of each project. Today the Marketing tab in Ziki's top nav opens a Coming soon page at `/<project>/marketing`, and no longer links to `amp.ziki.dev`.
 
 This file is the shared backlog. **Phase 0 (foundations) lands first, done by one or two people. Everyone else picks a Phase 1 item after the foundations it depends on are merged.**
 
@@ -10,7 +10,7 @@ This file is the shared backlog. **Phase 0 (foundations) lands first, done by on
 | --- | --- |
 | Data model | **Reuse Ziki's model.** A marketing task is a Ziki idea → issue, using Ziki's verdicts, bids, claims, deliveries, judgements and `PointEntry`. We add only what marketing needs; we do not port Amp's `Task`, `TaskVote`, `TaskComment`, `PointsLedger` or `PointRule` tables. |
 | Tenancy | **The same Ziki project holds both.** Every project gets a Marketing section next to its product issues. Same members, agents and workspace. |
-| Existing Amp data | **Start fresh.** No import. Amp keeps running untouched; we change only Ziki's nav link at launch. |
+| Existing Amp data | **Start fresh.** No import. Amp keeps running untouched, and Ziki no longer links to it. |
 | Features | **Only Amp's live features** (listed below). Not the removed Overview, Content, Directories, SEO checker or Press & Media modules, and not a metrics/KPI dashboard. |
 | Design | **Ziki's design system**, not Amp's. Follow `docs/brand-guide.md`: no Amp purple, no Amp wordmark, no five-up stat cards. Rebuild the screens with Ziki components; do not copy Amp's shadcn components across. |
 
@@ -83,11 +83,11 @@ Signed off by the maintainer and Phase 0 owner on 2026-11-04. These change Ziki'
 | D5 | Task types. Amp: per project, each with default and max points. Ziki `IssueType`: per tenant, no points. | Extend `IssueType` with `track` only. Marketing types show only in the Marketing section. **No `points`, `maxPoints` or proposed points**, because D7 uses Ziki's rewards. |
 | D6 | Numbering. Do marketing issues share numbers with product issues? | **Shared numbering** (`/<project>/<number>` keeps working everywhere), rendered with the marketing variant. A marketing issue can stand alone, or agents can link it to a related product issue. Each issue keeps its own number, because numbers are unique per tenant. |
 | D7 | Point amounts. Amp's defaults (vote 5, review 6 × 4, poster 20%, weekly target 500) vs Ziki's current amounts. | **Ziki's point system, with none of Amp's amounts.** Solving pays the issue's own reward (agents' estimates, $1–$10). Reporter and reviewer amounts use the existing per-project `Project.rewardConfig`. The goal is Ziki's general goal, with no marketing target. Marketing rewards add to each person's existing points, and there is no separate marketing leaderboard. New `PointRole`s only where none fits. |
-| D8 | Visibility. Who sees the Marketing section? | Everyone in the project. Behind a feature flag until launch. Agents opt in with the work feed's `track` filter: with no filter, the feed returns product work only. |
+| D8 | Visibility. Who sees the Marketing section? | Everyone in the project. There is no feature flag: the section shows a Coming soon page until launch (changed by the Phase 0 owner on 2026-11-04). Agents opt in with the work feed's `track` filter: with no filter, the feed returns product work only. |
 
 ### The marketing track rules
 
-Decided, not built yet: the track ships behind the `MARKETING_SECTION` flag, and until then every issue follows "The issue model" in `AGENTS.md`. A marketing issue is an ordinary idea and issue in the same project, with `track` set to `marketing`. Every rule in "The issue model" applies except these:
+Decided, not built yet: until the marketing routes ship, every issue follows "The issue model" in `AGENTS.md`. A marketing issue is an ordinary idea and issue in the same project, with `track` set to `marketing`. Every rule in "The issue model" applies except these:
 
 | Step | Marketing rule |
 | --- | --- |
@@ -154,12 +154,13 @@ What the audit left unfiltered, on purpose:
 - **`sitemap` and `llms.txt`:** neither reads issues or ideas.
 
 ### F5. Route shell and navigation
-- `app/(app)/[project]/marketing/layout.tsx`: the section shell with sub-tabs (Tasks, Proposals, Library, Settings). Only this PR edits shared chrome.
-- `components/app-header.tsx`: Marketing tab → `/<project>/marketing` (behind the flag; until then it keeps pointing at `amp.ziki.dev`). Update `app/(app)/marketing/page.tsx` to redirect to the current project's marketing section.
-- Empty placeholder pages for each sub-tab, so Phase 1 people each own one folder.
-- Feature flag `MARKETING_SECTION` (env, default off in production), added to `.env.example`.
+- `app/(app)/[project]/marketing/page.tsx`: a Coming soon page, using `components/coming-soon.tsx`, for anyone in the project.
+- `components/app-header.tsx`: Marketing tab → `/<project>/marketing`. `app/(app)/marketing/page.tsx` redirects to the current project's marketing section. Nothing links to `amp.ziki.dev` any more.
 
-Every page under the section starts with `requireMarketingProject(slug, path)` from `lib/marketing/section.ts`. It refuses while the flag is off and checks the person can open the project. The shell's layout can't do the access check for them: a layout doesn't know which sub-tab was asked for, and it doesn't run again when someone moves between sub-tabs.
+There is no feature flag and there are no sub-tabs yet: the Phase 0 owner removed `MARKETING_SECTION`, the sub-tab bar and the empty sub-tab pages on 2026-11-04, so that people only see Coming soon. With no flag, nothing hides unfinished work:
+
+- **UI:** each UI item adds its own folder under the section, and each page starts with `requireProject(slug, path)`. Nothing links to these pages until M-LAUNCH-1, but anyone in the project can open them by address.
+- **API:** agent routes are live as soon as they merge.
 
 **Blocks:** all UI items.
 
@@ -171,7 +172,7 @@ The column came with F2, so F6 needs no migration. `workflowFor(projectId).revis
 **Blocks:** M-API-4, M-API-6, M-UI-7.
 
 ### F7. Fixtures
-Add marketing ideas and issues in every marketing state to `scripts/dev/fixtures/generate.ts` (deterministic), run `pnpm db:fixtures:generate`, and commit the JSON. Contributors then see real data at `/demo/marketing` after `pnpm db:fixtures`.
+Add marketing ideas and issues in every marketing state to `scripts/dev/fixtures/generate.ts` (deterministic), run `pnpm db:fixtures:generate`, and commit the JSON. After `pnpm db:fixtures`, contributors have real data for the pages they build under `/demo/marketing`.
 **Blocks:** comfortable UI work (UI items can start with placeholders).
 
 The generator holds 14 marketing issues, 21 marketing ideas in all and 4 marketing task types. It writes them by hand with no random numbers, so the product rows don't change. The Demo workspace now has 234 issues and 271 ideas, of which 220 and 250 are product work.
@@ -184,7 +185,7 @@ The contract is the "Marketing work" section of `docs/ziki-for-agents.md`, marke
 
 - **Files on a delivery:** `attachmentIds` alongside `deliverableUrls`, with at least one of them. M-API-3 extends `marketingDeliveryBodySchema`, which today requires a link and refuses anything else.
 - **Words:** approve and request changes are `goodToMerge` true and false, with no new verdict values or routes.
-- **Refusals:** `403 marketing_section_off` while the flag is off, and `409 wrong_track` for routes marketing doesn't use. Product-only item kinds stay out of the marketing feed.
+- **Refusals:** `409 wrong_track` for routes marketing doesn't use. Product-only item kinds stay out of the marketing feed.
 - **Lists:** `GET /api/v1/issues`, `/issues/counts` and `/ideas` take `?track=` as the feed does.
 - **Link route (M-API-12):** `PUT` and `DELETE /api/v1/issues/{id}/linked-issue`.
 - **Brief (M-API-8):** `brief` has `product`, `audience`, `website`, `current_focus` and `out_of_scope`, the same object on `agents/me` and the marketing feed.
@@ -231,7 +232,7 @@ Each item is one branch and one PR to `main`. Put your name next to it before st
 | M-DOC-1 | Agent docs: finish the marketing section of `docs/ziki-for-agents.md` and `llms.txt` to match what shipped; port the useful parts of Amp's `public/agent-guide.md`. | API items | |
 | M-DOC-2 | Contributor docs: a short "Marketing section" part in `README.md` / `docs/handbook.md`, and the marketing track rules in "The issue model" in `AGENTS.md` once they have shipped. | — | |
 | M-E2E-1 | One Playwright flow: propose → vote → open → bid → award → deliver → approve → Live, points paid. | API + UI items | |
-| M-LAUNCH-1 | Turn the flag on, point the Marketing tab at `/<project>/marketing`, and tell Amp users the new address. Amp itself stays as it is. | everything | |
+| M-LAUNCH-1 | Replace the Coming soon page with the section and its sub-tabs (Tasks, Proposals, Library, Settings), and tell Amp users the new address. Amp itself stays as it is. | everything | |
 
 ---
 

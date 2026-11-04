@@ -116,10 +116,10 @@ function TopNavLink({
  * The workspace areas: Product (the issue tracker), Marketing and Security.
  * The logo goes to the project's Ideas.
  */
-function TopNav({ pathname, projectSlug, marketingSection }: { pathname: string | null; projectSlug: string | null; marketingSection: boolean }) {
+function TopNav({ pathname, projectSlug }: { pathname: string | null; projectSlug: string | null }) {
   // Product opens the project the page is in, or the first one (#project-urls).
   const productHref = projectSlug ? ideasPath(projectSlug) : "/tenants";
-  const marketingHref = marketingTabHref(marketingSection, projectSlug);
+  const marketingHref = marketingTabHref(projectSlug);
   // The section's address starts with the project's slug, but it isn't Your App.
   const inMarketing = isNavItemActive(pathname, marketingHref);
   return (
@@ -273,10 +273,7 @@ export function AppHeader({
   reportFormUrl,
   organizationAdmin = false,
   defaultProjectSlug = null,
-  marketingSection = false,
 }: {
-  /** The Marketing section is switched on (lib/feature-flags.ts). */
-  marketingSection?: boolean;
   /** The first project in the current workspace, for pages whose URL names none yet. */
   defaultProjectSlug?: string | null;
   userName?: string | null;
@@ -325,7 +322,7 @@ export function AppHeader({
           <WorkspaceSwitcher workspaces={workspaces} activeTenantId={activeTenantId} canManage={organizationAdmin} orgHref={projectSlug ? orgPath(projectSlug) : null} tone="bar" className="min-w-0 max-sm:max-w-44" />
         </div>
 
-        <TopNav pathname={pathname} projectSlug={projectSlug} marketingSection={marketingSection} />
+        <TopNav pathname={pathname} projectSlug={projectSlug} />
 
         {/* Phones and tablets: min-w-0 lets the group narrow so its flex-wrap
             breaks the chips onto rows (no sideways scroll at 360px or 768px).
