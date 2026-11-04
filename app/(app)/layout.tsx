@@ -13,6 +13,7 @@ import { isOrganizationAdmin, type OrganizationRole } from "@/lib/organization-r
 import type { WorkspaceChoice } from "@/components/workspace-switcher";
 import { prisma } from "@/lib/prisma";
 import { currentTenantIdFor } from "@/lib/tenant-context";
+import { isMarketingSectionEnabled } from "@/lib/feature-flags";
 import { firstProjectSlugFor } from "@/lib/project-route";
 import { tenantsForUser } from "@/lib/tenants";
 import { countPendingEscalations } from "@/lib/agent-questions";
@@ -132,6 +133,7 @@ export default async function AppLayout({
           workspaces={workspaces}
           activeTenantId={activeTenantId}
           defaultProjectSlug={defaultProjectSlug}
+          marketingSection={isMarketingSectionEnabled()}
           reportFormUrl={REPORT_FORM_URL}
           organizationAdmin={tenantId !== null && isOrganizationAdmin(membershipRole, user.role)}
         />

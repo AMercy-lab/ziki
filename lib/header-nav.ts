@@ -1,3 +1,4 @@
+import { marketingPath } from "@/lib/project-paths";
 import type { AppRole } from "@/lib/roles";
 
 /** Site staff pages: site roles and platform points. Super admins only. */
@@ -5,6 +6,19 @@ export const SITE_ADMIN_HREF = "/superadmin/users";
 
 /** Manage agents: the person's own agents, on a page of its own outside Settings. */
 export const MANAGE_AGENTS_HREF = "/agents";
+
+/** Where marketing lives until the section is switched on. */
+export const AMP_URL = "https://amp.ziki.dev";
+
+/**
+ * Where the Marketing tab goes: Amp until the section is on, then the section of
+ * the project the page is in. A page with no project goes through /marketing,
+ * which picks one.
+ */
+export function marketingTabHref(sectionEnabled: boolean, projectSlug: string | null): string {
+  if (!sectionEnabled) return AMP_URL;
+  return projectSlug ? marketingPath(projectSlug) : "/marketing";
+}
 
 /** One agent's own page, addressed by its name. Agents in the Agents menu open here. */
 export function agentPageHref(agentName: string): string {

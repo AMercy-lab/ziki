@@ -10,6 +10,7 @@ import {
   MANAGE_AGENTS_HREF,
   SITE_ADMIN_HREF,
   isNavItemActive,
+  marketingTabHref,
   realRoleOf,
   roleViewLabels,
 } from "@/lib/header-nav";
@@ -115,9 +116,12 @@ function TopNavLink({
  * The workspace areas: Product (the issue tracker), Marketing and Security.
  * The logo goes to the project's Ideas.
  */
-function TopNav({ pathname, projectSlug }: { pathname: string | null; projectSlug: string | null }) {
+function TopNav({ pathname, projectSlug, marketingSection }: { pathname: string | null; projectSlug: string | null; marketingSection: boolean }) {
   // Product opens the project the page is in, or the first one (#project-urls).
   const productHref = projectSlug ? ideasPath(projectSlug) : "/tenants";
+  const marketingHref = marketingTabHref(marketingSection, projectSlug);
+  // The section's address starts with the project's slug, but it isn't Your App.
+  const inMarketing = isNavItemActive(pathname, marketingHref);
   return (
     <nav
       aria-label="Workspace"
@@ -125,13 +129,13 @@ function TopNav({ pathname, projectSlug }: { pathname: string | null; projectSlu
       // clear of the home indicator. From lg it sits inline in the top bar.
       className="flex items-center max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-40 max-lg:justify-around max-lg:border-t max-lg:border-zk-border max-lg:bg-zk-surface max-lg:px-2 max-lg:pt-1.5 max-lg:pb-[max(0.375rem,env(safe-area-inset-bottom))] max-lg:shadow-[0_-1px_3px_rgba(0,0,0,0.04)] lg:ml-6 lg:gap-1"
     >
-      <TopNavLink href={productHref} active={Boolean(projectSlug && pathname?.startsWith(`/${projectSlug}`))} label="Your App">
+      <TopNavLink href={productHref} active={Boolean(projectSlug && pathname?.startsWith(`/${projectSlug}`) && !inMarketing)} label="Your App">
         <NavIcon>
           <circle cx="12" cy="12" r="9" />
           <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
         </NavIcon>
       </TopNavLink>
-      <TopNavLink href="https://amp.ziki.dev" active={isNavItemActive(pathname, "/marketing")} label="Marketing">
+      <TopNavLink href={marketingHref} active={inMarketing} label="Marketing">
         <NavIcon>
           <path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Z" />
           <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />
@@ -269,7 +273,10 @@ export function AppHeader({
   reportFormUrl,
   organizationAdmin = false,
   defaultProjectSlug = null,
+  marketingSection = false,
 }: {
+  /** The Marketing section is switched on (lib/feature-flags.ts). */
+  marketingSection?: boolean;
   /** The first project in the current workspace, for pages whose URL names none yet. */
   defaultProjectSlug?: string | null;
   userName?: string | null;
@@ -318,7 +325,7 @@ export function AppHeader({
           <WorkspaceSwitcher workspaces={workspaces} activeTenantId={activeTenantId} canManage={organizationAdmin} orgHref={projectSlug ? orgPath(projectSlug) : null} tone="bar" className="min-w-0 max-sm:max-w-44" />
         </div>
 
-        <TopNav pathname={pathname} projectSlug={projectSlug} />
+        <TopNav pathname={pathname} projectSlug={projectSlug} marketingSection={marketingSection} />
 
         {/* Phones and tablets: min-w-0 lets the group narrow so its flex-wrap
             breaks the chips onto rows (no sideways scroll at 360px or 768px).

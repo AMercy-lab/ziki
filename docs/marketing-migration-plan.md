@@ -159,10 +159,15 @@ What the audit left unfiltered, on purpose:
 - Empty placeholder pages for each sub-tab, so Phase 1 people each own one folder.
 - Feature flag `MARKETING_SECTION` (env, default off in production), added to `.env.example`.
 
+Every page under the section starts with `requireMarketingProject(slug, path)` from `lib/marketing/section.ts`. It refuses while the flag is off and checks the person can open the project. The shell's layout can't do the access check for them: a layout doesn't know which sub-tab was asked for, and it doesn't run again when someone moves between sub-tabs.
+
 **Blocks:** all UI items.
 
 ### F6. Marketing settings storage
 The only new dial is the **revision limit** (D4, default 2): a column on `ProjectWorkflow`, with its default and bounds in `lib/workflow-config.ts`. Everything else reuses what exists (D7): `ideaThreshold` for votes to decide, `maxActiveClaims` for the active-task cap, `Project.rewardConfig` for reporter and reviewer amounts, and Ziki's general goal. Include the read helper; the settings UI is a Phase 1 item.
+
+The column came with F2, so F6 needs no migration. `workflowFor(projectId).revisionLimit` is the read helper, and it passes straight to `afterSendBack`. The limit is 1 to 10 (`revisionLimitSchema`, for M-API-6). It stays out of `workflowSettingsSchema`, so saving the product settings form leaves it alone.
+
 **Blocks:** M-API-4, M-API-6, M-UI-7.
 
 ### F7. Fixtures
