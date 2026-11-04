@@ -13,6 +13,13 @@ vi.mock("next/navigation", async (importOriginal) => ({
   unstable_rethrow: vi.fn(),
 }));
 
+const issueTypes = vi.hoisted(() => ({ findMany: vi.fn(), count: vi.fn(), upsert: vi.fn() }));
+vi.mock("@/lib/prisma", () => ({ prisma: { issueType: issueTypes } }));
+vi.mock("next/cache", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/cache")>()),
+  unstable_cache: <T,>(read: T) => read,
+}));
+
 vi.mock("@/app/actions/issues", () => ({
   createBugAction: vi.fn(),
 }));
@@ -278,4 +285,22 @@ describe("CreateBugForm quick report in a modal (#report-modal)", () => {
     );
   });
 
+});
+
+describe("marketing task types and the report form", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("offers only product types", async () => {
+    issueTypes.findMany.mockResolvedValue([{ id: "fix", name: "Fix", isActive: true }]);
+    const { getIssueTypes } = await import("@/lib/lookups");
+    await getIssueTypes("t1");
+    expect(issueTypes.findMany.mock.calls[0][0].where).toEqual({ tenantId: "t1", track: "product" });
+  });
+
+  it("still sets up the product types in a workspace that only has marketing types", async () => {
+    issueTypes.count.mockImplementation(async ({ where }: { where: { track?: string } }) => (where.track === "product" ? 0 : 4));
+    const { ensureDefaultIssueTypes } = await import("@/lib/issue-types");
+    await ensureDefaultIssueTypes("t1");
+    expect(issueTypes.upsert).toHaveBeenCalled();
+  });
 });
