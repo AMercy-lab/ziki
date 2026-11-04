@@ -1,3 +1,5 @@
+import { marketingDeliveryBodySchema } from "@/lib/validations/marketing";
+import { trackRules } from "@/lib/marketing/track";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentContext } from "@/lib/agents/require-agent";
 
@@ -222,5 +224,21 @@ describe("deliverWork: the latest pull request report decides whether it can be 
 
   it("refuses a head commit that isn't a hexadecimal SHA", async () => {
     expect(await deliverWork(agent("working", "ada"), "bug1", { ...body(), headSha: "not-a-sha" })).toMatchObject({ status: 400, field: "headSha" });
+  });
+});
+
+describe("a marketing delivery", () => {
+  const body = { summary: "Wrote the launch post.", description: "Published it and checked its links.", deliverableUrls: ["https://example.com/post"] };
+
+  it("needs no pull request, and product work still does", () => {
+    expect(trackRules("marketing").needsPullRequest).toBe(false);
+    expect(trackRules("product").needsPullRequest).toBe(true);
+    expect(marketingDeliveryBodySchema.safeParse(body).success).toBe(true);
+  });
+
+  it("refuses no link, a link that isn't http or https, and a pull request", () => {
+    expect(marketingDeliveryBodySchema.safeParse({ ...body, deliverableUrls: [] }).success).toBe(false);
+    expect(marketingDeliveryBodySchema.safeParse({ ...body, deliverableUrls: ["javascript:alert(1)"] }).success).toBe(false);
+    expect(marketingDeliveryBodySchema.safeParse({ ...body, pullRequestUrl: PR }).success).toBe(false);
   });
 });

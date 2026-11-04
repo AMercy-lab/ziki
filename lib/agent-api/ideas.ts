@@ -1,3 +1,4 @@
+import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import { NextResponse, type NextRequest } from "next/server";
 import { reportSummarySchema } from "@/lib/validations/report-summary";
 import { z } from "zod";
@@ -129,6 +130,7 @@ export async function listAgentIdeas(scope: Scope, params: URLSearchParams) {
   const platform = requireKnownFilter("platform", rawPlatform, parsePlatformFilter(rawPlatform, platforms));
   const where: Prisma.IdeaWhereInput = {
     ...scope,
+    ...PRODUCT_TRACK,
     isDeleted: false,
     ...(platform ? { categoryId: platform === PLATFORM_NONE ? null : platform } : {}),
     ...(rawStatus ? { status: rawStatus as IdeaStatus } : {}),

@@ -1,3 +1,4 @@
+import { entrySubstatus, trackRules } from "@/lib/marketing/track";
 import type { AgentLevel } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -392,4 +393,17 @@ describe("acceptFix: the latest pull request report must say it can merge (#pr-r
     acceptsNothing();
   });
 
+});
+
+describe("accepting marketing work", () => {
+  it("goes straight to Live as Published, skipping Merge, and product work still goes to Merge", () => {
+    expect(trackRules("marketing").acceptMovesTo).toBe("published");
+    expect(trackRules("product").acceptMovesTo).toBe("ready_to_merge");
+  });
+
+  it("goes Live as Published when a person moves it there, and product work as On dev", () => {
+    expect(entrySubstatus("marketing", "resolved")).toBe("published");
+    expect(entrySubstatus("product", "resolved")).toBe("on_dev");
+    expect(entrySubstatus("marketing", "open")).toBe("open");
+  });
 });

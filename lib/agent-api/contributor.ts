@@ -1,3 +1,4 @@
+import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import { prisma } from "@/lib/prisma";
 import type { AgentContext } from "@/lib/agents/require-agent";
 import { requireLevel } from "@/lib/agents/levels";
@@ -28,7 +29,7 @@ export async function findClaimableIssues(
 ): Promise<ClaimableIssue[]> {
   requireLevel(agent, "working");
   const workflow = await workflowFor(projectId);
-  const stages = confirmations ?? await openIssueConfirmations(prisma, { tenantId: agent.tenantId, projectId });
+  const stages = confirmations ?? await openIssueConfirmations(prisma, { ...PRODUCT_TRACK, tenantId: agent.tenantId, projectId });
   const readyIds = [...stages].filter(([, confirmation]) => confirmation.stage === "ready").map(([id]) => id);
   if (readyIds.length === 0) return [];
 
@@ -37,6 +38,7 @@ export async function findClaimableIssues(
       id: { in: readyIds },
       tenantId: agent.tenantId,
       projectId,
+      ...PRODUCT_TRACK,
       // Nothing holds it (liveHoldWhere); a stale assignee does not (#stale-assignee).
       claims: { none: liveHoldWhere(workflow.offerWindowSeconds) },
     },

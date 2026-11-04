@@ -1,3 +1,4 @@
+import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import { IdeasWelcome } from "@/components/ideas-welcome";
 import { IdeaChat } from "@/components/idea-chat";
 import { LocalTime } from "@/components/local-time";
@@ -265,6 +266,7 @@ export async function IssuesList({
   const where: Prisma.BugWhereInput = {
     ...bugInTenant(tenantId),
     ...(projectId && !allProjects ? { projectId } : {}),
+    ...PRODUCT_TRACK,
     isDeleted: isDeletedView,
     ...mineFilterWhere(mineFilter, userId),
     ...duplicatesWhere(showDuplicates),
@@ -605,6 +607,7 @@ export async function IssuesList({
   // headings.
   const ideaWhere: Prisma.IdeaWhereInput = {
     tenantId: tenantId ?? "",
+    ...PRODUCT_TRACK,
     ...(projectId && !allProjects ? { projectId } : {}),
     isDeleted: false,
     status: "open",
@@ -636,7 +639,7 @@ export async function IssuesList({
           "my work",
           () =>
             prisma.bug.count({
-              where: { ...bugInTenant(tenantId), ...(projectId && !allProjects ? { projectId } : {}), isDeleted: false, ...myWorkWhere(userId) },
+              where: { ...bugInTenant(tenantId), ...(projectId && !allProjects ? { projectId } : {}), ...PRODUCT_TRACK, isDeleted: false, ...myWorkWhere(userId) },
             }),
           0,
         )
@@ -782,6 +785,7 @@ export async function IssuesList({
       isFirstRun = (await prisma.bug.count({
         where: {
           ...bugInTenant(tenantId),
+          ...PRODUCT_TRACK,
           ...(projectId && !allProjects ? { projectId } : {}),
           isDeleted: false,
         },
@@ -797,7 +801,7 @@ export async function IssuesList({
   if (isWatchingView && userId) {
     try {
       finishedWatched = await prisma.bug.count({
-        where: { ...finishedWatchedWhere(userId), ...bugInTenant(tenantId) },
+        where: { ...finishedWatchedWhere(userId), ...bugInTenant(tenantId), ...PRODUCT_TRACK },
       });
     } catch (error) {
       console.error("[bugs] finished watched count failed", error);

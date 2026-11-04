@@ -1,3 +1,4 @@
+import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -50,6 +51,7 @@ export async function GET(req: NextRequest) {
       where: {
         ...bugInTenant(tenantId),
         ...(projectId ? { projectId } : {}),
+        ...PRODUCT_TRACK,
         isDeleted: false,
         OR: matches,
       },

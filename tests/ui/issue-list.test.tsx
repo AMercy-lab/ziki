@@ -241,3 +241,18 @@ describe("issue list layout", () => {
   });
 
 });
+
+describe("keeping marketing work out of the product list", () => {
+  it("lists and counts only product issues", async () => {
+    await renderList({ status: "open" });
+    expect(findMany.mock.calls.at(-1)![0].where.track).toBe("product");
+    const statusTabs = groupBy.mock.calls.find(([args]) => args.by.includes("status"));
+    expect(statusTabs![0].where).toMatchObject({ track: "product" });
+  });
+
+  it("lists and counts only product ideas", async () => {
+    await renderList();
+    expect(ideaFindMany.mock.calls.at(-1)![0].where.track).toBe("product");
+    expect(ideaCount.mock.calls.at(-1)![0].where.track).toBe("product");
+  });
+});

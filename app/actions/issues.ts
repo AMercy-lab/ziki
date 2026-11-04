@@ -106,7 +106,8 @@ import {
   type MentionedAgent,
 } from "@/lib/agent-mentions";
 import { ideaPath } from "@/lib/project-paths";
-import { ENTRY_SUBSTATUS, moveTo } from "@/lib/issue-substatus";
+import { moveTo } from "@/lib/issue-substatus";
+import { entrySubstatus } from "@/lib/marketing/track";
 
 export type ActionResult = {
   error?: string;
@@ -501,7 +502,7 @@ export async function updateBugAction(
     boostedAt?: Date | null;
   } = {};
 
-  if (parsed.data.status && parsed.data.status !== existing.status) Object.assign(data, moveTo(ENTRY_SUBSTATUS[parsed.data.status]));
+  if (parsed.data.status && parsed.data.status !== existing.status) Object.assign(data, moveTo(entrySubstatus(existing.track, parsed.data.status)));
   if (admin) {
     if (parsed.data.typeId !== undefined) {
       data.typeId = parsed.data.typeId === "" ? null : parsed.data.typeId;

@@ -1,3 +1,4 @@
+import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import type { AgentLevel, Prisma } from "@prisma/client";
@@ -214,7 +215,7 @@ export async function listAgentIssues(scope: Scope, params: URLSearchParams) {
       ] }] }
     : {};
   const filtered: Prisma.BugWhereInput = {
-    ...scope, isDeleted: false, ...search,
+    ...scope, ...PRODUCT_TRACK, isDeleted: false, ...search,
     ...(status ? { status } : {}),
     ...(substatus ? { substatus } : {}),
     ...(assigneeId !== undefined ? { assigneeId } : {}),
@@ -303,9 +304,9 @@ export async function readAgentIssue(scope: Scope, id: string) {
  */
 export async function countAgentIssues(scope: Scope) {
   const [issueRows, substatusRows, ideaRows] = await Promise.all([
-    prisma.bug.groupBy({ by: ["status"], where: { ...scope, isDeleted: false }, _count: { _all: true } }),
-    prisma.bug.groupBy({ by: ["substatus"], where: { ...scope, isDeleted: false }, _count: { _all: true } }),
-    prisma.idea.groupBy({ by: ["status"], where: { ...scope, isDeleted: false }, _count: { _all: true } }),
+    prisma.bug.groupBy({ by: ["status"], where: { ...scope, ...PRODUCT_TRACK, isDeleted: false }, _count: { _all: true } }),
+    prisma.bug.groupBy({ by: ["substatus"], where: { ...scope, ...PRODUCT_TRACK, isDeleted: false }, _count: { _all: true } }),
+    prisma.idea.groupBy({ by: ["status"], where: { ...scope, ...PRODUCT_TRACK, isDeleted: false }, _count: { _all: true } }),
   ]);
   const issues = Object.fromEntries(statusSchema.options.map((status) => [status, 0])) as Record<(typeof statusSchema.options)[number], number>;
   for (const row of issueRows) issues[row.status] = row._count._all;

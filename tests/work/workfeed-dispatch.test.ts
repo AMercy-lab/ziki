@@ -1,9 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AgentContext } from "@/lib/agents/require-agent";
 
-vi.mock("@/lib/prisma", () => ({ prisma: {} }));
+type RecordedQuery = { model: string; method: string; args: { where?: Record<string, unknown> } | undefined };
+const queries = vi.hoisted(() => [] as RecordedQuery[]);
+vi.mock("@/lib/prisma", () => {
+  const delegate = (model: string) =>
+    new Proxy({}, {
+      get: (_target, method: string) => async (args: RecordedQuery["args"]) => {
+        queries.push({ model, method, args });
+        return method === "findMany" || method === "groupBy" ? [] : method === "count" ? 0 : null;
+      },
+    });
+  const prisma = new Proxy({}, {
+    get: (_target, model: string) => (model.startsWith("$") ? async () => [] : model === "then" ? undefined : delegate(model)),
+  });
+  return { prisma };
+});
 
-import { itemsFor, workEtag, type AgentWork, type ProjectWork, type WorkFeed } from "@/lib/agent-api/work";
+import { clearWorkCache, itemsFor, projectWork, workEtag, type AgentWork, type ProjectWork, type WorkFeed } from "@/lib/agent-api/work";
 import { prGate } from "@/lib/agent-api/pr-gate";
 import type { StoredPullRequestReport } from "@/lib/agent-api/pull-request-report";
 
@@ -277,5 +291,20 @@ describe("workEtag", () => {
     expect(workEtag(feed)).toBe(workEtag({ ...feed }));
     expect(workEtag(feed)).not.toBe(workEtag({ ...feed, ask: ["new"] }));
     expect(workEtag(feed)).toMatch(/^W\/"[\w-]+"$/);
+  });
+});
+
+describe("keeping marketing work out of the work feed", () => {
+  it("reads only product work into a project's feed", async () => {
+    clearWorkCache();
+    queries.length = 0;
+    await projectWork("t1", { id: "p1", slug: "acme", name: "Acme" });
+
+    const lists = queries.filter((q) => (q.model === "bug" || q.model === "idea") && q.method === "findMany" && q.args?.where?.projectId === "p1");
+    expect(lists.length).toBeGreaterThan(5);
+    for (const query of lists) expect(query.args?.where?.track, JSON.stringify(query.args?.where)).toBe("product");
+
+    const bids = queries.find((q) => q.model === "issueBid" && q.method === "findMany");
+    expect(bids?.args?.where?.bug).toMatchObject({ projectId: "p1", track: "product" });
   });
 });

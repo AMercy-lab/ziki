@@ -1,3 +1,5 @@
+import { marketingIdeaFieldsSchema } from "@/lib/validations/marketing";
+import { reopenSubstatus, trackRules } from "@/lib/marketing/track";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentContext } from "@/lib/agents/require-agent";
 
@@ -227,4 +229,23 @@ describe("rejectIdea (#idea-rejected)", () => {
     expect(db.idea.update).not.toHaveBeenCalled();
   });
 
+});
+
+describe("the marketing track at conversion", () => {
+  it("skips confirmation for marketing and keeps it for product", () => {
+    expect(trackRules("marketing").convertsTo).toBe("open");
+    expect(trackRules("product").convertsTo).toBe("requires_confirmation");
+  });
+
+  it("reopens marketing work to Open, with no confirmation step to return to", () => {
+    expect(reopenSubstatus("marketing", false)).toBe("open");
+    expect(reopenSubstatus("product", false)).toBe("requires_confirmation");
+    expect(reopenSubstatus("product", true)).toBe("open");
+  });
+
+  it("refuses a marketing idea that doesn't say why it is worth doing", () => {
+    expect(marketingIdeaFieldsSchema.safeParse({ track: "marketing" }).success).toBe(false);
+    expect(marketingIdeaFieldsSchema.safeParse({ track: "marketing", rationale: "   " }).success).toBe(false);
+    expect(marketingIdeaFieldsSchema.safeParse({ track: "marketing", rationale: "People keep asking." }).success).toBe(true);
+  });
 });

@@ -1,3 +1,4 @@
+import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import { createHash } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -83,6 +84,7 @@ export async function findSimilarIssues(
              GREATEST(similarity("title", ${query}), word_similarity(${query}, "title")) AS "score"
       FROM "Bug"
       WHERE "isDeleted" = false
+        AND "track" = 'product'
         AND "tenantId" = ${scope.tenantId}
         AND "projectId" = ${scope.projectId}
         AND "status"::text = ANY(${SIMILAR_STATUSES as string[]})
@@ -92,6 +94,7 @@ export async function findSimilarIssues(
              GREATEST(similarity("title", ${query}), word_similarity(${query}, "title")) AS "score"
       FROM "Idea"
       WHERE "isDeleted" = false
+        AND "track" = 'product'
         AND "tenantId" = ${scope.tenantId}
         AND "projectId" = ${scope.projectId}
         AND "status" = 'open'
@@ -107,13 +110,13 @@ export async function findSimilarIssues(
   const titleMatch = terms.map((t) => ({ title: { contains: t, mode: "insensitive" as const } }));
   const [issues, ideas] = await Promise.all([
     db.bug.findMany({
-      where: { tenantId: scope.tenantId, projectId: scope.projectId, isDeleted: false, status: { in: [...SIMILAR_STATUSES] }, AND: titleMatch },
+      where: { tenantId: scope.tenantId, projectId: scope.projectId, ...PRODUCT_TRACK, isDeleted: false, status: { in: [...SIMILAR_STATUSES] }, AND: titleMatch },
       select: { id: true, number: true, title: true, status: true, voteCount: true },
       orderBy: [{ voteCount: "desc" }, { updatedAt: "desc" }],
       take: SIMILAR_LIMIT,
     }),
     db.idea.findMany({
-      where: { tenantId: scope.tenantId, projectId: scope.projectId, isDeleted: false, status: "open", AND: titleMatch },
+      where: { tenantId: scope.tenantId, projectId: scope.projectId, ...PRODUCT_TRACK, isDeleted: false, status: "open", AND: titleMatch },
       select: { id: true, number: true, title: true, score: true },
       orderBy: [{ score: "desc" }, { updatedAt: "desc" }],
       take: SIMILAR_LIMIT,
