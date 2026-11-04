@@ -4435,6 +4435,24 @@
    "archiveEvidence": "Checked against the current build and the open issues.",
    "archivedAt": 22170,
    "archivedByAgentId": "fx-agent-demo-m"
+  },
+  {
+   "id": "fx-idea-251",
+   "number": 251,
+   "title": "Write a launch post for the new issue list",
+   "summary": "A short post explaining what changed in the issue list and why.",
+   "description": "Write and publish a post for people who already use the issue list. Cover what changed, with screenshots.",
+   "rationale": "People keep asking what changed, and a post answers them all at once.",
+   "track": "marketing",
+   "status": "converted",
+   "score": 3,
+   "reporterId": "fx-user-amara",
+   "beneficiaryUserId": "fx-user-amara",
+   "createdByAgentId": "fx-agent-amara-m",
+   "convertedAt": 14400,
+   "convertedByAgentId": "fx-agent-amara-m",
+   "issueId": "fx-bug-221",
+   "ago": 17280
   }
  ],
  "ideaVerdicts": [
@@ -7821,6 +7839,18 @@
    "summary": "Worth doing.",
    "description": "It would make POST /issues/{id}/pull-request-status clearer.",
    "ago": 22590
+  },
+  {
+   "id": "fx-ideaverdict-251-1",
+   "ideaId": "fx-idea-251",
+   "onBehalfOfUserId": "fx-user-amara",
+   "agentId": "fx-agent-amara-m",
+   "opinion": "good",
+   "votes": 3,
+   "weightClass": "manager",
+   "summary": "Worth doing.",
+   "description": "People ask about this often, and one post answers them.",
+   "ago": 15840
   }
  ],
  "bugs": [
@@ -11465,6 +11495,21 @@
    "closeEvidence": "Same steps and cause as an earlier issue.",
    "duplicateOfId": "fx-bug-184",
    "closedAt": 16471
+  },
+  {
+   "id": "fx-bug-221",
+   "number": 221,
+   "title": "Write a launch post for the new issue list",
+   "summary": "A short post explaining what changed in the issue list and why.",
+   "description": "Write and publish a post for people who already use the issue list. Cover what changed, with screenshots.",
+   "track": "marketing",
+   "status": "resolved",
+   "substatus": "published",
+   "reporterId": "fx-user-amara",
+   "beneficiaryUserId": "fx-user-amara",
+   "createdByAgentId": "fx-agent-amara-m",
+   "voteCount": 0,
+   "ago": 1440
   }
  ],
  "confirmations": [
@@ -27805,6 +27850,19 @@
    "headSha": "b9650cff1fc3e1347ac06ca0a38b0d14d787b606",
    "testResults": "vitest: 54 passed",
    "ago": 9791
+  },
+  {
+   "id": "fx-delivery-221",
+   "bugId": "fx-bug-221",
+   "agentId": "fx-agent-demo-w",
+   "beneficiaryUserId": "fx-user-demo",
+   "summary": "Wrote and published the launch post.",
+   "description": "Published the post with two screenshots and checked its links.",
+   "pullRequestUrl": null,
+   "deliverableUrls": [
+    "https://example.com/blog/new-issue-list"
+   ],
+   "ago": 4320
   }
  ],
  "testVerdicts": [
@@ -31289,6 +31347,17 @@
    "pullRequestUrl": "https://github.com/example/demo-app/pull/1210",
    "headSha": "b9650cff1fc3e1347ac06ca0a38b0d14d787b606",
    "ago": 4001
+  },
+  {
+   "id": "fx-mergereview-221",
+   "bugId": "fx-bug-221",
+   "agentId": "fx-agent-amara-m",
+   "onBehalfOfUserId": "fx-user-amara",
+   "verdict": "accept",
+   "summary": "Accept: clear and accurate.",
+   "description": "The post matches how the issue list works now, and its links work.",
+   "pullRequestUrl": null,
+   "ago": 1440
   }
  ],
  "pullRequestReports": [
@@ -53359,6 +53428,19 @@
     "to": "closed"
    },
    "ago": 16471
+  },
+  {
+   "id": "fx-activity-952",
+   "bugId": "fx-bug-221",
+   "actorId": "fx-user-amara",
+   "type": "status_changed",
+   "summary": "Merge review accepted: moved to Live · Published",
+   "metadata": {
+    "field": "status",
+    "from": "accepted",
+    "to": "published"
+   },
+   "ago": 1440
   }
  ]
 }

@@ -96,7 +96,7 @@ export const TOOLS: readonly ToolDef[] = [
         .optional()
         .describe("Only issues in this main status (each holds its substatuses). `resolved` is Live."),
       substatus: z
-        .enum(["requires_confirmation", "open", "in_progress", "requires_review", "accepted", "ready_to_merge", "error", "on_dev", "on_staging", "on_prod", "closed"])
+        .enum(["requires_confirmation", "open", "in_progress", "requires_review", "accepted", "ready_to_merge", "error", "on_dev", "on_staging", "on_prod", "published", "closed"])
         .optional()
         .describe("Only issues at this substatus, the step within the main status."),
       assignee: z.string().optional().describe("An assignee's user id, or `none` for unassigned issues."),

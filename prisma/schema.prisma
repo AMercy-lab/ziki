@@ -14,7 +14,7 @@ datasource db {
 /// - in_progress: in_progress (a claim holds it)
 /// - done: requires_review (delivered, being judged), accepted (judged good to merge, waiting for a manager's review)
 /// - merge: ready_to_merge (a manager accepted it), error (its pull request can't merge as reported)
-/// - resolved (Live): on_dev, on_staging, on_prod (where agents report it is deployed)
+/// - resolved (Live): on_dev, on_staging, on_prod (where agents report it is deployed), published (marketing work a manager accepted)
 /// - closed: closed
 enum Status {
   open
@@ -38,7 +38,16 @@ enum Substatus {
   on_dev
   on_staging
   on_prod
+  published
   closed
+}
+
+/// Which kind of work an idea or issue is, and which rules it follows
+/// (docs/marketing-migration-plan.md). Everything is `product` unless it was
+/// proposed in a project's Marketing section.
+enum WorkTrack {
+  product
+  marketing
 }
 
 /// Application roles for RBAC.
@@ -307,16 +316,18 @@ model PasswordResetToken {
 }
 
 model IssueType {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name        String
   description String?
   /// Markdown that pre-fills the report form's description (#307). Null: none.
   template    String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean   @default(true)
+  /// Marketing types show only in the Marketing section.
+  track       WorkTrack @default(product)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   bugs        Bug[]
   ideas       Idea[]
 
@@ -366,6 +377,16 @@ model Bug {
   duplicateOfId             String?
   duplicateOf               Bug?                    @relation("BugDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
   duplicates                Bug[]                   @relation("BugDuplicates")
+  /// Product or marketing work (`WorkTrack`).
+  track                     WorkTrack               @default(product)
+  /// How many times this marketing work has been sent back for changes on the
+  /// same claim, up to `ProjectWorkflow.revisionLimit`. Not the edit history (`revisions`).
+  revisionCount             Int                     @default(0)
+  /// The product issue this marketing issue goes with, if any. Optional: a
+  /// marketing issue can stand alone. Same project, enforced where it is set.
+  linkedIssueId             String?
+  linkedIssue               Bug?                    @relation("BugLinkedIssue", fields: [linkedIssueId], references: [id], onDelete: SetNull)
+  linkedMarketingIssues     Bug[]                   @relation("BugLinkedIssue")
   /// #423: every issue belongs to a tenant and one of its projects.
   tenantId                  String
   tenant                    Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
@@ -439,6 +460,8 @@ model Bug {
   @@unique([tenantId, number])
   @@index([tenantId, projectId])
   @@index([tenantId, projectId, substatus])
+  @@index([projectId, track, status])
+  @@index([linkedIssueId])
   @@index([projectId, areaId])
   @@index([beneficiaryUserId])
   @@index([createdByAgentId])
@@ -821,6 +844,8 @@ model ProjectWorkflow {
   stakeLimit             Int               @default(2)
   /// No new stake while the person holds this many issues In progress (#stakes).
   stakeInProgressLimit   Int               @default(2)
+  /// Times marketing work can be sent back to the same claim before it reopens for bids.
+  revisionLimit          Int               @default(2)
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
   project                Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -1339,7 +1364,10 @@ model Delivery {
   summary           String
   /// What changed, how it was checked, and anything left open.
   description       String
-  pullRequestUrl    String
+  /// The pull request delivered. Null on marketing work, which has none.
+  pullRequestUrl    String?
+  /// Links to the finished work, on marketing work.
+  deliverableUrls   String[]  @default([])
   /// The pull request's head commit when it was delivered, when GitHub said.
   headSha           String?
   /// Links to screenshots of the fix.
@@ -1394,6 +1422,10 @@ model Idea {
   /// Required when an agent files a report; null on reports filed before it existed.
   summary            String?
   description        String
+  /// Why it is worth doing. Required on marketing ideas, by validation.
+  rationale          String?
+  /// Product or marketing work (`WorkTrack`). Converting copies it to the issue.
+  track              WorkTrack        @default(product)
   status             IdeaStatus       @default(open)
   /// Good minus bad votes from its verdicts.
   score              Int              @default(0)
@@ -1452,6 +1484,7 @@ model Idea {
   @@unique([tenantId, number])
   @@unique([tenantId, legacyBugNumber])
   @@index([tenantId, projectId, status])
+  @@index([projectId, track, status])
   @@index([reporterId])
   @@index([createdByAgentId])
 }
@@ -1691,8 +1724,8 @@ model MergeReview {
   summary          String
   /// The full reasoning; for a reject, the feedback the fix's author acts on.
   description      String
-  /// The pull request it reviewed.
-  pullRequestUrl   String
+  /// The pull request it reviewed. Null on marketing work, which has none.
+  pullRequestUrl   String?
   /// The head commit it reviewed, when known.
   headSha          String?
   createdAt        DateTime           @default(now())

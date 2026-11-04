@@ -79,7 +79,7 @@ export function firstCloseForTenant(tenantId: string): Prisma.Sql {
     FROM "BugActivity" a
     INNER JOIN "Bug" bug ON bug."id" = a."bugId"
     WHERE a.type = 'status_changed'
-      AND a.metadata ->> 'to' IN ('resolved', 'on_dev', 'on_staging', 'on_prod', 'closed')
+      AND a.metadata ->> 'to' IN ('resolved', 'on_dev', 'on_staging', 'on_prod', 'published', 'closed')
       AND bug."tenantId" = ${tenantId}
       AND bug."isDeleted" = false
     GROUP BY a."bugId"
