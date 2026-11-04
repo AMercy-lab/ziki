@@ -103,7 +103,7 @@ export type StoredMergeReview = {
   summary: string;
   description: string;
   onBehalfOfUserId: string;
-  pullRequestUrl: string;
+  pullRequestUrl: string | null;
   headSha: string | null;
   createdAt: Date;
   updatedAt: Date;

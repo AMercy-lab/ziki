@@ -67,7 +67,7 @@ export type DeliveryEntry = {
   beneficiaryUserId: string;
   summary: string;
   description: string;
-  pullRequestUrl: string;
+  pullRequestUrl: string | null;
   headSha: string | null;
   screenshots: string[];
   testResults: string | null;

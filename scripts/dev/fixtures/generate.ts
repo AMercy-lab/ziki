@@ -535,6 +535,42 @@ for (const [status, count] of IDEA_PLAN) {
   }
 }
 
+// One published marketing issue, so every substatus has a fixture. It draws no
+// random numbers and comes last, so the rows above stay as they are.
+{
+  const num = ++issueNumber;
+  const ideaNum = ++ideaNumber;
+  const bug = id("bug", num);
+  const idea = id("idea", ideaNum);
+  const worker = allAgents.find((a) => a.level === "working")!;
+  const manager = managers.find((m) => m.owner !== worker.owner)!;
+  const title = "Write a launch post for the new issue list";
+  const summary = "A short post explaining what changed in the issue list and why.";
+  const description = "Write and publish a post for people who already use the issue list. Cover what changed, with screenshots.";
+  rows.ideas.push({
+    id: idea, number: ideaNum, title, summary, description, rationale: "People keep asking what changed, and a post answers them all at once.", track: "marketing",
+    status: "converted", score: 3, reporterId: userId(manager.owner), beneficiaryUserId: userId(manager.owner), createdByAgentId: agentId(manager.key),
+    convertedAt: 10 * DAY, convertedByAgentId: agentId(manager.key), issueId: bug, ago: 12 * DAY,
+  });
+  rows.ideaVerdicts.push({
+    id: id("ideaverdict", `${ideaNum}-1`), ideaId: idea, onBehalfOfUserId: userId(manager.owner), agentId: agentId(manager.key), opinion: "good", votes: 3, weightClass: "manager",
+    summary: "Worth doing.", description: "People ask about this often, and one post answers them.", ago: 11 * DAY,
+  });
+  rows.bugs.push({
+    id: bug, number: num, title, summary, description, track: "marketing", status: "resolved", substatus: "published",
+    reporterId: userId(manager.owner), beneficiaryUserId: userId(manager.owner), createdByAgentId: agentId(manager.key), voteCount: 0, ago: 1 * DAY,
+  });
+  rows.deliveries.push({
+    id: id("delivery", num), bugId: bug, agentId: agentId(worker.key), beneficiaryUserId: userId(worker.owner), summary: "Wrote and published the launch post.",
+    description: "Published the post with two screenshots and checked its links.", pullRequestUrl: null, deliverableUrls: ["https://example.com/blog/new-issue-list"], ago: 3 * DAY,
+  });
+  rows.mergeReviews.push({
+    id: id("mergereview", num), bugId: bug, agentId: agentId(manager.key), onBehalfOfUserId: userId(manager.owner), verdict: "accept", summary: "Accept: clear and accurate.",
+    description: "The post matches how the issue list works now, and its links work.", pullRequestUrl: null, ago: 1 * DAY,
+  });
+  activity(bug, manager.owner, "Merge review accepted: moved to Live · Published", 1 * DAY, "accepted", "published");
+}
+
 const out = {
   generatedBy: "scripts/dev/fixtures/generate.ts",
   tenant: FIXTURE_TENANT,
