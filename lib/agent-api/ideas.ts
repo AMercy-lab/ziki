@@ -1,8 +1,7 @@
-import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import { NextResponse, type NextRequest } from "next/server";
 import { reportSummarySchema } from "@/lib/validations/report-summary";
 import { z } from "zod";
-import type { IdeaStatus, Prisma } from "@prisma/client";
+import type { IdeaStatus, Prisma, WorkTrack } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { AgentContext } from "@/lib/agents/require-agent";
 import { audit } from "@/lib/agents/audit";
@@ -68,6 +67,8 @@ export const ideaSelect = {
   title: true,
   summary: true,
   description: true,
+  rationale: true,
+  track: true,
   status: true,
   score: true,
   typeId: true,
@@ -105,8 +106,12 @@ export function ideaJson(idea: IdeaRow, ideaThreshold: number) {
   };
 }
 
-/** `?status=`, `?convertible=`, `?platform=` (slug, id or "none"), `?q=` and the shared cursor, newest first. */
+/** `?track=`, `?status=`, `?convertible=`, `?platform=` (slug, id or "none"), `?q=` and the shared cursor, newest first. */
 export async function listAgentIdeas(scope: Scope, params: URLSearchParams) {
+  const rawTrack = params.get("track") ?? "product";
+  if (rawTrack !== "product" && rawTrack !== "marketing") {
+    throw new IssueApiError(400, "track must be product or marketing.", { error: "invalid_request", field: "track" });
+  }
   const rawStatus = params.get("status");
   if (rawStatus && !(IDEA_STATUSES as readonly string[]).includes(rawStatus)) {
     throw new IssueApiError(400, `status must be one of ${IDEA_STATUSES.join(", ")}.`);
@@ -130,7 +135,7 @@ export async function listAgentIdeas(scope: Scope, params: URLSearchParams) {
   const platform = requireKnownFilter("platform", rawPlatform, parsePlatformFilter(rawPlatform, platforms));
   const where: Prisma.IdeaWhereInput = {
     ...scope,
-    ...PRODUCT_TRACK,
+    track: rawTrack as WorkTrack,
     isDeleted: false,
     ...(platform ? { categoryId: platform === PLATFORM_NONE ? null : platform } : {}),
     ...(rawStatus ? { status: rawStatus as IdeaStatus } : {}),

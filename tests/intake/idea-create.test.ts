@@ -57,6 +57,7 @@ const input = (overrides: Partial<CreatePolicyInput> = {}): CreatePolicyInput =>
 const similarRow = { id: "b1", number: 12, title: "Login button does nothing in Safari", status: "open", voteCount: 3, score: 0.8 };
 const idea = {
   id: "i1", number: 12, title: "Export activity as CSV", summary: "People want a CSV.", description: "People want their data.",
+  rationale: null, track: "product" as const,
   status: "open" as const, score: 3, typeId: null, categoryId: null, areaId: null, proofLinks: [], projectId: "p1",
   reporterId: "ada", beneficiaryUserId: "ada", createdByAgentId: null, convertedAt: null, archiveReason: null,
   archiveEvidence: null, archiveDuplicateOf: null, archivedAt: null, archivedByAgentId: null,
@@ -115,9 +116,25 @@ describe("seeing an idea", () => {
 
   it("lists the project's ideas and names a bad filter", async () => {
     const page = await listAgentIdeas(scope, new URLSearchParams("status=open"));
-    expect(db.idea.findMany.mock.calls[0][0].where).toMatchObject({ tenantId: "t1", projectId: "p1", isDeleted: false, status: "open" });
+    expect(db.idea.findMany.mock.calls[0][0].where).toMatchObject({ tenantId: "t1", projectId: "p1", track: "product", isDeleted: false, status: "open" });
     expect(page.items[0]).toMatchObject({ id: "i1", convertible: true });
     await expect(listAgentIdeas(scope, new URLSearchParams("status=idea"))).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("lists rejected marketing ideas with their track and rationale, scoped to the project", async () => {
+    db.idea.findMany.mockResolvedValue([{ ...idea, track: "marketing", rationale: "Supports the launch focus.", status: "rejected" }]);
+
+    const page = await listAgentIdeas(scope, new URLSearchParams("track=marketing&status=rejected"));
+
+    expect(db.idea.findMany.mock.calls.at(-1)?.[0].where).toMatchObject({
+      tenantId: "t1",
+      projectId: "p1",
+      track: "marketing",
+      status: "rejected",
+      isDeleted: false,
+    });
+    expect(page.items[0]).toMatchObject({ track: "marketing", rationale: "Supports the launch focus.", status: "rejected" });
+    await expect(listAgentIdeas(scope, new URLSearchParams("track=web"))).rejects.toMatchObject({ status: 400, body: { field: "track" } });
   });
 });
 
