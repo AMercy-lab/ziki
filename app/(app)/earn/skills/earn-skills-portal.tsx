@@ -65,6 +65,33 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
       status: "approved",
       submittedAt: "Nov 3, 2026",
     },
+    {
+      id: "sub-3",
+      title: "Next.js App Router Hydration Auditor",
+      category: "testing",
+      categoryLabel: "Testing & QA",
+      summary: "Strictly verifies client/server component boundaries and catches hydration mismatches early.",
+      status: "pending",
+      submittedAt: "Nov 4, 2026",
+    },
+    {
+      id: "sub-4",
+      title: "PostgreSQL Schema Index & Query Tuner",
+      category: "backend",
+      categoryLabel: "Backend & Database",
+      summary: "Analyzes foreign key constraints, detects missing composite indexes, and flags table-lock hazards.",
+      status: "pending",
+      submittedAt: "Nov 5, 2026",
+    },
+    {
+      id: "sub-5",
+      title: "Tailwind v4 Token & CSS Variable Extractor",
+      category: "design",
+      categoryLabel: "Design & UI",
+      summary: "Extracts computed CSS design tokens into clean variables. Review requested: add unit tests for fallback tokens.",
+      status: "changes_requested",
+      submittedAt: "Nov 1, 2026",
+    },
   ]);
 
   const activeCategoryConfig = CATEGORY_OPTIONS.find((c) => c.id === category) || CATEGORY_OPTIONS[0];
@@ -334,11 +361,7 @@ Confirm passing test suite`}
               </div>
 
               {/* Submit CTA */}
-              <div className="pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-t border-zk-divider">
-                <div className="text-xs text-zk-muted">
-                  Category: <strong className="text-sm font-bold text-zk-text">{activeCategoryConfig.label}</strong>
-                </div>
-
+              <div className="pt-4 flex items-center justify-end border-t border-zk-divider">
                 <button
                   type="submit"
                   disabled={isSubmitting}
@@ -377,18 +400,6 @@ Confirm passing test suite`}
                   <span><strong>Originality check:</strong> Review the directory to ensure a duplicate skill does not already exist.</span>
                 </li>
               </ul>
-            </div>
-
-            <div className="rounded-[20px] border border-zk-border bg-zk-chip p-6 space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-zk-text">
-                Verification Workflow
-              </h3>
-              <ol className="space-y-2.5 text-xs text-zk-text2 leading-relaxed list-decimal list-inside">
-                <li>Submit skill specification and instructions.</li>
-                <li>Automated syntax and type checking.</li>
-                <li>Core maintainer review and quality sign-off.</li>
-                <li>Published live to the verified skills library.</li>
-              </ol>
             </div>
           </div>
         </div>

@@ -313,6 +313,166 @@ Before finalizing any landing page, issue view, or marketing route:
       isVerified: true
     },
     createdAt: "2026-10-28T12:00:00.000Z"
+  },
+  {
+    id: "api-contract-sentinel",
+    slug: "api-contract-sentinel",
+    title: "REST & GraphQL API Contract Sentinel",
+    icon: "api",
+    category: "backend",
+    categoryLabel: "Backend & Database",
+    badge: "API Security",
+    description:
+      "Validates OpenAPI 3.1 & GraphQL schema contracts, detects breaking schema changes, and generates type-safe mock fixtures.",
+    tags: ["api", "openapi", "graphql", "contracts", "mocking"],
+    usersCount: 135,
+    prompt: `You have the REST & GraphQL API Contract Sentinel skill equipped.
+1. Strictly validate request body and query parameter schemas against OpenAPI 3.1 specifications.
+2. Flag breaking payload changes before merging backend API routes.
+3. Assert uniform HTTP error response envelopes across all endpoints.`,
+    spec: {
+      overview:
+        "Guarantees forward and backward compatibility across backend endpoints, enforcing contract-first design with automated schema linting.",
+      capabilities: [
+        "OpenAPI 3.1 specification schema validation",
+        "Breaking change detection in REST and GraphQL schemas",
+        "Deterministic mock fixture generation",
+        "Automated payload type inference"
+      ],
+      checklist: [
+        "Validate route handler input against Zod / OpenAPI contract",
+        "Verify standard error response status codes (400, 401, 403, 404, 500)",
+        "Confirm zero unhandled Promise rejections on missing fields"
+      ],
+      sampleCommand: "npm run test:api-contract",
+      documentationUrl: "https://swagger.io/specification/"
+    },
+    author: {
+      name: "API Infrastructure Team",
+      handle: "@api-infra",
+      isVerified: true
+    },
+    createdAt: "2026-10-29T14:00:00.000Z"
+  },
+  {
+    id: "docker-microvm-runner",
+    slug: "docker-microvm-runner",
+    title: "Docker MicroVM Container Architect",
+    icon: "database",
+    category: "backend",
+    categoryLabel: "Backend & Database",
+    badge: "DevOps",
+    description:
+      "Containerizes reproducible development environments, scans image vulnerability layers, and verifies zero-root runtime isolation.",
+    tags: ["docker", "containers", "devops", "isolation"],
+    usersCount: 112,
+    prompt: `You have the Docker MicroVM Container Architect skill equipped.
+1. Enforce multi-stage Docker builds to minimize runtime image footprint.
+2. Ensure container processes run under non-root unprivileged users.
+3. Verify deterministic environment variables and bind-mount configurations.`,
+    spec: {
+      overview:
+        "Automates Dockerfile auditing and container security verification, ensuring minimal image sizes and rock-solid deployment parity.",
+      capabilities: [
+        "Multi-stage build optimization and layer caching",
+        "CVE vulnerability scanning on base alpine and debian images",
+        "Zero-root security context assertions",
+        "Container healthcheck probe configuration"
+      ],
+      checklist: [
+        "Verify `USER node` or non-root runtime declaration in Dockerfile",
+        "Check that production image excludes devDependencies",
+        "Confirm container starts and passes healthcheck probes"
+      ],
+      sampleCommand: "docker build --check .",
+      documentationUrl: "https://docs.docker.com/develop/develop-images/dockerfile_best-practices/"
+    },
+    author: {
+      name: "Cloud Platform Guild",
+      handle: "@cloud-ops",
+      isVerified: true
+    },
+    createdAt: "2026-10-30T11:30:00.000Z"
+  },
+  {
+    id: "framer-motion-smoother",
+    slug: "framer-motion-smoother",
+    title: "Motion & Micro-Interaction Smoother",
+    icon: "figma",
+    category: "design",
+    categoryLabel: "Design & UI",
+    badge: "UI Motion",
+    description:
+      "Crafts 60fps spring transitions, guarantees reduced-motion accessibility overrides, and eliminates layout shift (CLS).",
+    tags: ["motion", "animation", "spring", "reduced-motion"],
+    usersCount: 97,
+    prompt: `You are equipped with the Motion & Micro-Interaction Smoother skill.
+1. Prioritize transform and opacity properties for GPU-accelerated 60fps animations.
+2. Honor prefers-reduced-motion media queries and disable spring physics for users who request it.
+3. Prevent Cumulative Layout Shift (CLS) by reserving dimensions before animating entry states.`,
+    spec: {
+      overview:
+        "High-fidelity UI animation and micro-interaction skill ensuring buttery-smooth transitions while strictly maintaining WCAG compliance.",
+      capabilities: [
+        "Physically accurate spring physics configuration",
+        "prefers-reduced-motion accessibility overrides",
+        "GPU-accelerated transform & opacity animation enforcement",
+        "Layout shift (CLS) prevention during modal and drawer mounts"
+      ],
+      checklist: [
+        "Verify all animations wrap in `motion-safe:` utility or `useReducedMotion`",
+        "Assert 60fps frame rate without dropped frames during interaction",
+        "Confirm layout animation uses `layoutId` without distorting aspect ratios"
+      ],
+      sampleCommand: "npm run test:motion",
+      documentationUrl: "https://www.framer.com/motion/"
+    },
+    author: {
+      name: "Design Engineering Team",
+      handle: "@design-eng",
+      isVerified: true
+    },
+    createdAt: "2026-11-01T09:00:00.000Z"
+  },
+  {
+    id: "vitest-mutation-tester",
+    slug: "vitest-mutation-tester",
+    title: "Vitest Mutation Test Engine",
+    icon: "test",
+    category: "testing",
+    categoryLabel: "Testing & QA",
+    badge: "Code Coverage",
+    description:
+      "Injects synthetic mutations into application logic to expose untested edge-cases, asserting minimum 95% branch kill rate.",
+    tags: ["vitest", "mutation-testing", "coverage", "assertions"],
+    usersCount: 153,
+    prompt: `You have the Vitest Mutation Test Engine skill equipped.
+1. When authoring unit tests, verify mutants (flipped operators, changed return values) are caught.
+2. Require tests to fail when core assertions are omitted or weakened.
+3. Aim for minimum 95% mutant kill score on mission-critical utilities.`,
+    spec: {
+      overview:
+        "Goes beyond simple line coverage by deliberately introducing bugs (mutations) into source files to verify that existing test suites catch them.",
+      capabilities: [
+        "Automated synthetic mutation injection",
+        "Dead-code and survival mutant reporting",
+        "Branch coverage verification on edge condition handlers",
+        "Incremental mutation testing on git diff"
+      ],
+      checklist: [
+        "Run `npx vitest run --coverage`",
+        "Verify test suites catch boolean inversion and boundary condition shifts",
+        "Confirm 100% passing tests with 0 false positives"
+      ],
+      sampleCommand: "npx vitest run test/unit/",
+      documentationUrl: "https://vitest.dev/guide/"
+    },
+    author: {
+      name: "Test Automation Guild",
+      handle: "@test-guild",
+      isVerified: true
+    },
+    createdAt: "2026-11-02T15:20:00.000Z"
   }
 ];
 
