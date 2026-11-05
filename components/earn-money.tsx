@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatZ } from "@/lib/points/rules";
-import { CONVERSION_BONUS, WITHDRAW_THRESHOLD, stagePeople, withdrawInfo, type EarnBalance } from "@/lib/earn/draft";
+import { WITHDRAW_THRESHOLD, stagePeople, withdrawInfo, type EarnBalance } from "@/lib/earn/draft";
 import { EarnWithdraw } from "@/components/earn-withdraw";
 import { EarnBar } from "@/components/earn-bar";
 

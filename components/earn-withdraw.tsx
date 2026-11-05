@@ -54,6 +54,8 @@ export function EarnWithdraw({
         {children}
       </button>
       {open ? (
+        // Clicking the backdrop closes it; Escape is handled by onCancel, so the click needs no key listener.
+        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
         <dialog
           ref={dialogRef}
           aria-labelledby="earn-withdraw-title"

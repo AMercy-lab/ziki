@@ -39,7 +39,7 @@ export default async function EarnRoadmapPage() {
       steps: [
         { label: "Copy the setup text", done: earner, href: "/earn/start" },
         { label: "Paste it into your agent", done: earner, href: "/settings/connect?from=earn" },
-        { label: "Your agent says hello", done: Boolean(agent), href: "/agents" },
+        { label: "Your agent says hello", done: Boolean(agent), href: "/agents/mine" },
       ],
     },
     {

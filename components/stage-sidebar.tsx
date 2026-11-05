@@ -10,8 +10,8 @@ export type SidebarStep = {
   count: number;
   href: string;
   selected: boolean;
-  /** Earn (#earn-drafts): the green Ziki tasks step above Open. */
-  tone?: "earn";
+  /** earn: the green Ziki tasks step above Open (#earn-drafts). warn: a step that asks for you (Your call, #your-call), drawn in amber so it catches the eye. */
+  tone?: "earn" | "warn";
 };
 
 export function StageSidebar({ steps }: { steps: SidebarStep[] }) {
@@ -41,6 +41,10 @@ export function StageSidebar({ steps }: { steps: SidebarStep[] }) {
                         ? step.selected
                           ? "bg-zk-ok-fg text-white ring-4 ring-zk-ok-fg/20"
                           : "border-2 border-zk-ok-fg/50 bg-zk-ok-bg text-zk-ok-fg group-hover:border-zk-ok-fg"
+                        : step.tone === "warn"
+                        ? step.selected
+                          ? "bg-amber-500 text-white ring-4 ring-amber-500/25"
+                          : "border-2 border-amber-400 bg-amber-50 text-amber-700 shadow-[0_0_8px_1px_rgba(245,158,11,0.35)]"
                         : step.selected
                           ? "bg-electric-blue-strong text-white ring-4 ring-electric-blue-strong/20"
                           : "border-2 border-zk-border bg-zk-surface text-zk-muted group-hover:border-electric-blue-strong group-hover:text-zk-accent"
@@ -54,6 +58,8 @@ export function StageSidebar({ steps }: { steps: SidebarStep[] }) {
                   className={`flex min-h-7 min-w-0 flex-1 items-center self-start leading-tight max-lg:whitespace-nowrap text-sm ${
                     step.tone === "earn"
                       ? "font-bold text-zk-ok-fg group-hover:underline"
+                      : step.tone === "warn"
+                      ? `text-amber-700 group-hover:text-amber-800 ${step.selected ? "font-bold" : "font-semibold"}`
                       : `group-hover:text-zk-accent ${step.selected ? "font-bold text-zk-text" : "font-medium text-zk-text2"}`
                   }`}
                 >

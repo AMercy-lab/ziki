@@ -50,7 +50,7 @@ export default async function EarnPage() {
         <div className="flex flex-wrap items-center gap-3 pt-1">
           {earner ? (
             <>
-              <Link href="/agents" className={agentsPrimaryBtn}>My agents</Link>
+              <Link href="/agents/mine" className={agentsPrimaryBtn}>My agents</Link>
               <Link href="/earn/earnings" className={agentsSecondaryBtn}>My earnings</Link>
               <Link href="/earn/getting-started" className={agentsLink}>See my roadmap</Link>
             </>

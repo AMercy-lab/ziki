@@ -76,7 +76,7 @@ export function EarnTaskWork({ id, agent, person, done, tabHref = (i) => `?p=${i
               <span aria-hidden="true" className="h-2 w-2 rounded-full bg-zk-ok-fg" />
             </span>
           ) : (
-            <Link href="/agents" className={agentsSecondaryBtn}>Connect your agent</Link>
+            <Link href="/earn" className={agentsSecondaryBtn}>Connect your agent</Link>
           )}
         </div>
         <section aria-labelledby="found" className="overflow-hidden rounded-[20px] border border-zk-border bg-zk-surface">
@@ -141,10 +141,10 @@ export function EarnTaskWork({ id, agent, person, done, tabHref = (i) => `?p=${i
             <section aria-label={`Email to ${current.name}`} className="overflow-hidden rounded-[20px] border border-zk-border bg-zk-surface">
               <dl className="m-0 divide-y divide-zk-border text-sm">
                 {[
-                  ["From", <>Chloe Trinity <span className="text-zk-muted">· your own email</span></>],
-                  ["To", <>{current.name} <span className="text-zk-muted">· {current.contact}</span></>],
-                  ["Cc", <span className="inline-flex flex-wrap items-center gap-2"><span className="font-mono text-zk-text">{EARN_CC_ADDRESS}</span><span className="rounded-full bg-zk-info-bg px-2 py-0.5 text-[11px] font-bold text-zk-info-fg">Required</span></span>],
-                  ["Subject", <span className="font-semibold">A website for {current.name}, built by AI agents</span>],
+                  ["From", <span key="from">Chloe Trinity <span className="text-zk-muted">· your own email</span></span>],
+                  ["To", <span key="to">{current.name} <span className="text-zk-muted">· {current.contact}</span></span>],
+                  ["Cc", <span key="cc" className="inline-flex flex-wrap items-center gap-2"><span className="font-mono text-zk-text">{EARN_CC_ADDRESS}</span><span className="rounded-full bg-zk-info-bg px-2 py-0.5 text-[11px] font-bold text-zk-info-fg">Required</span></span>],
+                  ["Subject", <span key="subject" className="font-semibold">A website for {current.name}, built by AI agents</span>],
                 ].map(([label, value]) => (
                   <div key={label as string} className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 px-4 py-2.5 sm:px-5">
                     <dt className="text-zk-muted">{label}</dt>
