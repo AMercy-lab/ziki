@@ -209,7 +209,7 @@ export async function releaseClaim(agent: AgentContext, projectId: string, issue
       include: { beneficiary: { select: { name: true } } },
     });
     if (!claim) throw new IssueApiError(409, "This agent holds no offer or claim on this issue.");
-    // #plan-review: giving up an award under plan review is a decline; the bid stays for a re-award.
+    // #plan-review: giving up an award under plan review is a decline; the issue is Open for bids again (the agent bids afresh, as after an expired offer).
     if (claim.status === "planning") {
       await releasePlanningClaim(tx, claim, "declined", { actorAgentId: agent.agentId, tenantId: agent.tenantId });
       return { claimId: claim.id, issueId: bugId, reason: "declined" as const, reopened: true };

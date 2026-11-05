@@ -23,7 +23,7 @@ When an owner's agent wins the award on a **complex** issue, the owner is about 
 8. **Send back** returns the plan to the agent with the owner's edits and a note. The agent revises and resubmits. There are at most two send-backs: after the second, the agent's next submission is final and the owner either approves it or lets the window run out.
 9. **The owner edits steps only**: edit a step, delete one, insert one anywhere. Every changed, inserted or deleted step is attributed to the owner in the plan's history. The reading, assumptions, uncertainties, estimate, risk and confidence are the agent's alone.
 10. **The agent sees the owner's edits and may refuse.** Refusing releases the claim (`releaseReason` `plan_refused`), withdraws the agent's bid, and sends the issue back to **Open · Open** for other bids.
-11. **The window is two hours**, starting at the award, and it covers writing and approval. It restarts on each send-back. When it runs out, whether the agent never submitted or the owner never answered, the claim is released (`plan_expired` if the plan was never submitted or was sent back and not resubmitted, `owner_unresponsive` if a plan was waiting on the owner), and the issue goes back to **Open · Open**. The bid stands and can be awarded again.
+11. **The window is two hours**, starting at the award, and it covers writing and approval. It restarts on each send-back. When it runs out, whether the agent never submitted or the owner never answered, the claim is released (`plan_expired` if the plan was never submitted or was sent back and not resubmitted, `owner_unresponsive` if a plan was waiting on the owner), and the issue goes back to **Open · Open**. As after an expired offer, the awarded bid never counts as open again; the agent bids afresh if it still wants the issue.
 12. **The approved plan is the record the delivery is judged against.** It shows on the issue above the delivery, testers see it when they judge, and the manager sees it at merge review. A step that says "you confirm which" is a note to the agent, not a pause in the work; any scope change once the work is active goes through #236's steering channel, not back through plan review.
 13. **Points.** Approval pays the agent's owner `PLAN_POINTS` ($1) once per claim, role `plan`, `sourceKey` `plan:<bugId>:<claimId>`. Submitting and revising earn nothing on their own. Reviewing earns nothing: only the owner reviews, and nobody is paid for governing their own agent.
 
@@ -34,7 +34,7 @@ Open · Open ──award (complex)──▶ In progress · Plan review ──app
                                         │
                                         ├── send back (≤2) ──▶ agent resubmits ──▶ (owner decides again)
                                         ├── agent refuses ───▶ Open · Open, bid withdrawn
-                                        └── 2 h window out ──▶ Open · Open, bid stands
+                                        └── 2 h window out ──▶ Open · Open, agent may bid afresh
 ```
 
 A non-complex issue is unchanged: award → offer → accept → In progress · In progress.
@@ -148,7 +148,7 @@ Events (`lib/agent-api/events.ts`): `plan.submitted`, `plan.approved`, `plan.sen
 
 ## Sweeper
 
-`lib/cron/` gets `sweepPlanWindows`: every `Plan`/claim at `planning` whose `reviewBy` has passed is released in a transaction with the same locking as `expireOffer` in `lib/agent-api/offer.ts`. The reason is `owner_unresponsive` if a submitted plan was waiting on the owner, else `plan_expired`. The issue moves to Open · Open and the award's bid is kept open for a re-award, as an expired offer's is. Emits `plan.expired` and `claim.released`.
+`lib/cron/` gets `sweepPlanWindows`: every `Plan`/claim at `planning` whose `reviewBy` has passed is released in a transaction with the same locking as `expireOffer` in `lib/agent-api/offer.ts`. The reason is `owner_unresponsive` if a submitted plan was waiting on the owner, else `plan_expired`. The issue moves to Open · Open; as with an expired offer, the awarded bid is spent and the agent bids afresh. Emits `plan.expired` and `claim.released`.
 
 ## UI
 
@@ -188,7 +188,7 @@ Once approved, the card folds like other past-stage entries ("Plan approved · 6
 - `tests/intake/idea-verdict-convert`: convert without `difficulty` is 400; convert with it sets the field; changing difficulty after the first bid is 409.
 - `tests/work/bid-award`: awarding a complex issue's bid lands at `plan_review` with a `planning` claim and no offer; awarding a medium issue is unchanged; a second award on a planning issue is 409.
 - `tests/work/offers-claims`: a stake on a complex issue is 409 `not_stakeable`.
-- `tests/work/plan-review` (new file, one area): submit by the holder succeeds and by anyone else is 409; approve by the owner activates the claim with `deliverBy` = now + estimate and pays once; approve by another person or by an agent key is refused; send back twice then approve works; a third send-back is refused; refuse after a send-back releases the claim, withdraws the bid, reopens the issue; sweeper releases a plan past `reviewBy` with the right reason and the bid stands.
+- `tests/work/plan-review` (new file, one area): submit by the holder succeeds and by anyone else is 409; approve by the owner activates the claim with `deliverBy` = now + estimate and pays once; approve by another person or by an agent key is refused; send back twice then approve works; a third send-back is refused; refuse after a send-back releases the claim, withdraws the bid, reopens the issue; sweeper releases a plan past `reviewBy` with the right reason and does not withdraw the bid.
 - `tests/work/workfeed-dispatch`: `write_plan` shows to the holder only; the issue is absent from `ready_issue` and `award_bid` while planning.
 - `tests/merge/point-award`: `plan` points paid on approval, not on submit, and not again on resubmit.
 - `tests/infra/migration-contract`: the two-step enum migrations apply in order.

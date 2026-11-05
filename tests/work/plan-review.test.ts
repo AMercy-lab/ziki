@@ -230,7 +230,7 @@ describe("the plan window", () => {
     expect(db.issueClaim.update).toHaveBeenCalledWith({ where: { id: "claim1" }, data: expect.objectContaining({ releaseReason: "owner_unresponsive" }) });
     expect(db.issueClaim.update).toHaveBeenCalledWith({ where: { id: "claim2" }, data: expect.objectContaining({ releaseReason: "plan_expired" }) });
     expect(db.issueClaim.update).toHaveBeenCalledTimes(2);
-    // The bid stands: nothing withdraws it.
+    // A lapsed window never withdraws the bid (a refusal does); the awarded row is simply spent, as after an expired offer.
     expect(db.issueBid.updateMany).not.toHaveBeenCalled();
     expect(publish).toHaveBeenCalledWith(db, expect.objectContaining({ type: "plan.expired", payload: expect.objectContaining({ reason: "owner_unresponsive", claimId: "claim1" }) }));
   });

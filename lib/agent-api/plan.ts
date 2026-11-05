@@ -26,7 +26,8 @@ import { notifyPlanSubmitted } from "@/lib/agent-notifications";
  * back returns it with the owner's edited steps (each change attributed to
  * them) and restarts the window, at most twice; the agent resubmits or
  * refuses. When the window runs out the award is released and the issue is
- * Open for bids again, the bid still standing.
+ * Open for bids again; as after an expired offer, the awarded bid never
+ * counts again (lib/open-bids.ts) and the agent bids afresh.
  */
 
 type Tx = Prisma.TransactionClient;
@@ -382,8 +383,9 @@ export type PlanReleaseReason = "plan_refused" | "plan_expired" | "owner_unrespo
 
 /**
  * Releases a planning claim and sends its issue back to Open · Open for bids,
- * in the caller's transaction with the issue locked. `withdrawBid` takes the
- * agent's bid down too (a refusal); otherwise the bid stands for a re-award.
+ * in the caller's transaction with the issue locked. An awarded bid never
+ * counts as open again (lib/open-bids.ts); `withdrawBid` marks it withdrawn
+ * as well, so a refusal reads as one on the issue page.
  */
 export async function releasePlanningClaim(
   tx: Tx,
@@ -436,8 +438,8 @@ export async function refusePlan(agent: AgentContext, projectId: string, issueRe
  * Releases every planning claim whose window ran out (#plan-review rule 11):
  * `owner_unresponsive` when a submitted plan was waiting on the owner,
  * `plan_expired` when the agent never submitted or never resubmitted. The
- * issue goes back to Open for bids and the bid stands. Run by the platform
- * sweeper; idempotent.
+ * issue goes back to Open for bids (the agent bids afresh). Run by the
+ * platform sweeper; idempotent.
  */
 export async function sweepPlanWindows(tenantId?: string, projectId?: string): Promise<{ expired: number }> {
   const candidates = await prisma.issueClaim.findMany({

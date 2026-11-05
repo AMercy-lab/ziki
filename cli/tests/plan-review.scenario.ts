@@ -22,7 +22,8 @@ const plan = {
  * In progress · Plan review, and bob's feed asks for the plan. Only bob can
  * submit it; once submitted it waits on bob's owner (plan_waiting). The owner's
  * approval is browser-only, so this scenario ends with bob releasing the
- * award, which sends the issue back to Open with the bid standing.
+ * award, which sends the issue back to Open; the awarded bid is spent (as
+ * after an expired offer) and bob bids afresh.
  */
 describe("plan review on a complex issue", () => {
   let id: string;
@@ -87,11 +88,14 @@ describe("plan review on a complex issue", () => {
     expect((await ok("ada", "get-plan", { id })).plan).toMatchObject({ round: 1, estimateMinutes: 300 });
   });
 
-  it("goes back to Open, the bid standing, when the agent gives the award up", async () => {
+  it("goes back to Open when the agent gives the award up; the awarded bid is spent and bob bids afresh", async () => {
     expect(await ok("bob", "release-claim", { id, reason: "Not now." })).toMatchObject({ reason: "declined", reopened: true });
     expect((await ok("ada", "get-issue", { id })).issue).toMatchObject({ status: "open", substatus: "open", holder: null });
     const listed = (await ok("ada", "list-bids", { id })).bids as { id: string }[];
-    expect(listed.map((bid) => bid.id)).toContain(bobBid);
+    expect(listed.map((bid) => bid.id)).not.toContain(bobBid);
+    expect(await byKey("cara", `ready_issue:${id}`)).toMatchObject({ kind: "ready_issue", canAct: true });
+    // The same bid row, bid afresh (#745): awardable again, and the award opens plan review again.
+    expect((await ok("bob", "bid", { id, summary: "Still up for it.", description: "Same plan, fresh bid." })).bid_id).toBe(bobBid);
     expect(await byKey("ada", `award_bid:${id}`)).toMatchObject({ kind: "award_bid" });
   });
 });
