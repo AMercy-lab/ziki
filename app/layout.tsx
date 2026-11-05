@@ -5,7 +5,8 @@ import { getSiteUrl } from "@/lib/site-url";
 import { SHARE_IMAGE } from "@/lib/share-image";
 import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 import { ToastProvider } from "@/components/ui/toast";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { isEarnPath } from "@/lib/earn/paths";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ThemePreference } from "@/components/theme-toggle";
@@ -86,8 +87,10 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const theme = await currentTheme();
+  // The earn pages are light only, whatever the person picked; the pick is kept for every other page (data-user-theme).
+  const onEarn = isEarnPath((await headers()).get("x-ziki-path") ?? "");
   return (
-    <html lang="en" data-theme={themeAttribute(theme)} className="overflow-x-clip" suppressHydrationWarning>
+    <html lang="en" data-theme={onEarn ? "light" : themeAttribute(theme)} data-user-theme={themeAttribute(theme) ?? "system"} className="overflow-x-clip" suppressHydrationWarning>
       <head>
         <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM Integration Documentation" />
       </head>
