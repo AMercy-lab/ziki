@@ -1,4 +1,5 @@
 import { isEarnPath } from "@/lib/earn/paths";
+import { isProjectFirstPath } from "@/lib/project-paths";
 import { isReservedProjectSlug } from "@/lib/project-slug";
 
 /** The agents strip's height (#agents-dock); the page keeps this much free at its foot. */
@@ -15,26 +16,29 @@ export const AGENTS_DOCK_HEIGHT = 76;
  * - the workspace's `/home`, `/feed`, `/activity` and `/inbox` (and below it);
  * - the earn pages (`isEarnPath`, lib/earn/paths.ts), where an earner keeps the
  *   bar for their agents (#earn-drafts);
- * - a project's landing page `/<project>`, its `/ideas` and `/issues` pages
- *   (and below them), an issue `/<project>/<number>`, `/<project>/workstream`
- *   and `/<project>/work`.
+ * - a project's landing page `/<org>/<project>`, its `/ideas` and `/issues`
+ *   pages (and below them), an issue `/<org>/<project>/<number>`,
+ *   `/<org>/<project>/workstream` and `/<org>/<project>/work`.
  *
- * A project's slug is any first segment that isn't a reserved top-level route,
- * so `/settings/...`, `/agents/...` and the rest never count as projects.
+ * An organisation's slug is any first segment that isn't a reserved top-level
+ * route, so `/settings/...`, `/agents/...` and the rest never count as projects.
+ * `/<org>` alone lists the organisation's projects, and an old `/<project>/...`
+ * address is only passing through its redirect: neither draws the bar.
  */
 export function dockVisibleOn(pathname: string | null | undefined, agentCount: number): boolean {
   if (agentCount <= 0) return false;
-  const segments = (pathname ?? "").split("/").filter(Boolean);
-  const [first, second] = segments;
+  const path = pathname ?? "";
+  const segments = path.split("/").filter(Boolean);
+  const [first] = segments;
   if (!first) return false;
   if (isEarnPath(pathname)) return true;
   if (first === "inbox") return true;
   if (first === "home" || first === "feed" || first === "activity") return segments.length === 1;
-  if (isReservedProjectSlug(first)) return false;
-  // A project's pages.
-  if (segments.length === 1) return true;
-  if (second === "ideas" || second === "issues") return true;
-  return segments.length === 2 && (second === "workstream" || second === "work" || /^\d+$/.test(second!));
+  if (isReservedProjectSlug(first) || segments.length < 2 || isProjectFirstPath(path)) return false;
+  // A project's pages, after /<org>/<project>.
+  const [page, ...below] = segments.slice(2);
+  if (!page || page === "ideas" || page === "issues") return true;
+  return below.length === 0 && (page === "workstream" || page === "work" || /^\d+$/.test(page));
 }
 
 /**

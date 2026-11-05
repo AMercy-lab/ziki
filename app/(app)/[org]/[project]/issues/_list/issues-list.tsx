@@ -712,7 +712,7 @@ export async function IssuesList({
       );
       if (counts) {
         nextStep = workspaceNextStep({
-          slug,
+          slug: ref,
           membershipRole,
           appRole: effectiveRole,
           ...counts,

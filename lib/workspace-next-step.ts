@@ -1,5 +1,5 @@
 import { isOrganizationAdmin, type OrganizationRole } from "@/lib/organization-role";
-import { orgPath } from "@/lib/project-paths";
+import { orgPath, type ProjectRef } from "@/lib/project-paths";
 import type { GettingStartedStepId } from "@/lib/onboarding";
 import type { AppRole } from "@/lib/roles";
 
@@ -29,7 +29,7 @@ export type WorkspaceNextStep = {
 
 export type WorkspaceNextStepInput = {
   /** The project the card is shown in, for its links (#project-urls). */
-  slug: string;
+  slug: ProjectRef;
   /** The person's role in this workspace; null when they aren't a member of it. */
   membershipRole: OrganizationRole | null;
   appRole?: AppRole | null;

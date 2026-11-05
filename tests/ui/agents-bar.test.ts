@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { dockVisibleOn, leaderboardInMenu, leaderboardVisible } from "@/lib/agents-dock";
+import { projectRef } from "@/lib/project-paths";
 import { gettingStartedFor, parseDismissed, withDismissed } from "@/lib/onboarding";
 import { NEXT_STEP_COOKIE, workspaceNextStep, type WorkspaceNextStepInput } from "@/lib/workspace-next-step";
+
+const ref = projectRef("zedu", "acme");
 
 /**
  * The agents bar (#agents-dock): which pages draw it, when the Leaderboard
@@ -11,17 +14,17 @@ import { NEXT_STEP_COOKIE, workspaceNextStep, type WorkspaceNextStepInput } from
 
 describe("dockVisibleOn: where the agents bar shows", () => {
   it.each([
-    "/acme",
-    "/acme/ideas",
-    "/acme/ideas/drafts",
-    "/acme/ideas/rejected",
-    "/acme/ideas/7",
-    "/acme/issues",
-    "/acme/issues/open",
-    "/acme/issues/new",
-    "/acme/42",
-    "/acme/workstream",
-    "/acme/work",
+    "/zedu/acme",
+    "/zedu/acme/ideas",
+    "/zedu/acme/ideas/drafts",
+    "/zedu/acme/ideas/rejected",
+    "/zedu/acme/ideas/7",
+    "/zedu/acme/issues",
+    "/zedu/acme/issues/open",
+    "/zedu/acme/issues/new",
+    "/zedu/acme/42",
+    "/zedu/acme/workstream",
+    "/zedu/acme/work",
     "/inbox",
     "/inbox/escalations/abc",
     "/home",
@@ -52,9 +55,9 @@ describe("dockVisibleOn: where the agents bar shows", () => {
     "/settings/agents",
     "/settings/agent/robo",
     "/projects/acme/settings",
-    "/acme/org",
-    "/acme/org/members",
-    "/acme/org/invites",
+    "/zedu/acme/org",
+    "/zedu/acme/org/members",
+    "/zedu/acme/org/invites",
     "/superadmin",
     "/superadmin/users",
     "/superadmin/orgs/acme",
@@ -72,34 +75,34 @@ describe("dockVisibleOn: where the agents bar shows", () => {
   });
 
   it("hides everywhere when you have no agents", () => {
-    for (const path of ["/acme", "/acme/issues", "/acme/42", "/acme/workstream", "/inbox", "/home", "/activity", "/feed", "/agents/mine", "/settings", "/docs"]) {
+    for (const path of ["/zedu/acme", "/zedu/acme/issues", "/zedu/acme/42", "/zedu/acme/workstream", "/inbox", "/home", "/activity", "/feed", "/agents/mine", "/settings", "/docs"]) {
       expect(dockVisibleOn(path, 0)).toBe(false);
     }
   });
 
   it("matches whole path segments, not prefixes", () => {
     // A project called "organic" or "settings-ui" is a project: its pages are work pages.
-    expect(dockVisibleOn("/organic/issues", 1)).toBe(true);
-    expect(dockVisibleOn("/settings-ui/issues", 1)).toBe(true);
+    expect(dockVisibleOn("/zedu/organic/issues", 1)).toBe(true);
+    expect(dockVisibleOn("/zedu/settings-ui/issues", 1)).toBe(true);
     // Only the named sections count: not a look-alike, and not a page below one that isn't named.
-    expect(dockVisibleOn("/acme/ideasx", 1)).toBe(false);
-    expect(dockVisibleOn("/acme/issuesx", 1)).toBe(false);
-    expect(dockVisibleOn("/acme/42x", 1)).toBe(false);
-    expect(dockVisibleOn("/acme/organisation", 1)).toBe(false);
+    expect(dockVisibleOn("/zedu/acme/ideasx", 1)).toBe(false);
+    expect(dockVisibleOn("/zedu/acme/issuesx", 1)).toBe(false);
+    expect(dockVisibleOn("/zedu/acme/42x", 1)).toBe(false);
+    expect(dockVisibleOn("/zedu/acme/organisation", 1)).toBe(false);
     expect(dockVisibleOn("/homepage", 1)).toBe(false);
     // Home, feed and activity are those pages only, not what sits below them.
     expect(dockVisibleOn("/home/extra", 1)).toBe(false);
     expect(dockVisibleOn("/feed/x", 1)).toBe(false);
     expect(dockVisibleOn("/activity/x", 1)).toBe(false);
     // A project that happens to be called "feeds" is a project: its landing page is a work page.
-    expect(dockVisibleOn("/feeds", 1)).toBe(true);
+    expect(dockVisibleOn("/zedu/feeds", 1)).toBe(true);
     // Under issues, whatever it is.
-    expect(dockVisibleOn("/acme/issues/org", 1)).toBe(true);
+    expect(dockVisibleOn("/zedu/acme/issues/org", 1)).toBe(true);
   });
 
   it("ignores a trailing slash", () => {
     expect(dockVisibleOn("/agents/mine/", 1)).toBe(false);
-    expect(dockVisibleOn("/acme/issues/", 1)).toBe(true);
+    expect(dockVisibleOn("/zedu/acme/issues/", 1)).toBe(true);
     expect(dockVisibleOn("/home/", 1)).toBe(true);
   });
 
@@ -117,8 +120,8 @@ describe("dockVisibleOn: where the agents bar shows", () => {
 
   it("matches earn on the whole segment: a look-alike isn't earn", () => {
     expect(dockVisibleOn("/earning/tasks", 1)).toBe(false);
-    expect(dockVisibleOn("/earnings", 1)).toBe(true); // a project that happens to be called "earnings": its landing page
-    expect(dockVisibleOn("/earnings/notes", 1)).toBe(false);
+    expect(dockVisibleOn("/zedu/earnings", 1)).toBe(true); // a project that happens to be called "earnings": its landing page
+    expect(dockVisibleOn("/zedu/earnings/notes", 1)).toBe(false);
   });
 
   it.each([
@@ -132,17 +135,29 @@ describe("dockVisibleOn: where the agents bar shows", () => {
     "/redesigns",
     "/redesigns/abc",
     "/leaderboard",
-    "/acme/notes",
-    "/acme/notes/agents/robo",
-    "/acme/tasks/3",
-    "/acme/projects",
-    "/acme/42/history",
-    "/acme/something-new",
+    "/zedu/acme/notes",
+    "/zedu/acme/notes/agents/robo",
+    "/zedu/acme/tasks/3",
+    "/zedu/acme/projects",
+    "/zedu/acme/42/history",
+    "/zedu/acme/something-new",
     "/",
   ])("hides on a page the allowlist doesn't name: %s", (path) => {
     expect(dockVisibleOn(path, 1)).toBe(false);
     expect(dockVisibleOn(path, 5)).toBe(false);
   });
+
+  it("hides on an organisation's list of projects", () => {
+    expect(dockVisibleOn("/zedu", 2)).toBe(false);
+    expect(dockVisibleOn("/zedu/", 2)).toBe(false);
+  });
+
+  it.each(["/acme/ideas", "/acme/issues/open", "/acme/42", "/acme/workstream", "/acme/work"])(
+    "hides on an old project-first address while it redirects: %s",
+    (path) => {
+      expect(dockVisibleOn(path, 2)).toBe(false);
+    },
+  );
 
   it("hides when the path is unknown", () => {
     expect(dockVisibleOn(null, 1)).toBe(false);
@@ -170,24 +185,24 @@ describe("leaderboardVisible: you can't be the only person on a leaderboard", ()
 
 describe("leaderboardInMenu: the account menu only offers what the bar isn't showing", () => {
   it("is in the menu when the bar isn't drawn (no agents, or a page that hides it)", () => {
-    expect(leaderboardInMenu("/acme/issues", 0, 5)).toBe(true);
+    expect(leaderboardInMenu("/zedu/acme/issues", 0, 5)).toBe(true);
     expect(leaderboardInMenu("/settings", 2, 5)).toBe(true);
     expect(leaderboardInMenu("/agents/mine", 2, 5)).toBe(true);
   });
 
   it("is left out when the bar is showing it", () => {
-    expect(leaderboardInMenu("/acme/issues", 1, 5)).toBe(false);
+    expect(leaderboardInMenu("/zedu/acme/issues", 1, 5)).toBe(false);
     expect(leaderboardInMenu("/home", 3, 2)).toBe(false);
   });
 
   it("is never offered in a workspace of one member, bar or no bar", () => {
-    expect(leaderboardInMenu("/acme/issues", 0, 1)).toBe(false);
+    expect(leaderboardInMenu("/zedu/acme/issues", 0, 1)).toBe(false);
     expect(leaderboardInMenu("/settings", 2, 1)).toBe(false);
   });
 
   it("is offered when the member count is unknown and the bar isn't there", () => {
     expect(leaderboardInMenu("/settings", 0, null)).toBe(true);
-    expect(leaderboardInMenu("/acme/issues", 1, null)).toBe(false);
+    expect(leaderboardInMenu("/zedu/acme/issues", 1, null)).toBe(false);
   });
 });
 
@@ -213,7 +228,7 @@ describe("Getting started: Connect your first agent", () => {
   const original = { members: 2, issues: 3 };
 
   it("adds a 5th step after the four that were there, open until the workspace has an agent", async () => {
-    const { steps } = await gettingStartedFor(checklistDb(), "t1", "acme");
+    const { steps } = await gettingStartedFor(checklistDb(), "t1", ref);
     expect(steps.map((step) => step.id)).toEqual(["workspace", "project", "issue", "invite", "agent"]);
     const agent = steps[4]!;
     expect(agent.label).toBe("Connect your first agent");
@@ -222,39 +237,39 @@ describe("Getting started: Connect your first agent", () => {
   });
 
   it("ticks once the workspace has an agent, whoever owns it", async () => {
-    const { steps } = await gettingStartedFor(checklistDb({ agents: [mine] }), "t1", "acme");
+    const { steps } = await gettingStartedFor(checklistDb({ agents: [mine] }), "t1", ref);
     expect(steps.find((step) => step.id === "agent")?.done).toBe(true);
     const teammates = { ...mine, ownerUserId: "teammate" };
-    const other = await gettingStartedFor(checklistDb({ agents: [teammates] }), "t1", "acme");
+    const other = await gettingStartedFor(checklistDb({ agents: [teammates] }), "t1", ref);
     expect(other.steps.find((step) => step.id === "agent")?.done).toBe(true);
   });
 
   it("does not count a revoked agent or another workspace's", async () => {
     const agents: AgentRow[] = [{ ...mine, revokedAt: new Date("2026-01-01") }, { ...mine, tenantId: "t2" }];
-    const { steps } = await gettingStartedFor(checklistDb({ agents }), "t1", "acme");
+    const { steps } = await gettingStartedFor(checklistDb({ agents }), "t1", ref);
     expect(steps.find((step) => step.id === "agent")?.done).toBe(false);
   });
 
   it("stays hidden for a list that was already complete: no agent doesn't bring it back", async () => {
-    const { steps, complete } = await gettingStartedFor(checklistDb(original), "t1", "acme");
+    const { steps, complete } = await gettingStartedFor(checklistDb(original), "t1", ref);
     expect(steps.find((step) => step.id === "agent")?.done).toBe(false);
     expect(complete).toBe(true);
     // Done the same way when the agent is there too.
-    expect((await gettingStartedFor(checklistDb({ ...original, agents: [mine] }), "t1", "acme")).complete).toBe(true);
+    expect((await gettingStartedFor(checklistDb({ ...original, agents: [mine] }), "t1", ref)).complete).toBe(true);
   });
 
   it("is still open while any of the four original steps is, agent or not", async () => {
-    expect((await gettingStartedFor(checklistDb({ agents: [mine] }), "t1", "acme")).complete).toBe(false);
-    expect((await gettingStartedFor(checklistDb({ members: 2 }), "t1", "acme")).complete).toBe(false);
-    expect((await gettingStartedFor(checklistDb({ issues: 1, invites: 0 }), "t1", "acme")).complete).toBe(false);
+    expect((await gettingStartedFor(checklistDb({ agents: [mine] }), "t1", ref)).complete).toBe(false);
+    expect((await gettingStartedFor(checklistDb({ members: 2 }), "t1", ref)).complete).toBe(false);
+    expect((await gettingStartedFor(checklistDb({ issues: 1, invites: 0 }), "t1", ref)).complete).toBe(false);
     // A pending invite counts as the teammate step, as before.
-    expect((await gettingStartedFor(checklistDb({ issues: 1, invites: 1 }), "t1", "acme")).complete).toBe(true);
+    expect((await gettingStartedFor(checklistDb({ issues: 1, invites: 1 }), "t1", ref)).complete).toBe(true);
   });
 });
 
 describe("workspaceNextStep: the one next thing, from who you are", () => {
   const base: WorkspaceNextStepInput = {
-    slug: "acme",
+    slug: ref,
     membershipRole: "owner",
     appRole: "user",
     agentCount: 0,
@@ -295,7 +310,7 @@ describe("workspaceNextStep: the one next thing, from who you are", () => {
     const card = ask({ agentCount: 1, memberCount: 1 });
     expect(card?.id).toBe("invite-teammate");
     expect(card?.message).toBe("Invite a teammate so your agents' work gets reviewed.");
-    expect(card?.href).toBe("/acme/org/invites");
+    expect(card?.href).toBe("/zedu/acme/org/invites");
   });
 
   it("says nothing to an owner with agents once the workspace has company or a pending invite", () => {
