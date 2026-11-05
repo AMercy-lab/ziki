@@ -15,7 +15,7 @@ export default async function NewMarketingTaskPage({
   params: Promise<{ project: string }>;
 }) {
   const { project: slug } = await params;
-  const { tenantId } = await requireProject(slug, marketingPath(slug, "tasks/new"));
+  const { tenantId, project } = await requireProject(slug, marketingPath(slug, "tasks/new"));
 
   let types;
   try {
@@ -40,7 +40,7 @@ export default async function NewMarketingTaskPage({
           Propose a marketing task
         </h1>
       </header>
-      <NewMarketingTaskForm types={types} />
+      <NewMarketingTaskForm projectId={project.id} types={types} />
     </div>
   );
 }

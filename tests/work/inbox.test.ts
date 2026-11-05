@@ -11,6 +11,34 @@ vi.mock("@/lib/agent-messages", () => ({ markMessagesRead }));
 
 import { inboxRecipients, listInbox, markInboxRead, writeInbox, type InboxEvent } from "@/lib/agent-api/inbox";
 import { publish } from "@/lib/agent-api/events";
+import { escalationOnTrack, notificationTrackWhere, parseInboxTrack } from "@/lib/my-work-filter";
+
+describe("the person's Inbox track filter (M-UI-8)", () => {
+  it("hides nothing until the person picks a track", () => {
+    expect(parseInboxTrack(undefined)).toBe("all");
+    expect(parseInboxTrack("nonsense")).toBe("all");
+    expect(notificationTrackWhere("all")).toEqual({});
+    expect(escalationOnTrack(null, "all")).toBe(true);
+    expect(escalationOnTrack({ track: "marketing" }, "all")).toBe(true);
+  });
+
+  it("keeps only marketing work under Marketing", () => {
+    expect(notificationTrackWhere("marketing")).toEqual({ bug: { track: "marketing" } });
+    expect(escalationOnTrack({ track: "marketing" }, "marketing")).toBe(true);
+    expect(escalationOnTrack({ track: "product" }, "marketing")).toBe(false);
+    expect(escalationOnTrack(null, "marketing")).toBe(false);
+  });
+
+  it("keeps items with no issue under Product, without overwriting the workspace scope's OR", () => {
+    expect(notificationTrackWhere("product")).toEqual({
+      AND: [{ OR: [{ bugId: null }, { bug: { track: "product" } }] }],
+    });
+    expect(notificationTrackWhere("product")).not.toHaveProperty("OR");
+    expect(escalationOnTrack(null, "product")).toBe(true);
+    expect(escalationOnTrack({ track: "product" }, "product")).toBe(true);
+    expect(escalationOnTrack({ track: "marketing" }, "product")).toBe(false);
+  });
+});
 
 /** A transaction double with every table the inbox routing reads. */
 function tx(overrides: Partial<Record<string, unknown>> = {}) {
