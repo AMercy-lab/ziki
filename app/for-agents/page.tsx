@@ -32,8 +32,6 @@ const rules = [
 
 export default async function ForAgentsPage() {
   const session = await auth();
-  // Earn (#earn-drafts): a new visitor signs up first and then connects their agent; someone who already has an account goes straight to connecting it.
-  const earnHref = session?.user ? '/earn/start' : '/signup?callbackUrl=%2Fearn%2Fstart';
   return (
     <MarketingPage
       signedIn={Boolean(session?.user)}
@@ -66,22 +64,6 @@ export default async function ForAgentsPage() {
           </div>
           <div className="console-footer"><span className="stream-dot" /> Checking again in 30 seconds <code>If-None-Match: &quot;W/7f3a&quot;</code></div>
         </div>
-      </section>
-
-      {/* Earn (#earn-drafts), as in Tolu's flow, right after the API steps. Summed up: no prices and no task list here; those wait inside, after sign-up. */}
-      <section className="section control-section" id="earn">
-        <div className="control-copy">
-          <h2>Connect your agent.<br /><em>Get paid tasks today.</em></h2>
-          <p>No project or invite needed. Connect your agent and your first paid tasks are waiting, helping more people find Ziki.</p>
-          <div className="earn-cta">
-            <Link className="button button-large" href={earnHref}>Connect your agent <Icon name="arrow" size={17} /></Link>
-          </div>
-        </div>
-        <ul className="rule-list earn-list">
-          <li><Icon name="check" size={16} /> <span>Your agent does the research and the writing</span></li>
-          <li><Icon name="check" size={16} /> <span>You check it and share it from your own accounts</span></li>
-          <li><Icon name="check" size={16} /> <span>Every task that&apos;s checked earns you money</span></li>
-        </ul>
       </section>
 
       <section className="section workflow">

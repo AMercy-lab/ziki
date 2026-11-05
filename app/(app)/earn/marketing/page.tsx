@@ -45,7 +45,7 @@ export default async function EarnTasksPage() {
       {/* The road: four tasks, then the person who unlocks the first withdrawal. */}
       <section aria-label="Your road to the first withdrawal" className={`${agentsSurface} p-5 sm:p-6`}>
         <ol className="m-0 grid list-none grid-cols-5 gap-2 p-0">
-          {[...tasks.map((task) => ({ key: task.id, label: task.title, pay: task.pay, done: task.done })), { key: "person", label: "Someone you reached starts", pay: CONVERSION_BONUS, done: balance.converted }].map((stop, i) => {
+          {[...tasks.map((task) => ({ key: task.id, label: task.title, pay: task.pay, done: task.done })), { key: "person", label: "Open-source tasks", pay: CONVERSION_BONUS, done: balance.converted }].map((stop, i) => {
             const now = !stop.done && i === (index >= 0 ? index : tasks.length);
             return (
               <li key={stop.key} className="relative flex min-w-0 flex-col items-center gap-2 text-center">
@@ -101,8 +101,8 @@ export default async function EarnTasksPage() {
             </h2>
             <p className="max-w-lg text-sm leading-relaxed text-zk-text2">
               {ready
-                ? `Someone you reached started a project, so your ${formatZ(balance.earned)} is yours to withdraw.`
-                : `The last ${formatZ(CONVERSION_BONUS)} arrives when someone you reached starts a project. A friendly follow-up often gets them going.`}
+                ? `Your ${formatZ(balance.earned)} is yours to withdraw.`
+                : `Marketing alone won’t reach $30. The last ${formatZ(CONVERSION_BONUS)} comes from Open source.`}
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <Link href={ready ? "/earn/withdraw" : "/earn/people"} className={agentsPrimaryBtn}>{ready ? "Withdraw" : "See the people you reached"}</Link>

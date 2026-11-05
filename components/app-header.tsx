@@ -22,7 +22,8 @@ import { LocalTime } from "@/components/local-time";
 import { BASE_PATH } from "@/lib/base-path";
 import { PAGE_CONTAINER_CLASS } from "@/components/page-container";
 import { ZikiMark } from "@/components/ziki-mark";
-import { EarnWithdraw } from "@/components/earn-withdraw";
+import { EarnPill } from "@/components/earn-pill";
+import { isEarnPath } from "@/lib/earn/paths";
 import type { WithdrawInfo } from "@/lib/earn/draft";
 
 const linkFocus =
@@ -327,39 +328,18 @@ export function AppHeader({
           <WorkspaceSwitcher workspaces={workspaces} activeTenantId={activeTenantId} canManage={organizationAdmin} orgHref={projectSlug ? orgPath(projectSlug) : null} tone="bar" className="min-w-0 max-sm:max-w-44" />
         </div>
 
-        <TopNav pathname={pathname} projectSlug={projectSlug} />
+        {/* Earn (#earn-drafts): an earner on the earn pages sees none of the builders' links. */}
+        {earned !== null && isEarnPath(pathname) ? null : <TopNav pathname={pathname} projectSlug={projectSlug} />}
 
         {/* Phones and tablets: min-w-0 lets the group narrow so its flex-wrap
             breaks the chips onto rows (no sideways scroll at 360px or 768px).
             From lg up it keeps shrink-0 so the account controls are never
             squeezed. */}
         <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 max-sm:gap-1 lg:shrink-0">
-          {earned !== null ? (
-            // Earn (#earn-drafts): the balance and Withdraw, in reach from every page (the canvas design).
-            // The amount opens your earnings on My agents; Withdraw opens Withdraw. The button is
-            // blue; on the Withdraw page itself it turns white, since you're already there.
-            <div className="inline-flex h-10 items-center gap-1 rounded-full border border-zk-border bg-zk-surface py-1 pl-1 pr-1 text-zk-text">
-              <Link
-                href="/earn/earnings"
-                aria-label={`$${earned.toFixed(2)} earned. See your earnings.`}
-                className={`inline-flex h-8 items-center rounded-full px-2.5 text-[14px] font-bold tabular-nums hover:bg-zk-chip ${linkFocus}`}
-              >
-                ${earned.toFixed(2)}
-              </Link>
-              {/* Never locked (Mark's review): below $30 it opens a window with the threshold; at $30 the Withdraw page. */}
-              {withdraw ? (
-                <EarnWithdraw
-                  info={withdraw}
-                  className={`inline-flex h-8 items-center rounded-full px-3 text-[13px] font-semibold ${linkFocus} ${
-                    pathname?.startsWith("/earn/withdraw")
-                      ? "bg-zk-surface text-zk-text ring-1 ring-zk-border"
-                      : "bg-electric-blue-strong text-white hover:bg-[#2552af]"
-                  }`}
-                >
-                  Withdraw
-                </EarnWithdraw>
-              ) : null}
-            </div>
+          {earned !== null && withdraw ? (
+            // Earn (#earn-drafts): the balance as one pill, in reach from every page. It drops a panel down (the bar, the
+            // next task, Withdraw); Withdraw opens a window over the page, never another page.
+            <EarnPill info={withdraw} />
           ) : null}
 
           <div ref={accountRef} className="relative">

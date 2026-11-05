@@ -9,7 +9,7 @@
  */
 
 export const WITHDRAW_THRESHOLD = 30;
-/** Paid when someone you reached starts a project; it is what takes you past the threshold. */
+/** Paid from open-source tasks; it is what takes you past the threshold. */
 export const CONVERSION_BONUS = 11;
 /** Where earners CC their cold emails, so Ziki can count them. */
 export const EARN_CC_ADDRESS = "earn@ziki.dev";
@@ -114,7 +114,7 @@ export function withdrawInfo(stage: EarnStage): WithdrawInfo {
     ways: [
       { label: "You signed up", pay: SIGNUP_BONUS, done: true, next: false, href: null },
       ...tasks.map((task, i) => ({ label: task.title, pay: task.pay, done: task.done, next: i === nextIndex, href: task.done ? null : zikiTaskPath(i + 1) })),
-      { label: "Someone you reached starts a project", pay: CONVERSION_BONUS, done: balance.converted, next: nextIndex < 0 && !balance.converted, href: nextIndex < 0 ? "/earn/people" : null },
+      { label: "Fix open-source issues", pay: CONVERSION_BONUS, done: balance.converted, next: nextIndex < 0 && !balance.converted, href: nextIndex < 0 ? "/earn/people" : null },
     ],
     next: nextIndex < 0 ? null : { n: nextIndex + 1, title: tasks[nextIndex].title, pay: tasks[nextIndex].pay, href: `/earn/start-task?n=${nextIndex + 1}` },
   };
@@ -163,7 +163,7 @@ export function earnBalance(stage: EarnStage = "new"): EarnBalance {
   // Say exactly what's left: the tasks still open and, until it happens, one person starting.
   const needs = [
     tasksLeft > 0 ? `finish your tasks (+$${tasksLeft})` : null,
-    converted ? null : `get one person you reached to start using Ziki (+$${CONVERSION_BONUS})`,
+    converted ? null : `do open-source tasks (+$${CONVERSION_BONUS})`,
   ].filter(Boolean);
   return {
     stage,

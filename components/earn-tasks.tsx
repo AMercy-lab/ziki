@@ -83,7 +83,7 @@ export function EarnTasks({ stage }: { stage: EarnStage }) {
             {converted ? "✓" : tasks.length + 1}
           </span>
           <div className="min-w-0 flex-1">
-            <p className={`text-sm font-semibold ${converted ? "text-zk-text2" : "text-zk-text"}`}>Someone you reached starts a project</p>
+            <p className={`text-sm font-semibold ${converted ? "text-zk-text2" : "text-zk-text"}`}>Fix open-source issues</p>
             <p className="mt-0.5 text-xs text-zk-muted">
               {converted
                 ? "Mama Ade's Bakery started a project. Withdraw is open."

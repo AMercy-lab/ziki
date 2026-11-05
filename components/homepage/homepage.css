@@ -496,7 +496,7 @@
 .ziki-homepage .th-kicker { color: rgba(255,255,255,.85); display: block; font-family: var(--font-geist-mono), ui-monospace, monospace; font-size: 12px; letter-spacing: .08em; margin-bottom: 18px; text-transform: uppercase; }
 
 /* Homepage: three ways in */
-.ziki-homepage .paths-grid { display: grid; gap: 18px; grid-template-columns: repeat(4, 1fr); }
+.ziki-homepage .paths-grid { display: grid; gap: 18px; grid-template-columns: repeat(3, 1fr); }
 .ziki-homepage .path-card { display: flex; flex-direction: column; padding: 26px 24px 24px; }
 .ziki-homepage .path-card .lifecycle-icon { margin: 0 0 18px; }
 .ziki-homepage .path-kicker { color: var(--green); font-family: var(--font-geist-mono), ui-monospace, monospace; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
@@ -528,10 +528,6 @@
 .ziki-homepage .closing-cta .cta-pair { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 29px; }
 .ziki-homepage .closing-cta .cta-pair .button { margin-top: 0; }
 
-@media (max-width: 1100px) {
-  .ziki-homepage .paths-grid { grid-template-columns: repeat(2, 1fr); }
-}
-
 @media (max-width: 900px) {
   .ziki-homepage .paths-grid { grid-template-columns: 1fr; }
   .ziki-homepage .status-track { grid-template-columns: 1fr; }
@@ -546,12 +542,3 @@
 /* One heading weight across the public pages. */
 .ziki-homepage h3 { font-weight: 600; letter-spacing: -.02em; }
 .ziki-homepage .th-head span:nth-child(4) { text-align: right; }
-
-/* Earn (#earn-drafts): the For AI agents section that lists the paid tasks. */
-#earn { margin-top: 48px; }
-.earn-list li { display: flex; align-items: center; gap: 10px; }
-.earn-list li > span { flex: 1; }
-.earn-cta { margin-top: 28px; }
-/* The one number on the public page: the first task's time and pay, as a single quiet line. */
-.earn-first { display: inline-block; margin-top: 18px; padding: 10px 16px; border-radius: 14px; background: rgba(46, 111, 239, 0.1); font-size: 15px; line-height: 1.5; }
-.earn-first::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #146c43; vertical-align: 1px; }

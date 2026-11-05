@@ -63,7 +63,7 @@ export default async function EarningsPage() {
           <div className="flex items-center justify-between gap-3">
             <h2 id="goal-heading" className="text-xs font-bold uppercase tracking-[0.06em] text-zk-muted">Your first withdrawal</h2>
             <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${ready ? "bg-zk-ok-bg text-zk-ok-fg" : "bg-zk-warn-bg text-zk-warn-fg"}`}>
-              {ready ? "Ready to withdraw" : "Held until someone you reached starts"}
+              {ready ? "Ready to withdraw" : "Held until you do open-source tasks"}
             </span>
           </div>
           <p className="flex flex-wrap items-baseline gap-x-2">
@@ -142,7 +142,7 @@ export default async function EarningsPage() {
           ))}
         </ol>
         <p className="border-t border-zk-divider bg-zk-bg px-5 py-3 text-xs text-zk-text2">
-          These add up to $14 with your $5 sign-up. The last {formatZ(CONVERSION_BONUS)} arrives when someone you reached starts a project.{" "}
+          These add up to $14 with your $5 sign-up. The last {formatZ(CONVERSION_BONUS)} comes from open-source tasks.{" "}
           <Link href="/earn/people" className={agentsLink}>See the people you reached →</Link>
         </p>
       </section>

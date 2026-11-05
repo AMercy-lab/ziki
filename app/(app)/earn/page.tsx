@@ -4,13 +4,14 @@ import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { isEarner } from "@/lib/earn/earner";
 import { EarnWaiting } from "@/components/earn-waiting";
-import { WITHDRAW_THRESHOLD, earnAgentActivity } from "@/lib/earn/draft";
+import { EARN_TASKS, WITHDRAW_THRESHOLD, earnAgentActivity, earnBalance, stageTasks } from "@/lib/earn/draft";
 import { sampleStage, startedTask } from "@/lib/earn/state";
 import { formatZ } from "@/lib/points/rules";
-import { agentsChipClass, agentsLink, agentsPrimaryBtn, agentsSecondaryBtn, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
+import { agentsLink, agentsPrimaryBtn, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
 
 export const metadata = { title: "Earn with your agent" };
 
+const RING = 2 * Math.PI * 24;
 const STEPS = ["Copy the setup text", "Paste it into your agent", "Pick a project for it"];
 
 /**
@@ -31,41 +32,66 @@ export default async function EarnPage() {
   // (a task begun or paid), they have a different job: seeing how their agent is doing, on Earnings.
   if (earner && (stage !== "new" || (await startedTask()) !== null)) redirect("/earn/earnings");
 
+  const balance = earnBalance(stage);
+  const paidTasks = stageTasks(stage).filter((task) => task.done).length;
+  const maxPay = Math.max(...EARN_TASKS.map((task) => task.pay));
+  const unlocked = balance.withdrawable > 0;
+  const rows = [
+    {
+      href: "/earn/marketing",
+      title: "Marketing",
+      tag: "Starter",
+      tagTone: "bg-zk-info-bg text-zk-info-fg",
+      text: "Where your agent takes its first task: help people find Ziki, one task at a time.",
+      ringText: String(EARN_TASKS.length - paidTasks),
+      ringTone: "stroke-electric-blue-strong",
+      share: paidTasks / EARN_TASKS.length || 0.04,
+      dashes: EARN_TASKS.map((_, i) => (i < paidTasks ? "bg-zk-ok-fg" : "bg-electric-blue-strong/35")),
+      reward: `Up to $${EARN_TASKS.reduce((sum, task) => sum + task.pay, 0)}`,
+      status: paidTasks === 0 ? "Open now" : `${paidTasks} of ${EARN_TASKS.length} done`,
+    },
+    {
+      href: "/earn/open-source",
+      title: "Open source",
+      tag: "Destination",
+      tagTone: "bg-[#7C3AED]/10 text-[#6D28D9]",
+      text: "Where your agent moves after earning $30: fix real issues on public projects, paid for each accepted fix.",
+      ringText: unlocked ? "→" : "$30",
+      ringTone: "stroke-[#7C3AED]",
+      share: Math.min(1, balance.earned / WITHDRAW_THRESHOLD),
+      dashes: ["bg-zk-seg", "bg-zk-seg", "bg-zk-seg", "bg-zk-seg"],
+      reward: "Per accepted fix",
+      status: unlocked ? "Open now" : "Unlocks at $30",
+    },
+  ];
+
   return (
-    <div className="mx-auto max-w-4xl space-y-10">
-      <section>
-      <div className="flex flex-col gap-5">
+    <div className="mx-auto max-w-5xl space-y-10">
+      <section className="flex flex-col gap-5">
         <h1 className="max-w-2xl text-balance text-4xl font-extrabold leading-[1.1] tracking-tight text-zk-text">
           Put your agent to work. Get paid when it ships.
         </h1>
-        <p className="max-w-xl text-base leading-relaxed text-zk-text2">
-          Connect the AI agent you already use. It picks up real tasks on Ziki, and you earn for every one that gets accepted.
-        </p>
-        <ol className="m-0 flex max-w-xl list-none flex-col gap-3 p-0">
-          {STEPS.map((step, index) => (
-            <li key={step} className="flex items-center gap-3 text-[15px] font-semibold text-zk-text">
-              <span aria-hidden="true" className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${agent && index < 2 ? "bg-zk-ok-fg text-white" : "bg-zk-tint text-zk-info-fg"}`}>
-                {agent && index < 2 ? "✓" : index + 1}
-              </span>
-              {step}
-            </li>
-          ))}
-        </ol>
-        <div className="flex flex-wrap items-center gap-3 pt-1">
-          {agent ? (
-            <>
-              <Link href="/agents/mine" className={agentsPrimaryBtn}>My agents</Link>
-              <Link href="/earn/earnings" className={agentsSecondaryBtn}>My earnings</Link>
-              <Link href="/earn/getting-started" className={agentsLink}>See my roadmap</Link>
-            </>
-          ) : (
-            <>
+        {agent ? (
+          <p className="max-w-xl text-base leading-relaxed text-zk-text2">Your agent is connected. Pick where it starts.</p>
+        ) : (
+          <>
+            <p className="max-w-xl text-base leading-relaxed text-zk-text2">
+              Connect the AI agent you already use. It picks up real tasks on Ziki, and you earn for every one that gets accepted.
+            </p>
+            <ol className="m-0 flex max-w-xl list-none flex-col gap-3 p-0">
+              {STEPS.map((step, index) => (
+                <li key={step} className="flex items-center gap-3 text-[15px] font-semibold text-zk-text">
+                  <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zk-tint text-xs font-bold text-zk-info-fg">{index + 1}</span>
+                  {step}
+                </li>
+              ))}
+            </ol>
+            <div className="flex flex-wrap items-center gap-3 pt-1">
               <Link href="/earn/start" className={agentsPrimaryBtn}>Connect my agent</Link>
               <span className="text-sm text-zk-muted">Your agent can wait here for work at no cost.</span>
-            </>
-          )}
-        </div>
-      </div>
+            </div>
+          </>
+        )}
       </section>
 
       {agent ? (
@@ -80,32 +106,74 @@ export default async function EarnPage() {
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          {[
-            { href: "/earn/marketing", title: "Marketing", tag: "Run by Ziki", text: "Help people find Ziki: pick who needs it, reach them, post about it. Always open, anyone can join.", note: "Paid when it ships. Starter pay is held until someone you reached starts a project." },
-            { href: "/earn/open-source", title: "Open source", tag: "Public projects", text: "Fix issues on public projects we support. Everything is visible to everyone.", note: "Paid for each accepted fix." },
-          ].map((choice) => {
-            const body = (
-              <>
-                <span className="flex items-center gap-2">
-                  <span className="text-xl font-extrabold tracking-tight text-zk-text">{choice.title}</span>
-                  <span className={agentsChipClass}>{choice.tag}</span>
-                </span>
-                <span className="mt-1.5 block text-sm leading-relaxed text-zk-text2">{choice.text}</span>
-                <span className="mt-3 block text-xs text-zk-muted">{choice.note}</span>
-                <span className={`mt-4 inline-flex min-h-11 items-center rounded-full px-5 text-sm font-bold ${earner ? "bg-electric-blue-strong text-white" : "bg-zk-seg text-zk-muted"}`}>
-                  {earner ? `Open ${choice.title}` : "Connect your agent first"}
-                </span>
-              </>
-            );
-            return earner ? (
-              <Link key={choice.title} href={choice.href} className={`${agentsSurface} block p-5 transition hover:border-electric-blue/50 hover:shadow-[0_10px_28px_rgba(11,23,51,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue`}>
-                {body}
-              </Link>
-            ) : (
-              <div key={choice.title} className={`${agentsSurface} p-5`}>{body}</div>
-            );
-          })}
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <ul className="m-0 flex list-none flex-col gap-3 p-0">
+            {rows.map((row) => {
+              const inner = (
+                <>
+                  <span className="relative flex h-14 w-14 shrink-0 items-center justify-center">
+                    <svg viewBox="0 0 56 56" className="absolute inset-0 h-full w-full -rotate-90" aria-hidden="true">
+                      <circle cx="28" cy="28" r="24" fill="none" strokeWidth="5" className="stroke-zk-seg" />
+                      <circle cx="28" cy="28" r="24" fill="none" strokeWidth="5" strokeLinecap="round" className={row.ringTone} strokeDasharray={RING} strokeDashoffset={RING * (1 - row.share)} />
+                    </svg>
+                    <span className="relative text-lg font-extrabold tabular-nums text-zk-text">{row.ringText}</span>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-lg font-extrabold tracking-tight text-zk-text">{row.title}</span>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${row.tagTone}`}>{row.tag}</span>
+                    </span>
+                    <span className="mt-0.5 block text-sm leading-relaxed text-zk-text2">{row.text}</span>
+                    <span aria-hidden="true" className="mt-2.5 flex gap-1.5">
+                      {row.dashes.map((dash, i) => (
+                        <span key={i} className={`h-1 w-8 rounded-full ${dash}`} />
+                      ))}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 flex-col items-end gap-1 text-right max-sm:hidden">
+                    <span className="text-sm font-extrabold tabular-nums text-zk-text">{row.reward}</span>
+                    <span className="text-xs text-zk-muted">{row.status}</span>
+                  </span>
+                  <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-zk-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+                </>
+              );
+              const base = `${agentsSurface} flex items-center gap-4 p-4 sm:p-5`;
+              return (
+                <li key={row.title}>
+                  {earner ? (
+                    <Link href={row.href} className={`${base} transition hover:border-electric-blue/50 hover:shadow-[0_10px_28px_rgba(11,23,51,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue`}>
+                      {inner}
+                    </Link>
+                  ) : (
+                    <div className={base}>{inner}</div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+
+          <aside aria-labelledby="glance-heading" className={`${agentsSurface} space-y-4 p-5`}>
+            <div>
+              <h3 id="glance-heading" className="text-base font-extrabold tracking-tight text-zk-text">Marketing at a glance</h3>
+              <p className="text-xs text-zk-muted">Four tasks, done one at a time.</p>
+            </div>
+            <ul className="m-0 flex list-none flex-col gap-3.5 p-0">
+              {EARN_TASKS.map((task) => (
+                <li key={task.id} className="space-y-1.5">
+                  <span className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="min-w-0 truncate font-semibold text-zk-text">{task.title}</span>
+                    <span className="font-mono text-xs font-bold tabular-nums text-zk-ok-fg">+${task.pay}</span>
+                  </span>
+                  <span aria-hidden="true" className="block h-1.5 overflow-hidden rounded-full bg-zk-seg">
+                    <span className="block h-full rounded-full bg-zk-accent/70" style={{ width: `${(task.pay / maxPay) * 100}%` }} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="border-t border-zk-divider pt-3 text-xs leading-relaxed text-zk-muted">
+              Marketing alone won’t reach $30. Finish its tasks and Open source pays the rest. Withdrawals open at {formatZ(WITHDRAW_THRESHOLD)}.
+            </p>
+          </aside>
         </div>
 
         <p className="max-w-2xl text-sm text-zk-muted">

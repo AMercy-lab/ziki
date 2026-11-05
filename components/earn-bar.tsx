@@ -5,7 +5,7 @@ import { CONVERSION_BONUS, EARN_TASKS, SIGNUP_BONUS, WITHDRAW_THRESHOLD, type Ea
  * The road to the first withdrawal (#earn-drafts), laid out like the earnings
  * bar Mark likes: a segmented bar, a marker at the end, a legend with colour
  * dots. Three colours: what you've earned (green), what your tasks can still
- * add (blue), and what arrives when someone you reached starts a project
+ * add (blue), and what arrives from open-source tasks
  * (amber). A small notch marks where each task pays out, so the bar reads as a
  * road and not a meter, and a glowing dot sits at your head of it.
  */
@@ -29,7 +29,7 @@ export function EarnBar({ balance }: { balance: Pick<EarnBalance, "earned" | "ta
   const parts = [
     { key: "earned", value: earned, bar: "bg-zk-ok-fg", dot: "bg-zk-ok-fg", text: "font-bold text-zk-text", label: "earned", show: balance.earned >= 0 },
     { key: "tasks", value: fromTasks, bar: "bg-zk-accent/35", dot: "bg-zk-accent/40", text: "font-bold text-zk-accent", label: "from your tasks", show: fromTasks > 0 },
-    { key: "person", value: fromPerson, bar: "bg-amber-300", dot: "bg-amber-300", text: "font-bold text-zk-warn-fg", label: "when someone you reached starts a project", show: fromPerson > 0 },
+    { key: "person", value: fromPerson, bar: "bg-amber-300", dot: "bg-amber-300", text: "font-bold text-zk-warn-fg", label: "from open-source tasks", show: fromPerson > 0 },
   ];
 
   return (
@@ -43,7 +43,7 @@ export function EarnBar({ balance }: { balance: Pick<EarnBalance, "earned" | "ta
           aria-label={
             ready
               ? `${formatZ(balance.earned)} earned. Withdraw is open.`
-              : `${formatZ(balance.earned)} earned. ${fromTasks ? `${formatZ(fromTasks)} to come from your tasks. ` : ""}${formatZ(fromPerson)} when someone you reached starts a project. Withdraw opens at ${formatZ(total)}.`
+              : `${formatZ(balance.earned)} earned. ${fromTasks ? `${formatZ(fromTasks)} to come from your tasks. ` : ""}${formatZ(fromPerson)} from open-source tasks. Withdraw opens at ${formatZ(total)}.`
           }
           className="relative flex h-3.5 overflow-hidden rounded-full bg-zk-seg"
         >

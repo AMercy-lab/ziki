@@ -33,7 +33,7 @@ export default async function EarnWithdrawPage() {
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">Withdraw</h1>
         <p className="mt-1 text-sm text-zk-text2">
-          {ready ? "Someone you reached started a project. Your money is ready." : `Withdrawals open at ${formatZ(WITHDRAW_THRESHOLD)}.`}
+          {ready ? "You’ve done the open-source work. Your money is ready." : `Withdrawals open at ${formatZ(WITHDRAW_THRESHOLD)}.`}
         </p>
       </div>
 
@@ -74,8 +74,8 @@ export default async function EarnWithdrawPage() {
             {balance.earned === 0
               ? "Start with your first task. Each one you finish adds to this."
               : balance.tasksLeft > 0
-                ? `${formatZ(left)} to go: ${formatZ(balance.tasksLeft)} from your tasks, then ${formatZ(CONVERSION_BONUS)} when someone you reached starts a project.`
-                : `${formatZ(left)} to go. It's paid when someone you reached starts a project. What you've earned stays yours.`}
+                ? `${formatZ(left)} to go: ${formatZ(balance.tasksLeft)} from your tasks, then ${formatZ(CONVERSION_BONUS)} from open-source tasks.`
+                : `${formatZ(left)} to go. It comes from open-source tasks. What you've earned stays yours.`}
           </p>
           <button type="button" disabled className="inline-flex min-h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-full bg-zk-seg px-5 text-sm font-bold text-zk-muted">
             <LockIcon />
@@ -119,7 +119,7 @@ export default async function EarnWithdrawPage() {
                 {tasks.length + 1}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-zk-text">Someone you reached starts a project</span>
+                <span className="block text-sm font-semibold text-zk-text">Fix open-source issues</span>
                 <span className="block text-xs text-zk-muted">
                   {signedUp > 0 ? (
                     <>Unlocks your withdrawal · {signedUp} has signed up. <Link href="/earn/people" className={agentsLink}>See people →</Link></>

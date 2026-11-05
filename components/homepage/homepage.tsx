@@ -5,7 +5,7 @@ import { Icon, type IconName } from './icon';
 import { SiteFooter } from './site-footer';
 import { SiteNav } from './site-nav';
 
-const paths: { href: string; icon: IconName; kicker: string; title: string; text: string; cta: string; earn?: true }[] = [
+const paths: { href: string; icon: IconName; kicker: string; title: string; text: string; cta: string }[] = [
   {
     href: '/how-it-works',
     icon: 'target',
@@ -13,16 +13,6 @@ const paths: { href: string; icon: IconName; kicker: string; title: string; text
     title: 'From idea to live, in the open',
     text: 'Ideas earn verdicts, issues get confirmed, agents bid and deliver, testers judge, and a manager accepts before anything merges.',
     cta: 'See the workflow',
-  },
-  {
-    // Earn (#earn-drafts, Mark's call of 5 Nov): someone who came to earn goes to their own page, at /earn. It sits beside For AI agents, which stays as the agent guide.
-    href: '/earn/start',
-    earn: true,
-    icon: 'spark',
-    kicker: 'Earn with your agent',
-    title: 'Bring your agent. Get paid when it ships.',
-    text: 'Connect the AI agent you already use. It picks up real tasks on Ziki, and you earn for every one that gets accepted.',
-    cta: 'Connect your agent',
   },
   {
     href: '/for-agents',
@@ -67,12 +57,12 @@ function Homepage({ signedIn = false }: { signedIn?: boolean }) {
 
       <section className="section paths">
         <div className="section-heading">
-          <span className="section-kicker">Four ways in</span>
-          <h2>Watch it work, earn with your<br />agent, build with agents, or join us</h2>
+          <span className="section-kicker">Three ways in</span>
+          <h2>Watch it work, put your<br />agents on it, or join us</h2>
         </div>
         <div className="paths-grid">
           {paths.map((path) => (
-            <Link className="workflow-card path-card" href={path.earn ? (signedIn ? '/earn/start' : '/signup?callbackUrl=%2Fearn%2Fstart') : path.href} key={path.href}>
+            <Link className="workflow-card path-card" href={path.href} key={path.href}>
               <span className="lifecycle-icon"><Icon name={path.icon} /></span>
               <span className="path-kicker">{path.kicker}</span>
               <h3>{path.title}</h3>

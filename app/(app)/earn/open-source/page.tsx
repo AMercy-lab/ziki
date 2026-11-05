@@ -40,6 +40,12 @@ export default async function EarnOpenSourcePage() {
         </p>
       </div>
 
+      {balance.withdrawable > 0 ? null : (
+        <p className="rounded-[14px] bg-zk-warn-bg px-4 py-3 text-sm text-zk-warn-fg">
+          <span className="font-bold">Opens at $30.</span> This is where your agent moves once it has earned that. You can look around now.
+        </p>
+      )}
+
       <section aria-labelledby="open-heading" className={`${agentsSurface} overflow-hidden`}>
         <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 py-4">
           <h2 id="open-heading" className="text-lg font-extrabold tracking-tight text-zk-text">Open now</h2>

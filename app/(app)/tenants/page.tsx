@@ -21,7 +21,6 @@ import { InviteCard } from "./invite-card";
 import { InviteLinkForm } from "./invite-link-form";
 import { ZeduOwnerForm } from "./zedu-owner-form";
 import { LocalTime } from "@/components/local-time";
-import { EARN_TASKS } from "@/lib/earn/draft";
 
 /* Distinct browser-tab title; the root layout appends "· Ziki". */
 export const metadata = { title: "Workspaces" };
@@ -83,7 +82,7 @@ export default async function TenantsPage({
         </h1>
         <p className="text-sm text-zk-text2">
           {hasTenants
-            ? "A workspace is your team. A project is one product inside it. A platform, such as Web or Mobile, is only a label on an issue."
+            ? "A workspace is your team. A project is one product inside it."
             : "You're not in a workspace yet. Accept an invite, or create a workspace of your own."}
         </p>
       </div>
@@ -142,10 +141,6 @@ export default async function TenantsPage({
               <li>
                 <span className="font-medium">A project</span> is one product in that workspace, such as a web
                 app or a desktop app. The switcher chooses which project&apos;s issues you see.
-              </li>
-              <li>
-                <span className="font-medium">A platform</span> is a label on an issue, such as Web or Mobile.
-                It is not a product, and every project in the workspace uses the same list.
               </li>
             </ul>
           </section>
@@ -259,37 +254,6 @@ export default async function TenantsPage({
         </p>
         <InviteLinkForm />
       </section>
-
-      {/* Earn (#earn-drafts): a newcomer's third choice, for someone who came to earn, not to build
-          or join a team. People already in a workspace reach their money from the menu and the agents bar. */}
-      {!hasTenants ? (
-      <section aria-labelledby="earn-with-ziki" className="rounded-[20px] border border-zk-ok-fg/30 bg-zk-surface p-4 sm:p-6">
-        <div>
-          <div>
-            <h2 id="earn-with-ziki" className="text-base font-semibold text-zk-text">
-              Earn money with Ziki
-            </h2>
-            <p className="mt-1 text-sm text-zk-text2">
-              No team or app needed. Help small businesses find Ziki and get paid for each task.
-            </p>
-          </div>
-        </div>
-        <ul className="mt-3 grid gap-1.5 text-sm text-zk-text2 sm:grid-cols-2">
-          {EARN_TASKS.map((task) => (
-            <li key={task.id} className="rounded-xl bg-zk-bg px-3 py-2">{task.title}</li>
-          ))}
-        </ul>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Link
-            href="/earn/start"
-            className="inline-flex min-h-11 items-center justify-center rounded-full bg-zk-ok-fg px-5 text-sm font-bold text-white hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-electric-blue"
-          >
-            Earn
-          </Link>
-          <span className="text-xs text-zk-muted">You connect your agent first, then your tasks are on My agents.</span>
-        </div>
-      </section>
-      ) : null}
 
       {hasTenants || inviteId ? (
         <section aria-labelledby="create-tenant" className={card}>
