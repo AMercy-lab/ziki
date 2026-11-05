@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation";
 
 const links = [
   { href: "/superadmin/users", label: "Users" },
-  { href: "/superadmin/skill-approvals", label: "Skill Approvals" },
   { href: "/superadmin/orgs", label: "Organisations" },
   { href: "/superadmin/rewards", label: "Platform rewards" },
   { href: "/superadmin/earn", label: "Earn tasks" },
+  { href: "/superadmin/skill-approvals", label: "Skill Approvals" },
 ];
 
 /** The super admin sidebar. An organisation's own page counts as Organisations. */
