@@ -22,6 +22,9 @@ import { IssueBidsPanel, type BidEntryView } from "@/components/issue-bids";
 import { IssueConfirmationsPanel, type ConfirmationEntryView, type ConfirmationsData } from "@/components/issue-confirmations";
 import { Library } from "@/components/marketing/library/library";
 import { deliveryFiles, filterLibrary, type LibraryItem } from "@/components/marketing/library/model";
+import { MarketingTaskHeader } from "@/components/marketing/marketing-task-header";
+import { MarketingDeliverablesPanel, type MarketingDeliveryView } from "@/components/marketing/marketing-deliverables-panel";
+import { MarketingTaskDetail } from "@/components/marketing/marketing-task-detail";
 
 const PR = "https://github.com/emerjent/ziki/pull/42";
 
@@ -323,5 +326,115 @@ describe("IssueConfirmationsPanel past Requires confirmation", () => {
     const banner = screen.getByTestId("confirmation-banner");
     expect(banner).toHaveAttribute("data-confirmed", "true");
     expect(banner).toHaveTextContent(/Ada.*Bob/);
+  });
+});
+
+describe("Marketing task detail (M-UI-4)", () => {
+  it("deduplicates badge when taskType name is Marketing", () => {
+    render(
+      <MarketingTaskHeader
+        number={43}
+        title="Author Technical Deep-Dive Article"
+        description="Write deep-dive."
+        status="open"
+        substatus="open"
+        taskType={{ id: "t-mkt", name: "Marketing" }}
+        reward={350}
+        revisionCount={0}
+        maxRevisions={2}
+        projectSlug="ziki"
+        createdAt={new Date("2026-11-01T12:00:00Z")}
+      />
+    );
+    const marketingBadges = screen.getAllByText("Marketing");
+    expect(marketingBadges.length).toBe(1);
+  });
+
+  it("renders external deliverable links with domain formatting", () => {
+    const deliveries: MarketingDeliveryView[] = [
+      {
+        id: "del-1",
+        agentName: "Creative Claude",
+        by: "Fabian",
+        summary: "Teaser video render and social banner assets",
+        description: "Uploaded assets.",
+        deliverableUrls: ["https://figma.com/design/sample123"],
+        screenshots: [],
+        current: true,
+        updatedAt: new Date("2026-11-02T10:00:00Z"),
+        replies: [],
+      },
+    ];
+
+    render(
+      <MarketingDeliverablesPanel
+        bugId="bug-1"
+        deliveries={deliveries}
+        isInProgress={false}
+        canReply={true}
+      />
+    );
+
+    const figmaLink = screen.getByRole("link", { name: /figma\.com/ });
+    expect(figmaLink).toHaveAttribute("href", "https://figma.com/design/sample123");
+    expect(screen.getByText("figma.com")).toBeInTheDocument();
+  });
+
+  it("switches tabs between pipeline sections and activates discussion on hash", () => {
+    const bug = {
+      id: "bug-mkt-1",
+      number: 101,
+      title: "Write Q4 Launch Thread on X",
+      description: "Draft 8-tweet thread.",
+      status: "in_progress" as const,
+      substatus: "in_progress" as const,
+      reward: 500,
+      revisionCount: 1,
+      createdAt: new Date("2026-11-04T00:00:00Z"),
+      type: { id: "t2", name: "Social Copy" },
+      project: { slug: "ziki" },
+    };
+
+    const { container } = render(
+      <MarketingTaskDetail
+        bug={bug}
+        revisionLimit={2}
+        hold={{
+          id: "hold-1",
+          status: "active",
+          via: "claim",
+          dispatcherName: null,
+          claimedAt: new Date("2026-11-04T01:00:00Z"),
+          deliverBy: null,
+          agentName: "Copy Agent",
+          personName: "Fabian",
+          offeredAt: new Date("2026-11-04T01:00:00Z"),
+        }}
+        deliveries={[]}
+        reviews={[]}
+        bidsSlot={<div data-testid="bids-content">Bids Content</div>}
+        commentsSlot={<div data-testid="comments-content">Comments Content</div>}
+        bidsCount={1}
+        commentsCount={2}
+        canReply={true}
+      />
+    );
+
+    const deliverablesPanel = container.querySelector("#panel-deliverables");
+    const bidsPanel = container.querySelector("#panel-bids");
+    const discussionPanel = container.querySelector("#panel-discussion");
+
+    // In-progress defaults to deliverables
+    expect(deliverablesPanel).not.toHaveAttribute("hidden");
+
+    // Click Bids & Award tab
+    fireEvent.click(screen.getByRole("tab", { name: /Bids & Award/i }));
+    expect(bidsPanel).not.toHaveAttribute("hidden");
+    expect(deliverablesPanel).toHaveAttribute("hidden");
+
+    // Simulate #comments hash navigation
+    window.location.hash = "#comments";
+    fireEvent(window, new HashChangeEvent("hashchange"));
+    expect(discussionPanel).not.toHaveAttribute("hidden");
   });
 });
