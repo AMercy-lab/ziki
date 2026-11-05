@@ -9,7 +9,7 @@ import { IssueApiError } from "@/lib/agent-api/errors";
 import { publish } from "@/lib/agent-api/events";
 import { isConfirmed } from "@/lib/agent-api/confirmations";
 import { countedMergeVerdicts, deliveredClaim, MANAGER_VERDICT_WEIGHT } from "@/lib/agent-api/merge-verdicts";
-import { judgementCounts, trackRules } from "@/lib/marketing/track";
+import { afterSendBack, judgementCounts, trackRules } from "@/lib/marketing/track";
 import { award, type PointAward } from "@/lib/points/award";
 import { holdPayout } from "@/lib/points/payout";
 import { calculateReporterPoints, calculateReviewerPoints, solverReward } from "@/lib/points/project-rewards";
@@ -74,6 +74,7 @@ export const mergeBugSelect = {
   status: true,
   substatus: true,
   track: true,
+  revisionCount: true,
   assigneeId: true,
   beneficiaryUserId: true,
   reporterId: true,
@@ -82,6 +83,7 @@ export const mergeBugSelect = {
   project: { select: { repoUrl: true } },
   claims: {
     select: {
+      id: true,
       status: true,
       claimedAt: true,
       releasedAt: true,
@@ -304,6 +306,15 @@ async function reviewFix(
   const conflict = reviewerConflict({ id: agent.agentId, ownerUserId: agent.ownerId }, bug);
   if (conflict) {
     return { status: 403, error: "not_independent", message: new ReviewerNotIndependentError(conflict).message };
+  }
+
+  if (marketing && bug.substatus !== "accepted") {
+    return {
+      status: 409,
+      error: "not_ready",
+      missing: "verdicts",
+      message: "Marketing work can be reviewed once its reviewers approve it (Done · Accepted).",
+    };
   }
 
   if (review.verdict === "reject") return rejectFix(agent, bug, review, voting);
@@ -971,8 +982,8 @@ async function rejectFix(agent: AgentContext, bug: LoadedBug, review: MergeRevie
       message: "This issue's fix has already been merged, so it can't be rejected.",
     };
   }
-  const pullRequestUrl = bug.pullRequestUrl;
-  if (!pullRequestUrl) {
+  const pullRequestUrl = bug.track === "marketing" ? null : bug.pullRequestUrl;
+  if (!pullRequestUrl && bug.track !== "marketing") {
     return {
       status: 409,
       error: "not_ready",
@@ -993,6 +1004,88 @@ async function rejectFix(agent: AgentContext, bug: LoadedBug, review: MergeRevie
       if (votes < voting.threshold) return recordReviewVote(tx, agent, bug, saved, votes, voting.threshold);
       decision = thresholdDecision({ userId: agent.ownerId, agentId: agent.agentId }, votes, voting.threshold);
     }
+
+    if (bug.track === "marketing") {
+      const workflow = await workflowFor(bug.projectId, tx);
+      const sendBack = afterSendBack(bug, workflow.revisionLimit, "manager_reject");
+      if (sendBack.keepsClaim) {
+        await tx.bug.update({
+          where: { id: bug.id },
+          data: { ...moveTo(sendBack.substatus), revisionCount: sendBack.revisionCount },
+        });
+      } else {
+        const now = new Date();
+        const held = bug.claims.filter((claim) => !claim.releasedAt && (claim.status === "active" || claim.status === "offered"));
+        for (const claim of held) {
+          await tx.issueClaim.update({ where: { id: claim.id }, data: { status: "released", releasedAt: now, releaseReason: "manager_rejected" } });
+          await publish(tx, {
+            tenantId: bug.tenantId,
+            type: "claim.released",
+            actorAgentId: null,
+            bugId: bug.id,
+            payload: { claimId: claim.id, issueId: bug.id, beneficiaryUserId: claim.beneficiaryUserId, reason: "manager_rejected" },
+          });
+        }
+        await tx.bug.update({
+          where: { id: bug.id },
+          data: { ...moveTo("open"), assigneeId: null, revisionCount: 0 },
+        });
+      }
+      await tx.bugActivity.create({
+        data: {
+          bugId: bug.id,
+          actorId: agent.ownerId,
+          type: "status_changed",
+          summary: sendBack.keepsClaim
+            ? `Work rejected by manager: ${review.summary} (revision round ${sendBack.revisionCount} of ${workflow.revisionLimit})`
+            : `Work rejected by manager: ${review.summary} and revision limit reached (${workflow.revisionLimit}): reopened for bids`,
+          metadata: {
+            field: "status",
+            from: bug.substatus,
+            to: sendBack.substatus,
+            rejected: true,
+            mergeReviewId: saved.review.id,
+            revisionCount: sendBack.revisionCount,
+            revisionLimit: workflow.revisionLimit,
+          },
+        },
+      });
+      await audit(
+        agent,
+        "issue.merge_rejected",
+        `bug:${bug.id}`,
+        {
+          ...moveTo(sendBack.substatus),
+          rejected: true,
+          mergeReviewId: saved.review.id,
+          summary: review.summary,
+          notes: review.description,
+          pullRequestUrl,
+          headSha: saved.review.headSha,
+          revisionCount: sendBack.revisionCount,
+        },
+        { bugId: bug.id, db: tx },
+      );
+      await publish(tx, {
+        tenantId: bug.tenantId,
+        type: "issue.updated",
+        payload: {
+          issueId: bug.id,
+          rejected: true,
+          ...moveTo(sendBack.substatus),
+          mergeReviewId: saved.review.id,
+          summary: review.summary,
+          notes: review.description,
+          pullRequestUrl,
+          headSha: saved.review.headSha,
+          revisionCount: sendBack.revisionCount,
+        },
+        actorAgentId: agent.agentId,
+        bugId: bug.id,
+      });
+      return { status: 200, accepted: false, review: saved.review, replaced: saved.replaced, rejected: true };
+    }
+
     await tx.bug.update({ where: { id: bug.id }, data: moveTo("in_progress") });
     await tx.bugActivity.create({
       data: {
