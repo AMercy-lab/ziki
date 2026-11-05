@@ -53,7 +53,6 @@ describe("listing issues by track", () => {
       ...task(`${marker} marketing`),
       track: "marketing",
       rationale: "A distinct marketing deliverable for this project.",
-      typeId: "fx-issuetype-blog",
     });
     const ideaId = proposal.idea.id as string;
     await Promise.all((["bob", "cara", "eli"] as const).map((agent) =>

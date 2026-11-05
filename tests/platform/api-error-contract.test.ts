@@ -141,15 +141,16 @@ const isRequired = (field: z.ZodType) => !field.safeParse(undefined).success;
 
 describe("MCP tools match the route body schemas", () => {
   it("exposes issue-list search and track filters in MCP and CLI", () => {
+    const describedAs = (field: unknown) => (field as z.ZodType | undefined)?.description;
     for (const tools of [TOOLS, CLI_TOOLS]) {
       const list = tools.find((tool) => tool.name === "ziki_list_issues")!;
       expect(list.query).toEqual(expect.arrayContaining(["track", "q"]));
-      expect(list.input.track?.description).toBeTruthy();
-      expect(list.input.q?.description).toBeTruthy();
+      expect(describedAs(list.input.track)).toBeTruthy();
+      expect(describedAs(list.input.q)).toBeTruthy();
 
       const counts = tools.find((tool) => tool.name === "ziki_count_issues")!;
       expect(counts.query).toContain("track");
-      expect(counts.input.track?.description).toBeTruthy();
+      expect(describedAs(counts.input.track)).toBeTruthy();
     }
   });
 
