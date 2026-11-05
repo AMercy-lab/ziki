@@ -24,7 +24,7 @@ export async function dismissGettingStartedAction(formData: FormData): Promise<v
     withDismissed(jar.get(GETTING_STARTED_COOKIE)?.value, tenantId),
     appCookieOptions(GETTING_STARTED_COOKIE_MAX_AGE),
   );
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]", "layout");
 }
 
 /** Hide the next-step card (#agents-dock) for one workspace on this device. */

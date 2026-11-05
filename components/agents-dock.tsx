@@ -6,8 +6,8 @@ import { isEarnPath } from "@/lib/earn/paths";
 import { usePathname, useRouter } from "next/navigation";
 import { agentPageHref, LEADERBOARD_HREF } from "@/lib/header-nav";
 import { VersionCredits } from "@/components/credits-dialog";
-import { projectPath } from "@/lib/project-paths";
-import { isReservedProjectSlug } from "@/lib/project-slug";
+import { projectPath, type ProjectRef } from "@/lib/project-paths";
+import { useProjectRef } from "@/lib/use-project-ref";
 import { AGENTS_DOCK_HEIGHT, dockVisibleOn, leaderboardVisible } from "@/lib/agents-dock";
 import { PAGE_CONTAINER_CLASS } from "@/components/page-container";
 import { formatZ } from "@/lib/points/rules";
@@ -94,12 +94,6 @@ const LABELS_LINGER = 350;
 /** Until a nameplate has measured itself: its name and status, and with what it has earned. */
 const GUESS = { text: 110, full: 180 };
 
-/** The project the page is in (`/<slug>/...`), or null on a page outside any project. */
-function projectSlugFromPath(pathname: string | null): string | null {
-  const first = pathname?.split("/").filter(Boolean)[0];
-  return first && !isReservedProjectSlug(first) ? decodeURIComponent(first) : null;
-}
-
 /** The order agents stand in, left to right: whatever needs you first, then stuck, then the rest. */
 const RANK: Record<DockAgent["status"], number> = { waiting: 0, stuck: 1, working: 2, idle: 3, offline: 4 };
 
@@ -136,7 +130,7 @@ export function AgentsDock({
   /** Earn (#earn-drafts): the viewer is an earner; on the earn pages the leaderboard and workstream icons are left out. */
   earn?: boolean;
   /** Workstream's project on pages outside a project. */
-  defaultProjectSlug?: string | null;
+  defaultProjectSlug?: ProjectRef | null;
   /** The running version (package version and short commit), in tiny grey text under the links. */
   version?: string;
   /** Members of the current workspace: the leaderboard link is left out when it is just you. Null when unknown. */
@@ -158,7 +152,7 @@ export function AgentsDock({
   const dockHeight = AGENTS_DOCK_HEIGHT;
   const floorHeight = pixelOnFloor ? Math.round(CANVAS_H * ROBOT_SCALE) : LOW_FLOOR_H;
   const pathname = usePathname();
-  const projectSlug = projectSlugFromPath(pathname) ?? defaultProjectSlug;
+  const projectSlug = useProjectRef() ?? defaultProjectSlug;
   // Drawn only where it helps (lib/agents-dock.ts): an allowlist of the work pages, and never with no agents.
   const visible = dockVisibleOn(pathname, all.length);
   const [panel, setPanel] = useState(false);
@@ -671,7 +665,7 @@ function Strip({ height, links, children }: { height: number; links: ReactNode; 
 }
 
 /** Right side of the strip: the leaderboard, with the workstream as an icon under it, and the running version (#workstream). */
-function DockLinks({ projectSlug, version, quiet = false, leaderboard = true }: { projectSlug: string | null; version?: string; /** Earn: no leaderboard or workstream (#earn-drafts). */ quiet?: boolean; /** Left out in a workspace of one member: nobody to rank against. */ leaderboard?: boolean }) {
+function DockLinks({ projectSlug, version, quiet = false, leaderboard = true }: { projectSlug: ProjectRef | null; version?: string; /** Earn: no leaderboard or workstream (#earn-drafts). */ quiet?: boolean; /** Left out in a workspace of one member: nobody to rank against. */ leaderboard?: boolean }) {
   return (
     <div className="flex shrink-0 flex-col items-end gap-0.5">
       {quiet || !leaderboard ? null : (

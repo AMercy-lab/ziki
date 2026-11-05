@@ -15,7 +15,7 @@ import { isOrganizationAdmin, type OrganizationRole } from "@/lib/organization-r
 import type { WorkspaceChoice } from "@/components/workspace-switcher";
 import { prisma } from "@/lib/prisma";
 import { currentTenantIdFor } from "@/lib/tenant-context";
-import { firstProjectSlugFor } from "@/lib/project-route";
+import { firstProjectRefFor } from "@/lib/project-route";
 import { tenantsForUser } from "@/lib/tenants";
 import { countPendingEscalations } from "@/lib/agent-questions";
 import { loadOwnAgents } from "@/lib/dashboard-overview";
@@ -23,7 +23,7 @@ import { AgentsDock, type DockAgent } from "@/components/agents-dock";
 import { appVersionLabel } from "@/lib/deployed-version";
 import { agentActivity, agentEarnings } from "@/lib/points/agent-earnings";
 import { earnBalanceFor, showEarnWelcome } from "@/lib/earn/state";
-import { EarnWelcomeModal } from "@/components/earn-welcome-modal";
+import { EarnWelcomeToast } from "@/components/earn-welcome-toast";
 import { isEarnConnectPath, isEarnLandingPath, isEarnPath } from "@/lib/earn/paths";
 import { withdrawInfo } from "@/lib/earn/draft";
 import { earnAgentWhere, earnWorkspace, isEarner } from "@/lib/earn/earner";
@@ -85,12 +85,12 @@ export default async function AppLayout({
     const connected = await prisma.agent.findFirst({ where: earnAgentWhere(user.id), select: { id: true } }).catch(() => null);
     if (!connected || isEarnConnectPath(requestPath)) {
       return (
-        <div data-app-shell="" className="min-h-screen bg-zk-bg">
+        <div data-app-shell="" className="min-h-dvh bg-zk-bg">
           <SkipLink />
-          <main id={MAIN_CONTENT_ID} tabIndex={-1} className="min-h-screen outline-none">
+          <main id={MAIN_CONTENT_ID} tabIndex={-1} className="min-h-dvh outline-none">
             {children}
           </main>
-          {welcomeNotice ? <EarnWelcomeModal /> : null}
+          {welcomeNotice ? <EarnWelcomeToast /> : null}
         </div>
       );
     }
@@ -113,7 +113,7 @@ export default async function AppLayout({
     console.error("[layout] workspace context failed", error);
   }
   // For links on pages whose URL names no project yet (#project-urls).
-  const defaultProjectSlug = await firstProjectSlugFor(user.id).catch(() => null);
+  const defaultProjectSlug = await firstProjectRefFor(user.id).catch(() => null);
   // A missing Notification table must not take down every signed-in page.
   let unreadCount = 0;
   try {
@@ -218,7 +218,7 @@ export default async function AppLayout({
       {/* The agents dock keeps the page's foot clear of its floor line itself, as tall as what stands on it, and draws nothing (no spacer either) where it doesn't help. */}
       <AgentsDock agents={dockAgents} defaultProjectSlug={defaultProjectSlug} version={appVersionLabel()} earn={earnSample !== null} memberCount={memberCount} />
       <FocusMainOnNavigate />
-      {welcomeNotice ? <EarnWelcomeModal /> : null}
+      {welcomeNotice ? <EarnWelcomeToast /> : null}
       <KeyboardShortcuts
         enabled={shortcutsEnabled}
       />
