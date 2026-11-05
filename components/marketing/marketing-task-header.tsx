@@ -47,10 +47,11 @@ export function MarketingTaskHeader({
   const isLive = status === "resolved" || substatus === "published";
   const isInProgress = status === "in_progress";
   const isInReview = status === "done" || substatus === "requires_review";
+  const showTaskType = taskType && taskType.name.trim().toLowerCase() !== "marketing";
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Top Meta Bar: Number, Type, Track Badge, Status, Reward */}
+      {/* Top Meta Bar: Number, Marketing Track Badge, Task Type, Status, Reward */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-sm font-bold text-zk-muted">#{number}</span>
@@ -60,7 +61,7 @@ export function MarketingTaskHeader({
           >
             Marketing
           </Link>
-          {taskType ? (
+          {showTaskType ? (
             <span className="inline-flex items-center rounded-full border border-zk-divider bg-zk-surface px-2.5 py-0.5 text-xs font-medium text-zk-text2">
               {taskType.name}
             </span>
@@ -118,7 +119,7 @@ export function MarketingTaskHeader({
       {projectFocus ? (
         <div className="flex items-start gap-3 rounded-xl border border-zk-info-fg/30 bg-zk-info-bg/40 p-3.5 text-sm text-zk-text">
           <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zk-info-fg text-white">
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="10" />
               <path d="m12 8 4 4-4 4M8 12h8" />
             </svg>
@@ -144,33 +145,34 @@ export function MarketingTaskHeader({
         </div>
       ) : null}
 
-      {/* Task Rationale Box (Why this task was proposed) */}
-      {rationale ? (
-        <div className="flex items-start gap-3 rounded-xl border border-zk-divider bg-zk-surface p-3.5 text-sm text-zk-text">
-          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zk-chip text-zk-text2">
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-            </svg>
-          </span>
-          <div className="min-w-0 flex-1">
-            <span className="text-xs font-bold uppercase tracking-wider text-zk-muted">
-              Strategic Rationale
-            </span>
-            <p className="mt-0.5 text-sm text-zk-text2">{rationale}</p>
-          </div>
-        </div>
-      ) : null}
+      {/* Unified Description & Strategic Rationale Card */}
+      {description || rationale ? (
+        <section aria-label="Task description" className="rounded-[20px] border border-zk-border bg-zk-surface p-5 text-sm text-zk-text">
+          {description ? (
+            <div>
+              <h2 className="mb-2 text-xs font-bold uppercase tracking-[0.08em] text-zk-muted">
+                Task Description
+              </h2>
+              <div className="prose prose-sm max-w-none text-zk-text dark:prose-invert whitespace-pre-wrap leading-relaxed">
+                {description}
+              </div>
+            </div>
+          ) : null}
 
-      {/* Description */}
-      {description ? (
-        <div className="rounded-xl border border-zk-divider bg-zk-surface p-4 text-sm text-zk-text">
-          <h2 className="mb-2 text-xs font-bold uppercase tracking-wider text-zk-muted">
-            Task Description
-          </h2>
-          <div className="prose prose-sm max-w-none text-zk-text dark:prose-invert whitespace-pre-wrap">
-            {description}
-          </div>
-        </div>
+          {rationale ? (
+            <div className={description ? "mt-4 border-t border-zk-divider pt-4" : ""}>
+              <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-zk-muted">
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-zk-muted" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                </svg>
+                <span>Strategic Rationale</span>
+              </div>
+              <p className="mt-1.5 text-sm leading-relaxed text-zk-text2 whitespace-pre-line">
+                {rationale}
+              </p>
+            </div>
+          ) : null}
+        </section>
       ) : null}
     </div>
   );

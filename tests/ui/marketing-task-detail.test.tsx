@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ addComment: vi.fn() }));
@@ -71,6 +71,28 @@ describe("MarketingTaskHeader (M-UI-4)", () => {
     expect(screen.queryByText(/PR #/)).toBeNull();
     expect(screen.queryByText(/commit/i)).toBeNull();
     expect(screen.queryByText(/staging/i)).toBeNull();
+  });
+
+  it("deduplicates badge when taskType name is Marketing", () => {
+    render(
+      <MarketingTaskHeader
+        number={43}
+        title="Author Technical Deep-Dive Article"
+        description="Write deep-dive."
+        status="open"
+        substatus="open"
+        taskType={{ id: "t-mkt", name: "Marketing" }}
+        reward={350}
+        revisionCount={0}
+        maxRevisions={2}
+        projectSlug="ziki"
+        createdAt={new Date("2026-11-01T12:00:00Z")}
+      />
+    );
+
+    // Only one Marketing badge rendered (no duplicate [Marketing] [Marketing])
+    const marketingBadges = screen.getAllByText("Marketing");
+    expect(marketingBadges.length).toBe(1);
   });
 });
 
@@ -173,33 +195,35 @@ describe("MarketingReviewsPanel (M-UI-4)", () => {
 });
 
 describe("MarketingTaskDetail full integration (M-UI-4)", () => {
+  const defaultBug = {
+    id: "bug-mkt-1",
+    number: 101,
+    title: "Write Q4 Launch Thread on X",
+    description: "Draft 8-tweet thread explaining Ziki's agentic coordination model.",
+    status: "in_progress" as const,
+    substatus: "in_progress" as const,
+    reward: 500,
+    revisionCount: 1,
+    createdAt: new Date("2026-11-04T00:00:00Z"),
+    type: { id: "t2", name: "Social Copy" },
+    reporter: { name: "Fabian Muoghalu", email: "fabbenco97@gmail.com" },
+    project: {
+      slug: "ziki",
+      name: "Ziki",
+      goal: "Scale open-source agentic coordination",
+      siteUrl: "https://ziki.dev",
+    },
+    idea: {
+      id: "idea-1",
+      number: 12,
+      rationale: "High impressions from thought-leadership threads convert to active GitHub stars.",
+    },
+  };
+
   it("renders the entire marketing task layout and respects quiet Teal design", () => {
     render(
       <MarketingTaskDetail
-        bug={{
-          id: "bug-mkt-1",
-          number: 101,
-          title: "Write Q4 Launch Thread on X",
-          description: "Draft 8-tweet thread explaining Ziki's agentic coordination model.",
-          status: "in_progress",
-          substatus: "in_progress",
-          reward: 500,
-          revisionCount: 1,
-          createdAt: new Date("2026-11-04T00:00:00Z"),
-          type: { id: "t2", name: "Social Copy" },
-          reporter: { name: "Fabian Muoghalu", email: "fabbenco97@gmail.com" },
-          project: {
-            slug: "ziki",
-            name: "Ziki",
-            goal: "Scale open-source agentic coordination",
-            siteUrl: "https://ziki.dev",
-          },
-          idea: {
-            id: "idea-1",
-            number: 12,
-            rationale: "High impressions from thought-leadership threads convert to active GitHub stars.",
-          },
-        }}
+        bug={defaultBug}
         revisionLimit={2}
         hold={{
           id: "hold-1",
@@ -214,6 +238,8 @@ describe("MarketingTaskDetail full integration (M-UI-4)", () => {
         bidsSlot={<div data-testid="bids-slot">Bids Slot</div>}
         commentsSlot={<div data-testid="comments-slot">Comments Slot</div>}
         sideRailSlot={<div data-testid="side-rail-slot">Side Rail Slot</div>}
+        bidsCount={3}
+        commentsCount={5}
         canReply={true}
       />
     );
@@ -225,9 +251,60 @@ describe("MarketingTaskDetail full integration (M-UI-4)", () => {
     expect(screen.getByText("$500")).toBeInTheDocument();
     expect(screen.getByText(/Revision 1 of 2/)).toBeInTheDocument();
 
-    // Verify slots render properly
+    // Verify breadcrumb
+    const breadcrumbLink = screen.getByRole("link", { name: /Marketing Tasks/i });
+    expect(breadcrumbLink).toHaveAttribute("href", "/ziki/marketing/tasks");
+
+    // Verify tab buttons and counts
+    expect(screen.getByRole("tab", { name: /Deliverables/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Peer Reviews/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Bids & Award/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Discussion/i })).toBeInTheDocument();
+
+    // Verify slots exist in DOM
     expect(screen.getByTestId("bids-slot")).toBeInTheDocument();
     expect(screen.getByTestId("comments-slot")).toBeInTheDocument();
     expect(screen.getByTestId("side-rail-slot")).toBeInTheDocument();
+  });
+
+  it("switches tabs between Deliverables, Peer Reviews, Bids & Award and Discussion", () => {
+    const { container } = render(
+      <MarketingTaskDetail
+        bug={defaultBug}
+        revisionLimit={2}
+        hold={null}
+        deliveries={[]}
+        reviews={[]}
+        bidsSlot={<div data-testid="bids-slot">Bids Content</div>}
+        commentsSlot={<div data-testid="comments-slot">Comments Content</div>}
+        bidsCount={1}
+        commentsCount={2}
+        canReply={true}
+      />
+    );
+
+    const deliverablesPanel = container.querySelector("#panel-deliverables");
+    const reviewsPanel = container.querySelector("#panel-reviews");
+    const bidsPanel = container.querySelector("#panel-bids");
+    const discussionPanel = container.querySelector("#panel-discussion");
+
+    // Initial tab in progress is deliverables
+    expect(deliverablesPanel).not.toHaveAttribute("hidden");
+    expect(reviewsPanel).toHaveAttribute("hidden");
+
+    // Click Peer Reviews tab
+    fireEvent.click(screen.getByRole("tab", { name: /Peer Reviews/i }));
+    expect(reviewsPanel).not.toHaveAttribute("hidden");
+    expect(deliverablesPanel).toHaveAttribute("hidden");
+
+    // Click Bids & Award tab
+    fireEvent.click(screen.getByRole("tab", { name: /Bids & Award/i }));
+    expect(bidsPanel).not.toHaveAttribute("hidden");
+    expect(reviewsPanel).toHaveAttribute("hidden");
+
+    // Click Discussion tab
+    fireEvent.click(screen.getByRole("tab", { name: /Discussion/i }));
+    expect(discussionPanel).not.toHaveAttribute("hidden");
+    expect(bidsPanel).toHaveAttribute("hidden");
   });
 });

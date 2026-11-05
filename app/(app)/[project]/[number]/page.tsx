@@ -1111,6 +1111,16 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
       };
     }
 
+    const marketingNextStep = nextStep
+      ? {
+          ...nextStep,
+          detail: nextStep.detail ? nextStep.detail.replace(/\bissue\b/gi, "task") : null,
+          action: nextStep.action
+            ? nextStep.action.replace(/\bfixing it\b/gi, "executing it").replace(/\bissue\b/gi, "task")
+            : "",
+        }
+      : null;
+
     return (
       <MarketingTaskDetail
         bug={{
@@ -1145,7 +1155,9 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
         deliveries={marketingDeliveries}
         reviews={marketingReviews}
         bannerSlot={deliveredBanner ? <DeliveredBanner {...deliveredBanner} /> : null}
-        nextStepSlot={<NextStepBar step={nextStep} agentInstructions={agentInstructions} />}
+        nextStepSlot={<NextStepBar step={marketingNextStep} agentInstructions={agentInstructions} />}
+        bidsCount={bidList.length}
+        commentsCount={commentCount}
         bidsSlot={
           pastConfirmation || bidList.length > 0 || bidAgents.length > 0 ? (
             <IssueBidsPanel
@@ -1277,6 +1289,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                 estimates={rewardEstimates}
                 viewerId={user.id}
                 canEstimate={!bug.isDeleted && bug.status !== "closed"}
+                caption="paid upon accepted delivery"
               />
             ) : null}
 
@@ -1324,12 +1337,47 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
               </div>
             </section>
 
-            <IssueLinks
-              links={proofLinks}
-              linkedPullRequestUrl={null}
-              idea={sourceIdea ? { number: sourceIdea.number, slug: bug.project.slug } : null}
-              repairs={linkRepairs}
-            />
+            {sourceIdea || proofLinks.length > 0 ? (
+              <section aria-label="Links" className="rounded-[20px] border border-zk-border bg-zk-surface px-4 py-3.5">
+                <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-zk-muted">Links</h2>
+                <dl className="mt-3 flex flex-col gap-2.5">
+                  {sourceIdea ? (
+                    <div className="flex min-w-0 items-baseline gap-3">
+                      <dt className="w-16 shrink-0 whitespace-nowrap text-xs leading-5 text-zk-muted">Source Idea</dt>
+                      <dd className="m-0 min-w-0">
+                        <Link
+                          href={ideaPath(bug.project.slug, sourceIdea.number)}
+                          className="text-xs font-semibold text-zk-accent hover:underline"
+                        >
+                          Idea #{sourceIdea.number}
+                        </Link>
+                      </dd>
+                    </div>
+                  ) : null}
+                  {proofLinks.length > 0 ? (
+                    <div className="flex min-w-0 items-baseline gap-3">
+                      <dt className="w-16 shrink-0 whitespace-nowrap text-xs leading-5 text-zk-muted">Deliverables</dt>
+                      <dd className="m-0 min-w-0">
+                        <ul className="m-0 list-none space-y-1.5 p-0">
+                          {proofLinks.map((url, index) => (
+                            <li key={`${index}-${url}`}>
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 break-all text-xs font-medium leading-5 text-zk-accent hover:underline"
+                              >
+                                <span>{url}</span>
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </dd>
+                    </div>
+                  ) : null}
+                </dl>
+              </section>
+            ) : null}
 
             <ActivityTimeline
               activities={[...shownActivities].reverse()}
