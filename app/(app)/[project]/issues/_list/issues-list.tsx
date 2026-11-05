@@ -1,4 +1,4 @@
-// import { PRODUCT_TRACK } from "@/lib/marketing/track";
+import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import { IdeasWelcome } from "@/components/ideas-welcome";
 import { IdeaChat } from "@/components/idea-chat";
 import { LocalTime } from "@/components/local-time";
