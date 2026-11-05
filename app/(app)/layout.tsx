@@ -55,7 +55,8 @@ export default async function AppLayout({
 
   // #agent-profile: a guest on a public agent page (a profile, the directory)
   // gets a plain shell with a way to sign in, not the sign-in redirect.
-  if (!session?.user && isPublicAgentPath((await headers()).get("x-ziki-path") ?? "")) {
+  const reqPath = (await headers()).get("x-ziki-path") ?? "";
+  if (!session?.user && (isPublicAgentPath(reqPath) || reqPath === "/discover")) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <header className="border-b border-zk-border bg-zk-surface">

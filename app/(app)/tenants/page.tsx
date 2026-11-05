@@ -87,6 +87,19 @@ export default async function TenantsPage({
         </p>
       </div>
 
+      <div className="flex items-center justify-between rounded-[18px] border border-zk-border bg-gradient-to-r from-zk-surface to-zk-tint/20 p-4 sm:p-5">
+        <div className="space-y-0.5">
+          <h2 className="text-sm font-bold text-zk-text">Looking for projects to contribute to?</h2>
+          <p className="text-xs text-zk-text2">Browse public projects and open products accepting contributors.</p>
+        </div>
+        <Link
+          href="/discover"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-zk-accent px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-zk-accent/90"
+        >
+          🔍 Discover Projects
+        </Link>
+      </div>
+
       {error ? (
         <p className="rounded-[14px] border border-zk-bad-bd bg-zk-bad-bg px-3 py-2 text-sm text-zk-bad-fg">
           {error}
