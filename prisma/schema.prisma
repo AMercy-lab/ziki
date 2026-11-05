@@ -291,6 +291,8 @@ model User {
   closeSuggestions          CloseSuggestion[]       @relation("CloseSuggestionsGiven")
   reportedIdeas             Idea[]                  @relation("IdeaReporter")
   beneficiaryIdeas          Idea[]                  @relation("IdeaBeneficiary")
+  skillSubmissions          SkillSubmission[]       @relation("SkillSubmissionSubmittedBy")
+  reviewedSkillSubmissions  SkillSubmission[]       @relation("SkillSubmissionReviewedBy")
 }
 
 /// Single-use password reset tokens (~30 min TTL). Store only the SHA-256 hash.
@@ -2481,4 +2483,39 @@ model AgentPicture {
   data        Bytes
   updatedAt   DateTime @updatedAt
   agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+/// A contributor's skill submission to the skills library (#skill-submissions).
+/// Pending until a super admin approves or rejects it; an approved submission
+/// can be equipped by agents from the verified skills directory.
+enum SkillSubmissionStatus {
+  pending
+  approved
+  rejected
+}
+
+model SkillSubmission {
+  id               String              @id @default(cuid())
+  title            String
+  category           String
+  categoryLabel      String
+  summary          String
+  tags             String[]
+  prompt           String
+  sampleCommand    String?
+  documentationUrl String?
+  bounty           Int                 @default(0)
+  status           SkillSubmissionStatus @default(pending)
+  submittedById    String
+  submittedBy      User                @relation("SkillSubmissionSubmittedBy", fields: [submittedById], references: [id], onDelete: Cascade)
+  reviewedById     String?
+  reviewedBy       User?               @relation("SkillSubmissionReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt       DateTime?
+  rejectionReason  String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([status])
+  @@index([submittedById])
+  @@index([createdAt])
 }

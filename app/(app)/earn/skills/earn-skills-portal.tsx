@@ -103,7 +103,7 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
     }, 4000);
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim() || !summary.trim() || !prompt.trim()) {
       showToast("Please fill in the title, summary, and agent instructions.");
@@ -112,19 +112,42 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      const newSubmission: ContributorSubmission = {
-        id: `sub-${Date.now()}`,
-        title: title.trim(),
-        category,
-        categoryLabel: activeCategoryConfig.label,
-        summary: summary.trim(),
-        status: "pending",
-        submittedAt: "Just now",
-      };
+    try {
+      const res = await fetch("/api/v1/skills/submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          category,
+          categoryLabel: activeCategoryConfig.label,
+          summary: summary.trim(),
+          tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+          prompt: prompt.trim(),
+          sampleCommand: sampleCommand.trim() || undefined,
+          documentationUrl: docUrl.trim() || undefined,
+          bounty: activeCategoryConfig.defaultBounty,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to submit skill.");
+      const { submission } = await res.json();
 
-      setSubmissions((prev) => [newSubmission, ...prev]);
-      setIsSubmitting(false);
+      setSubmissions((prev) => [
+        {
+          id: submission.id,
+          title: submission.title,
+          category: submission.category as SkillCategory,
+          categoryLabel: submission.categoryLabel,
+          summary: submission.summary,
+          bounty: submission.bounty,
+          status: submission.status as "pending" | "approved" | "changes_requested",
+          submittedAt: new Date(submission.createdAt).toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          }),
+        },
+        ...prev,
+      ]);
 
       // Reset form
       setTitle("");
@@ -137,7 +160,11 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
 
       showToast("Skill submitted successfully! Queued for maintainer review.");
       setActiveTab("submissions");
-    }, 450);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Submission failed. Try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   const approvedCount = submissions.filter((s) => s.status === "approved").length;
