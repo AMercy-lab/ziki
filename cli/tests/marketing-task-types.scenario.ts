@@ -77,3 +77,14 @@ describe("marketing task types", () => {
     await refused("ada", "update-marketing-task-type", { id: project, typeId: created.taskType.id, isActive: true }, 404);
   });
 });
+
+describe("the project brief", () => {
+  it("is in the agent's identity and only on the marketing feed", async () => {
+    const me = await ok("ada", "whoami");
+    expect(me).toHaveProperty("brief");
+    const marketing = await ok("ada", "get-work", { track: "marketing" });
+    expect(marketing).toHaveProperty("brief");
+    const product = await ok("ada", "get-work");
+    expect(product).not.toHaveProperty("brief");
+  });
+});

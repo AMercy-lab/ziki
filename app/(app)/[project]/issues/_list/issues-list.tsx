@@ -254,6 +254,8 @@ export async function IssuesList({
   const mineFilter = parseMineFilter(params.mine);
   const ideaAuthor = parseIdeaAuthorFilter(params[IDEA_AUTHOR_PARAM]);
   const trackFilter = parseTrackFilter(params[TRACK_PARAM]);
+  // Search follows the same track as the list; "all" names none, so both come back.
+  const trackSearch = trackFilter === "all" ? {} : { track: trackFilter };
   const isDeletedView = canDelete && deletedParam === "true";
   // Workspace-wide view (`?all=1`). Absent → unchanged project scope.
   const allProjects = showsAllProjects(params[PROJECT_ALL_PARAM]);
@@ -389,7 +391,7 @@ export async function IssuesList({
   let typesenseBugSearch: { found: number } | null = null;
   if (qParam && boundSearchTerm(qParam).length >= 3 && tenantId && !isIdeasView && !complexBugSearchFilter) {
     try {
-      const indexed = await searchWorkItems({ query: boundSearchTerm(qParam), kind: "bug", tenantId, ...(projectId && !allProjects ? { projectId } : {}), track: "product", includeDeleted: isDeletedView, page: 1, perPage: 1, sortBy: bugSearchSort(currentSort, !isWatchingView), extraFilters: bugSearchExtraFilters });
+      const indexed = await searchWorkItems({ query: boundSearchTerm(qParam), kind: "bug", tenantId, ...(projectId && !allProjects ? { projectId } : {}), ...trackSearch, includeDeleted: isDeletedView, page: 1, perPage: 1, sortBy: bugSearchSort(currentSort, !isWatchingView), extraFilters: bugSearchExtraFilters });
       if (indexed.found > 0) typesenseBugSearch = indexed;
     } catch (error) {
       console.error("[issues] Typesense search failed; using PostgreSQL", error);
@@ -568,7 +570,7 @@ export async function IssuesList({
   let indexedBugIds: string[] | null = null;
   if (typesenseBugSearch && tenantId && qParam) {
     try {
-      const result = await searchWorkItems({ query: boundSearchTerm(qParam), kind: "bug", tenantId, ...(projectId && !allProjects ? { projectId } : {}), track: "product", includeDeleted: isDeletedView, page: pagination.page, perPage: pagination.take, sortBy: bugSearchSort(currentSort, !isWatchingView), extraFilters: bugSearchExtraFilters });
+      const result = await searchWorkItems({ query: boundSearchTerm(qParam), kind: "bug", tenantId, ...(projectId && !allProjects ? { projectId } : {}), ...trackSearch, includeDeleted: isDeletedView, page: pagination.page, perPage: pagination.take, sortBy: bugSearchSort(currentSort, !isWatchingView), extraFilters: bugSearchExtraFilters });
       indexedBugIds = result.hits.map((hit) => hit.id);
     } catch (error) {
       console.error("[issues] Typesense result lookup failed; using PostgreSQL", error);
@@ -977,33 +979,28 @@ export async function IssuesList({
     else next.set(MY_WORK_PARAM, "1");
     return listHref(next);
   })();
-  // Track filter: Product / Marketing / All
-  const trackHref = (() => {
+  // Track filter: Product (the default, which leaves the address alone) / Marketing / All
+  const trackHref = (track: "product" | "marketing" | "all") => {
     const next = new URLSearchParams(currentQuery);
     next.delete("page");
-    if (trackFilter === "product") next.delete(TRACK_PARAM);
-    else next.set(TRACK_PARAM, trackFilter);
+    if (track === "product") next.delete(TRACK_PARAM);
+    else next.set(TRACK_PARAM, track);
     return listHref(next);
-  })();
+  };
   const trackFilterOptions: ToolbarFilterOption[] = [
-    { label: "Product", count: 0, href: trackHref, selected: trackFilter === "product" },
-    { label: "Marketing", count: 0, href: trackHref.replace("product", "marketing"), selected: trackFilter === "marketing" },
-    { label: "All", count: 0, href: trackHref.replace("product", "all"), selected: trackFilter === "all" },
+    { label: "Product", count: 0, href: trackHref("product"), selected: trackFilter === "product" },
+    { label: "Marketing", count: 0, href: trackHref("marketing"), selected: trackFilter === "marketing" },
+    { label: "All", count: 0, href: trackHref("all"), selected: trackFilter === "all" },
   ];
   // The toolbar's Filter menu: on the All tab, All / Rejected / Duplicates (pick one); then My Work (on or off); then Track filter.
   const allTabFilters: ToolbarFilterOption[] = !isDeletedView && allSelected
     ? ALL_FILTERS.map(({ value, label }) => ({ label, count: allFilterCount(value), href: statusHref(value), selected: statusParam === value }))
     : [];
   const myWorkFilter: ToolbarFilterOption[] = myWorkCount > 0 || myWorkOn ? [{ label: "My Work", count: myWorkCount, href: myWorkHref, selected: myWorkOn }] : [];
-  const trackFilterToolbar: ToolbarFilterOption[] = trackFilter !== "product" ? [{ label: "Track", count: 0, href: trackHref, selected: true }] : [];
   const filterGroups: ToolbarFilterGroup[] = [
     ...(allTabFilters.length ? [{ label: "Show", options: allTabFilters }] : []),
     ...(myWorkFilter.length ? [{ options: myWorkFilter }] : []),
-    ...(trackFilterToolbar.length ? [{ label: "Track", options: [
-      { label: "Product", count: 0, href: (() => { const n = new URLSearchParams(currentQuery); n.delete("page"); n.delete(TRACK_PARAM); return listHref(n); })(), selected: trackFilter === "product" },
-      { label: "Marketing", count: 0, href: (() => { const n = new URLSearchParams(currentQuery); n.delete("page"); n.set(TRACK_PARAM, "marketing"); return listHref(n); })(), selected: trackFilter === "marketing" },
-      { label: "All", count: 0, href: (() => { const n = new URLSearchParams(currentQuery); n.delete("page"); n.set(TRACK_PARAM, "all"); return listHref(n); })(), selected: trackFilter === "all" },
-    ]}] : []),
+    { label: "Track", options: trackFilterOptions },
   ];
   // What the Filter button names while closed: anything beyond the default "All".
   const filterSummary = [

@@ -27,6 +27,31 @@ export function trackWhere(track: WorkTrack | "all"): Prisma.BugWhereInput {
 }
 
 /**
+ * `?track=` on the Inbox. Unlike the issue list it defaults to "all": the Inbox
+ * is a person's own record, so nothing is hidden until they ask (M-UI-8).
+ */
+export function parseInboxTrack(raw: string | string[] | null | undefined): WorkTrack | "all" {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return value === "product" || value === "marketing" ? value : "all";
+}
+
+/**
+ * The notifications a track filter keeps. One that names no issue (an invite, a
+ * workspace notice) isn't marketing work, so it stays under Product.
+ */
+export function notificationTrackWhere(track: WorkTrack | "all"): Prisma.NotificationWhereInput {
+  if (track === "all") return {};
+  if (track === "marketing") return { bug: { track } };
+  return { AND: [{ OR: [{ bugId: null }, { bug: { track } }] }] };
+}
+
+/** The same rule for an escalation, which is filtered once loaded. */
+export function escalationOnTrack(bug: { track: WorkTrack } | null, track: WorkTrack | "all"): boolean {
+  if (track === "all") return true;
+  return (bug?.track ?? "product") === track;
+}
+
+/**
  * Your work: issues associated with you across the full lifecycle.
  * Includes:
  * - Live bids placed for you (not withdrawn)
