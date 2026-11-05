@@ -9,6 +9,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ThemePreference } from "@/components/theme-toggle";
 import { THEME_COOKIE, parseTheme, themeAttribute, type Theme } from "@/lib/theme";
+import { OnScreenGuide } from "@/components/support-guide/on-screen-guide";
 import "./globals.css";
 
 // Fonts are self-hosted from app/fonts (latin, variable woff2) so the build
@@ -99,7 +100,10 @@ export default async function RootLayout({
         */}
         <ThemePreference theme={theme}>
           <ToastProvider>
-            <ConfirmProvider>{children}</ConfirmProvider>
+            <ConfirmProvider>
+              {children}
+              <OnScreenGuide />
+            </ConfirmProvider>
           </ToastProvider>
         </ThemePreference>
       </body>
