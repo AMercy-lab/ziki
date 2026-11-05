@@ -11,8 +11,8 @@ import type { ProposalItem, ProposalOpinion, ProposalVerdict, ProposalsResult, P
 /**
  * The Marketing section's proposals (M-UI-2). The caller resolves access with
  * requireProject first; every read stays inside that tenant and project and
- * only reads the marketing track. Open proposals are waiting for a verdict or
- * for an agent to convert them (D2); the rejected view also carries archived
+ * only reads the marketing track. Open proposals are waiting for the verdict
+ * that opens them (D2); the rejected view also carries archived
  * ideas, as the product Ideas › Rejected list does.
  */
 export async function readProposals(

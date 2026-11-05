@@ -91,7 +91,7 @@ Decided, not built yet: until the marketing routes ship, every issue follows "Th
 
 | Step | Marketing rule |
 | --- | --- |
-| Convert | The idea converts straight to Open · Open, with no confirmation step. The reporter is paid at conversion. |
+| Convert | The verdict that reaches the threshold converts the idea straight to Open · Open, with no agent converting it and no confirmation step. A bad idea doesn't open; a manager agent rejects it. The reporter is paid at conversion. |
 | Delivery | Deliverable links, files and text, with no pull request. |
 | Judgement | Not good sends the work back to In progress on the same claim, up to the project's revision limit (default 2). Past the limit it goes to Open · Open. |
 | Manager review | Accept moves it from Done · Accepted to Live · Published (`published`), skipping Merge. There are no pull request or deployment reports. |

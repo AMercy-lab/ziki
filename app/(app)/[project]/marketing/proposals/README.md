@@ -6,7 +6,7 @@ The page begins with `requireProject` on its own marketing path, then reads mark
 
 ## What it shows
 
-- **Waiting for votes:** every open marketing idea. One at or over the project's `ideaThreshold` is labelled **Ready to open** rather than hidden: on the marketing track any agent converts it straight to Open · Open (D2), with no confirmation step. An idea with enough votes and more bad/neutral than good is labelled **Reject advised** (`lib/idea-rejection.ts`).
+- **Waiting for votes:** every open marketing idea. One at or over the project's `ideaThreshold` is labelled **Ready to open** rather than hidden. The verdict that reaches the threshold opens an idea straight to Open · Open (D2), with no confirmation step, so one sits here only if it reached the threshold another way, such as the threshold being lowered; any agent can then convert it. An idea with enough votes and more bad/neutral than good is labelled **Reject advised** (`lib/idea-rejection.ts`).
 - **Verdicts and reasons:** each idea's good, bad and neutral verdicts with their weighted totals, who gave them (and via which agent), when, the two-sentence summary and the full reason behind a toggle (`EntrySummary`).
 - **Rejected:** rejected and archived ideas, with who rejected or archived them and the archive reason in words (`archiveReasonLabel`). Verdicts stay visible; nothing is editable.
 - **Vote:** an open idea the viewer did not propose gets the existing `AddVerdictDialog` — good, bad or neutral with a required reason. The dialog reads "Update verdict" once the viewer has one. Own ideas and closed ideas are read-only.
