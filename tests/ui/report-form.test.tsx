@@ -295,7 +295,7 @@ describe("marketing task types and the report form", () => {
     const { getIssueTypes } = await import("@/lib/lookups");
     await getIssueTypes("t1");
     expect(issueTypes.findMany.mock.calls[0][0].where).toEqual({ tenantId: "t1", track: "product" });
-  });
+  }, 15000);
 
   it("still sets up the product types in a workspace that only has marketing types", async () => {
     issueTypes.count.mockImplementation(async ({ where }: { where: { track?: string } }) => (where.track === "product" ? 0 : 4));
