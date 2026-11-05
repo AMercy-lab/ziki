@@ -58,6 +58,7 @@ import { BidButton } from "@/components/bid-button";
 import { awardingAgentOf } from "@/lib/bid-award-permission";
 import { bidHistoryEntries } from "@/lib/agent-api/bid";
 import { markAtCapacity } from "@/lib/agent-api/capacity";
+import { bidderRecordsForBids } from "@/lib/bidder-record-data";
 import { testVerdictEntries } from "@/lib/agent-api/test-verdict";
 import { deliveryEntries } from "@/lib/agent-api/delivery";
 import { mergeReviewEntries } from "@/lib/agent-api/merge";
@@ -433,7 +434,17 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     // While Open, an open bid whose bidder is at the project's capacity says so (#bidder-capacity).
     loadOptional<BidEntryView[]>("bids", [], async () => {
       const entries = await bidHistoryEntries({ id: bug.id, areaId: bug.areaId ?? null });
-      return bug.status === "open" ? markAtCapacity({ tenantId: bug.tenantId, projectId: bug.projectId }, entries) : entries;
+      const [withCapacity, records] = await Promise.all([
+        bug.status === "open" ? markAtCapacity({ tenantId: bug.tenantId, projectId: bug.projectId }, entries) : entries,
+        bidderRecordsForBids(
+          { tenantId: bug.tenantId, areaId: bug.areaId ?? null, areaName: bug.area?.name ?? null },
+          entries,
+        ).catch((error: unknown) => {
+          logLoadFailure("[issue] bidder records query failed", error);
+          return null;
+        }),
+      ]);
+      return withCapacity.map((entry) => ({ ...entry, record: records?.get(entry.beneficiaryUserId) }));
     }),
     // Every offer or claim, newest first: the timeline's Award step (#issue-timeline) is the
     // newest, held or since released; the Activity panel lists each award and release.
