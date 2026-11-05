@@ -22,6 +22,9 @@ import { LocalTime } from "@/components/local-time";
 import { BASE_PATH } from "@/lib/base-path";
 import { PAGE_CONTAINER_CLASS } from "@/components/page-container";
 import { ZikiMark } from "@/components/ziki-mark";
+import { EarnPill } from "@/components/earn-pill";
+import { isEarnPath } from "@/lib/earn/paths";
+import type { WithdrawInfo } from "@/lib/earn/draft";
 
 const linkFocus =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue focus-visible:ring-offset-2";
@@ -270,7 +273,13 @@ export function AppHeader({
   reportFormUrl,
   organizationAdmin = false,
   defaultProjectSlug = null,
+  earned = null,
+  withdraw = null,
 }: {
+  /** Earn (#earn-drafts): what the Withdraw window shows; null for everyone else. */
+  withdraw?: WithdrawInfo | null;
+  /** Earn (#earn-drafts): an earner's dollars, shown with Withdraw in the header; null for everyone else. */
+  earned?: number | null;
   /** The first project in the current workspace, for pages whose URL names none yet. */
   defaultProjectSlug?: string | null;
   userName?: string | null;
@@ -319,13 +328,19 @@ export function AppHeader({
           <WorkspaceSwitcher workspaces={workspaces} activeTenantId={activeTenantId} canManage={organizationAdmin} orgHref={projectSlug ? orgPath(projectSlug) : null} tone="bar" className="min-w-0 max-sm:max-w-44" />
         </div>
 
-        <TopNav pathname={pathname} projectSlug={projectSlug} />
+        {/* Earn (#earn-drafts): an earner on the earn pages sees none of the builders' links. */}
+        {earned !== null && isEarnPath(pathname) ? null : <TopNav pathname={pathname} projectSlug={projectSlug} />}
 
         {/* Phones and tablets: min-w-0 lets the group narrow so its flex-wrap
             breaks the chips onto rows (no sideways scroll at 360px or 768px).
             From lg up it keeps shrink-0 so the account controls are never
             squeezed. */}
         <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 max-sm:gap-1 lg:shrink-0">
+          {earned !== null && withdraw ? (
+            // Earn (#earn-drafts): the balance as one pill, in reach from every page. It drops a panel down (the bar, the
+            // next task, Withdraw); Withdraw opens a window over the page, never another page.
+            <EarnPill info={withdraw} />
+          ) : null}
 
           <div ref={accountRef} className="relative">
             <button
@@ -402,7 +417,7 @@ export function AppHeader({
           </div>
 
           {/* Escalations, as an envelope, then the bell last. */}
-          <InboxEnvelope key={`${userId}:${activeTenantId}:${pathname}`} unreadCount={unreadCount} pendingEscalations={pendingEscalationsCount} active={isNavItemActive(pathname, "/inbox")} />
+          {earned !== null && isEarnPath(pathname) ? null : <InboxEnvelope key={`${userId}:${activeTenantId}:${pathname}`} unreadCount={unreadCount} pendingEscalations={pendingEscalationsCount} active={isNavItemActive(pathname, "/inbox")} />}
         </div>
       </div>
     </header>
