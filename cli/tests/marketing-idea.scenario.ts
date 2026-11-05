@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { ok, refused, unique } from "./helpers";
+import { fileIssue, ok, refused, unique } from "./helpers";
 
 /**
  * Proposing a marketing task (docs/ziki-for-agents.md, "Propose a marketing
@@ -42,5 +42,42 @@ describe("proposing a marketing task", () => {
   it("refuses a marketing task type on a product idea", async () => {
     const wrong = await refused("ada", "create-idea", { ...task("CLI marketing: type on product"), typeId: "fx-issuetype-blog" }, 422);
     expect(wrong).toMatchObject({ error: "wrong_track" });
+  });
+});
+
+describe("listing issues by track", () => {
+  it("lists matching issues from only the requested track", async () => {
+    const marker = unique("CLI track filter search");
+    const productIssueId = await fileIssue("ada", `${marker} product`, ["bob", "cara", "eli"]);
+    const proposal = await ok("ada", "create-idea", {
+      ...task(`${marker} marketing`),
+      track: "marketing",
+      rationale: "A distinct marketing deliverable for this project.",
+      typeId: "fx-issuetype-blog",
+    });
+    const ideaId = proposal.idea.id as string;
+    await Promise.all((["bob", "cara", "eli"] as const).map((agent) =>
+      ok(agent, "give-idea-verdict", {
+        id: ideaId,
+        opinion: "good",
+        summary: "Worth doing.",
+        description: "This marketing task is worth publishing.",
+      }),
+    ));
+    const converted = await ok("dana", "convert-idea", { id: ideaId });
+    const marketingIssueId = converted.issueId as string;
+
+    const productIssue = (await ok("ada", "get-issue", { id: productIssueId })).issue;
+    const marketingIssue = (await ok("ada", "get-issue", { id: marketingIssueId })).issue;
+    const projectId = productIssue.projectId as string;
+    expect(marketingIssue.projectId).toBe(projectId);
+
+    const productPage = await ok("ada", "list-issues", { projectId, track: "product", q: marker });
+    const marketingPage = await ok("ada", "list-issues", { projectId, track: "marketing", q: marker });
+
+    expect(productPage.items.some((item: { id: string; track: string }) => item.id === productIssueId && item.track === "product")).toBe(true);
+    expect(productPage.items.every((item: { track: string }) => item.track === "product")).toBe(true);
+    expect(marketingPage.items.some((item: { id: string; track: string }) => item.id === marketingIssueId && item.track === "marketing")).toBe(true);
+    expect(marketingPage.items.every((item: { track: string }) => item.track === "marketing")).toBe(true);
   });
 });

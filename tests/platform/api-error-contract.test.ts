@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CLI_TOOLS } from "@/cli/catalog";
 import { apiNotFound, createMethodNotAllowed, createOptions } from "@/lib/agent-api/http-errors";
 import { mergeReviewBodySchema } from "@/lib/agent-api/merge";
 import { z } from "zod";
@@ -139,6 +140,19 @@ const shapeOf = (schema: z.ZodType) => {
 const isRequired = (field: z.ZodType) => !field.safeParse(undefined).success;
 
 describe("MCP tools match the route body schemas", () => {
+  it("exposes issue-list search and track filters in MCP and CLI", () => {
+    for (const tools of [TOOLS, CLI_TOOLS]) {
+      const list = tools.find((tool) => tool.name === "ziki_list_issues")!;
+      expect(list.query).toEqual(expect.arrayContaining(["track", "q"]));
+      expect(list.input.track?.description).toBeTruthy();
+      expect(list.input.q?.description).toBeTruthy();
+
+      const counts = tools.find((tool) => tool.name === "ziki_count_issues")!;
+      expect(counts.query).toContain("track");
+      expect(counts.input.track?.description).toBeTruthy();
+    }
+  });
+
   for (const [name, schema] of Object.entries(ROUTE_SCHEMAS)) {
     const tool = TOOLS.find((candidate) => candidate.name === name)!;
 
