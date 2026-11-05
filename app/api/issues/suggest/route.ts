@@ -1,4 +1,4 @@
-import { PRODUCT_TRACK } from "@/lib/marketing/track";
+import { parseTrackFilter, trackFilter } from "@/lib/marketing/track";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -31,6 +31,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: RATE_LIMIT_MESSAGE }, { status: 429 });
   }
 
+  const parsedTrack = parseTrackFilter(req.nextUrl.searchParams.get("track"));
+  if (!parsedTrack.ok) {
+    return NextResponse.json({ error: "invalid_request", field: "track" }, { status: 400 });
+  }
+
   const query = normalizeSuggestQuery(req.nextUrl.searchParams.get("q"));
   if (!shouldSuggest(query)) return NextResponse.json({ issues: [] });
 
@@ -51,11 +56,11 @@ export async function GET(req: NextRequest) {
       where: {
         ...bugInTenant(tenantId),
         ...(projectId ? { projectId } : {}),
-        ...PRODUCT_TRACK,
+        ...trackFilter(parsedTrack.track),
         isDeleted: false,
         OR: matches,
       },
-      select: { id: true, number: true, title: true, status: true, project: { select: { slug: true } } },
+      select: { id: true, number: true, title: true, status: true, track: true, project: { select: { slug: true } } },
       orderBy: { updatedAt: "desc" },
       take: SUGGEST_LIMIT,
     });

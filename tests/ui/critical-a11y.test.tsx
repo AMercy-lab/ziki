@@ -14,6 +14,10 @@ import { VoteButton } from "@/components/vote-button";
 import { WebhookManagement } from "@/components/webhook-management";
 import { Library } from "@/components/marketing/library/library";
 import { deliveryFiles } from "@/components/marketing/library/model";
+import { TasksBoard } from "@/components/marketing/tasks/tasks-board";
+import { TASK_TABS } from "@/components/marketing/tasks/model";
+import { Proposals } from "@/components/marketing/proposals/proposals";
+import type { ProposalItem, ProposalsResult } from "@/components/marketing/proposals/model";
 import { createWebhookAction, listWebhooksAction } from "@/app/actions/webhooks";
 
 vi.mock("@/app/actions/issues", () => ({
@@ -22,6 +26,15 @@ vi.mock("@/app/actions/issues", () => ({
   toggleVoteAction: vi.fn(),
 }));
 vi.mock("@/app/(app)/[project]/marketing/library/actions", () => ({ refreshLibrary: vi.fn() }));
+vi.mock("@/app/actions/idea-verdicts", () => ({
+  giveIdeaVerdictAction: vi.fn(),
+  quickIdeaVerdictAction: vi.fn(),
+  withdrawIdeaFromPage: vi.fn(),
+  withdrawIdeaAction: vi.fn(),
+  approveIdeaAction: vi.fn(),
+  rejectIdeaAction: vi.fn(),
+}));
+vi.mock("@/app/(app)/[project]/notes/actions", () => ({ voteNoteCommentAction: vi.fn() }));
 
 vi.mock("@/app/(app)/points/disputes/actions", () => ({
   openDisputeAction: vi.fn(),
@@ -41,6 +54,7 @@ vi.mock("@/app/actions/webhooks", () => ({
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => "/acme/marketing",
   useParams: () => ({ project: "acme" }),
 }));
 
@@ -102,6 +116,42 @@ describe("component accessibility (axe)", () => {
     }] }} />);
     await expectNoA11yViolations(container);
   });
+  it("keeps the marketing tasks board's stages, steps and rows accessible", async () => {
+    const { container } = render(<TasksBoard slug="acme" board={{
+      tab: TASK_TABS[1],
+      counts: { ideas: 2, open: 1, "in-progress": 0, closed: 0, done: 3, live: 0 },
+      sortParam: null,
+      list: { kind: "tasks", sort: "importance", rows: [{
+        id: "task-1", number: 41, title: "Write the launch post", href: "/acme/41", status: "open", substatus: "open", closeReason: null,
+        importance: 0, reward: 4, rewardEstimates: 2, rewardFixed: false, typeName: "Blog post", agentName: null, work: null, offeredTo: null,
+        revision: null, bids: 2, comments: 1, updatedAt: new Date("2026-11-01T10:00:00Z"),
+      }] },
+      pagination: { page: 1, totalPages: 1, totalCount: 1, from: 1, to: 1 },
+    }} />);
+    await expectNoA11yViolations(container);
+  });
+  it("keeps marketing proposals and their verdicts accessible", async () => {
+    const item: ProposalItem = {
+      id: "idea1", number: 7, title: "Write a launch post", summary: "A post about the launch.",
+      description: "Explain what changed and why.", rationale: "People keep asking what changed.",
+      typeName: "Blog post", reporterName: "Ada", createdAt: new Date("2026-11-04"),
+      score: 1, threshold: 3, votes: { good: 1, bad: 0, neutral: 0 },
+      verdicts: [{
+        id: "v1", opinion: "good", votes: 1, summary: "Worth doing.",
+        description: "It serves the current focus.", by: "Bola", agentName: "Bola's agent",
+        updatedAt: new Date("2026-11-04"),
+      }],
+      status: "open", rejectedAt: null, rejectedBy: null, archivedAt: null, archivedBy: null,
+      archiveReason: null, convertible: false, bad: false, own: false, mine: null,
+    };
+    const initial: ProposalsResult = {
+      ok: true, items: [item], threshold: 3, counts: { open: 1, rejected: 0 },
+      total: 1, page: 1, totalPages: 1, from: 1, to: 1,
+    };
+    const { container } = render(<Proposals slug="acme" projectName="Acme" view="open" initial={initial} />);
+    await expectNoA11yViolations(container);
+  });
+
   it("VoteButton has no violations", async () => {
     const { container } = render(<VoteButton bugId="b1" voteCount={3} />);
     await expectNoA11yViolations(container);

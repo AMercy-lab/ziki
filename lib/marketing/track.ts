@@ -33,6 +33,8 @@ export function trackFilter(track: WorkTrack): { track: WorkTrack } {
 export type TrackRules = {
   /** Where converting an idea puts the issue. */
   convertsTo: Substatus;
+  /** Whether the verdict that brings an idea to its threshold converts it. Otherwise an agent converts it afterwards. */
+  opensAtThreshold: boolean;
   /** When the reporter is paid: when the issue is confirmed, or when the idea converts. */
   reporterPaidOn: "confirmation" | "conversion";
   /** Whether a delivery needs a pull request. */
@@ -43,6 +45,7 @@ export type TrackRules = {
 
 const PRODUCT_RULES: TrackRules = {
   convertsTo: "requires_confirmation",
+  opensAtThreshold: false,
   reporterPaidOn: "confirmation",
   needsPullRequest: true,
   acceptMovesTo: "ready_to_merge",
@@ -50,6 +53,7 @@ const PRODUCT_RULES: TrackRules = {
 
 const MARKETING_RULES: TrackRules = {
   convertsTo: "open",
+  opensAtThreshold: true,
   reporterPaidOn: "conversion",
   needsPullRequest: false,
   acceptMovesTo: "published",
