@@ -106,7 +106,7 @@ export function MarketingTaskHeader({
             >
               {isLive ? "Live (Published)" : statusLabels[status] ?? status}
             </span>
-            {maxRevisions > 0 && (isInProgress || isInReview || revisionCount > 0) ? (
+            {maxRevisions > 0 && revisionCount > 0 ? (
               <span
                 className="inline-flex items-center rounded-full border border-zk-warn-fg/30 bg-zk-warn-bg px-2.5 py-0.5 font-bold text-zk-warn-fg"
                 title={`Marketing work revision limit: ${maxRevisions} rounds before reopening`}

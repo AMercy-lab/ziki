@@ -54,23 +54,25 @@ export function MarkDuplicateButton({
     };
   }, [bugId, open, query]);
 
-  const close = useCallback(() => {
+  const close = useCallback((restoreFocus = false) => {
     setOpen(false);
     setQuery("");
     setResults([]);
     setError(null);
-    wrapperRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    if (restoreFocus) {
+      wrapperRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    }
   }, []);
 
   useEffect(() => {
     if (!open) return;
     const onPointer = (event: PointerEvent) => {
       if (!wrapperRef.current?.contains(event.target as Node)) {
-        close();
+        close(false);
       }
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+      if (event.key === "Escape") close(true);
     };
     document.addEventListener("pointerdown", onPointer);
     document.addEventListener("keydown", onKey);
@@ -89,7 +91,7 @@ export function MarkDuplicateButton({
         return;
       }
       toast("Marked as a duplicate. It's now hidden from the issues list.");
-      close();
+      close(true);
       router.refresh();
     });
   };

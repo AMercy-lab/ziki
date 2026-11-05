@@ -77,7 +77,7 @@ export function MarketingDeliverablesPanel({
                 className="relative flex flex-col gap-3 rounded-xl border border-zk-ok-fg/20 bg-zk-ok-bg/30 p-4"
               >
                 {/* Delivery Header */}
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zk-ok-fg/10 pb-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zk-ok-fg/10 pb-2.5 pr-8">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <span
                       className={`rounded-full px-2.5 py-0.5 font-bold ${

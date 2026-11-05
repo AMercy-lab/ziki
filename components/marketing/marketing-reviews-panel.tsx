@@ -48,9 +48,9 @@ export function MarketingReviewsPanel({
           at={at}
         />
         <div className="flex items-center gap-2 text-xs">
-          {maxRevisions > 0 ? (
+          {maxRevisions > 0 && revisionCount > 0 ? (
             <span className="font-mono text-zk-muted">
-              Round {revisionCount + 1} of {maxRevisions}
+              Revision {revisionCount} of {maxRevisions}
             </span>
           ) : null}
           {reviews.length > 0 ? (

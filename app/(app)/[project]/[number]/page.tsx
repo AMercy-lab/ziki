@@ -1076,12 +1076,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
       agentName: verdict.agentName,
       by: verdict.by,
       updatedAt: verdict.updatedAt,
-      replies: verdict.replies?.map((r) => ({
-        id: r.id,
-        body: r.body,
-        authorName: r.authorName,
-        createdAt: r.createdAt,
-      })),
+      replies: verdict.replies ?? [],
     }));
 
     if (marketingDeliveries.length > 0) {
@@ -1111,15 +1106,13 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
       };
     }
 
-    const marketingNextStep = nextStep
-      ? {
-          ...nextStep,
-          detail: nextStep.detail ? nextStep.detail.replace(/\bissue\b/gi, "task") : null,
-          action: nextStep.action
-            ? nextStep.action.replace(/\bfixing it\b/gi, "executing it").replace(/\bissue\b/gi, "task")
-            : "",
-        }
-      : null;
+    const marketingNextStep = {
+      ...nextStep,
+      detail: nextStep.detail ? nextStep.detail.replace(/\bissue\b/gi, "task") : null,
+      action: nextStep.action
+        ? nextStep.action.replace(/\bfixing it\b/gi, "executing it").replace(/\bissue\b/gi, "task")
+        : null,
+    };
 
     return (
       <MarketingTaskDetail
@@ -1156,6 +1149,98 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
         reviews={marketingReviews}
         bannerSlot={deliveredBanner ? <DeliveredBanner {...deliveredBanner} /> : null}
         nextStepSlot={<NextStepBar step={marketingNextStep} agentInstructions={agentInstructions} />}
+        mergeReviewsSlot={
+          timelineReviews.length > 0 || mergeReviewing ? (
+            <MergeReviewsPanel
+              at={firstAt(timelineReviews)}
+              bugId={bug.id}
+              reviews={timelineReviews}
+              canReply={mergeReviewing}
+              history={!mergeReviewing}
+            />
+          ) : null
+        }
+        disputeSlot={
+          disputeRoles.length > 0 ? (
+            <DisputeAwardDialog bugNumber={bug.number} roles={disputeRoles} />
+          ) : null
+        }
+        escalationsSlot={<IssueEscalations escalations={escalations} />}
+        descriptionSlot={
+          <div className="flex flex-col gap-5">
+            {bug.project.goal ? (
+              <div className="flex items-start gap-3 rounded-xl border border-zk-info-fg/30 bg-zk-info-bg/40 p-3.5 text-sm text-zk-text">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zk-info-fg text-white">
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="m12 8 4 4-4 4M8 12h8" />
+                  </svg>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-bold uppercase tracking-wider text-[11px] text-zk-info-fg">
+                      {bug.project.name ? `${bug.project.name} Focus` : "Campaign Focus"}
+                    </span>
+                    {bug.project.siteUrl ? (
+                      <a
+                        href={bug.project.siteUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-zk-accent hover:underline"
+                      >
+                        Visit Site <span aria-hidden="true">↗</span>
+                      </a>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 font-medium leading-relaxed">{bug.project.goal}</p>
+                </div>
+              </div>
+            ) : null}
+
+            {bug.idea?.rationale ? (
+              <div className="rounded-xl border border-zk-border bg-zk-surface p-4 text-xs">
+                <span className="font-bold uppercase tracking-wider text-[11px] text-zk-muted">
+                  Strategic Rationale
+                </span>
+                <p className="mt-1.5 text-sm leading-relaxed text-zk-text">
+                  {bug.idea.rationale}
+                </p>
+              </div>
+            ) : null}
+
+            <EditableIssueDescription
+              bugId={bug.id}
+              initialTitle={bug.title}
+              initialDescription={bug.description}
+              summary={bug.summary}
+              canEdit={canEdit}
+              users={users}
+              lastEditedAt={lastRevision?.editedAt ?? null}
+              historyHref={issueHref(bug, "/history")}
+              tags={
+                bug.area ? (
+                  <span title="Area" className="inline-flex items-center rounded-full bg-zk-chip px-2.5 py-0.5 text-xs font-semibold text-zk-text2 ring-1 ring-zk-border">
+                    {bug.area.name}
+                  </span>
+                ) : null
+              }
+            >
+              {bug.milestone ? (
+                <dl className="mt-4 grid grid-cols-1 gap-3 text-sm text-zk-text2 sm:grid-cols-2">
+                  <div>
+                    <dt className="font-medium text-zk-muted">Milestone</dt>
+                    <dd className="flex flex-wrap items-center gap-2">
+                      <Link href={milestoneIssuesHref(bug.project.slug, bug.milestone.id)} className="font-bold text-zk-accent hover:underline">
+                        {bug.milestone.title}
+                      </Link>
+                      <MilestoneDue due={dueDateValue(bug.milestone.dueDate) || null} isClosed={bug.milestone.isClosed} />
+                    </dd>
+                  </div>
+                </dl>
+              ) : null}
+            </EditableIssueDescription>
+          </div>
+        }
         bidsCount={bidList.length}
         commentsCount={commentCount}
         bidsSlot={
@@ -1417,47 +1502,18 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
               </div>
             </section>
 
-            {sourceIdea || proofLinks.length > 0 ? (
-              <section aria-label="Links" className="rounded-[20px] border border-zk-border bg-zk-surface px-4 py-3.5">
-                <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-zk-muted">Links</h2>
-                <dl className="mt-3 flex flex-col gap-2.5">
-                  {sourceIdea ? (
-                    <div className="flex min-w-0 items-baseline gap-3">
-                      <dt className="w-16 shrink-0 whitespace-nowrap text-xs leading-5 text-zk-muted">Source Idea</dt>
-                      <dd className="m-0 min-w-0">
-                        <Link
-                          href={ideaPath(bug.project.slug, sourceIdea.number)}
-                          className="text-xs font-semibold text-zk-accent hover:underline"
-                        >
-                          Idea #{sourceIdea.number}
-                        </Link>
-                      </dd>
-                    </div>
-                  ) : null}
-                  {proofLinks.length > 0 ? (
-                    <div className="flex min-w-0 items-baseline gap-3">
-                      <dt className="w-16 shrink-0 whitespace-nowrap text-xs leading-5 text-zk-muted">Deliverables</dt>
-                      <dd className="m-0 min-w-0">
-                        <ul className="m-0 list-none space-y-1.5 p-0">
-                          {proofLinks.map((url, index) => (
-                            <li key={`${index}-${url}`}>
-                              <a
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 break-all text-xs font-medium leading-5 text-zk-accent hover:underline"
-                              >
-                                <span>{url}</span>
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      </dd>
-                    </div>
-                  ) : null}
-                </dl>
-              </section>
-            ) : null}
+            <IssueLinks
+              links={proofLinks}
+              linkedPullRequestUrl={bug.pullRequestUrl}
+              idea={sourceIdea ? { number: sourceIdea.number, slug: bug.project.slug } : null}
+              repairs={linkRepairs}
+            />
+
+            <SubmissionEvidence
+              screenshots={submissionScreenshots}
+              testResults={submissionTestResults}
+              pullRequestUrl={bug.pullRequestUrl}
+            />
 
             <ActivityTimeline
               activities={[...shownActivities].reverse()}

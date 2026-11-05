@@ -39,6 +39,10 @@ export type MarketingTaskDetailProps = {
   attachmentsSlot?: ReactNode;
   alertsSlot?: ReactNode;
   sideRailSlot?: ReactNode;
+  descriptionSlot?: ReactNode;
+  mergeReviewsSlot?: ReactNode;
+  disputeSlot?: ReactNode;
+  escalationsSlot?: ReactNode;
   bidsCount?: number;
   commentsCount?: number;
   canReply: boolean;
@@ -62,6 +66,10 @@ export function MarketingTaskDetail({
   attachmentsSlot,
   alertsSlot,
   sideRailSlot,
+  descriptionSlot,
+  mergeReviewsSlot,
+  disputeSlot,
+  escalationsSlot,
   bidsCount = 0,
   commentsCount = 0,
   canReply,
@@ -70,20 +78,13 @@ export function MarketingTaskDetail({
   const workerName = hold?.agentName ? `${hold.agentName} (for ${hold.personName})` : null;
 
   const [activeTab, setActiveTab] = useState<PipelineTab>(() => {
-    if (typeof window !== "undefined" && window.location.hash) {
-      const hash = window.location.hash.toLowerCase();
-      if (hash === "#comments" || hash.includes("comment")) return "discussion";
-      if (hash === "#reviews" || hash === "#verdicts") return "reviews";
-      if (hash === "#deliverables") return "deliverables";
-      if (hash === "#bids") return "bids";
-    }
     if (bug.status === "open") return "bids";
     if (bug.status === "done" || bug.substatus === "requires_review") return "reviews";
     return "deliverables";
   });
 
   useEffect(() => {
-    const handleHashChange = () => {
+    const applyHash = () => {
       const hash = window.location.hash.toLowerCase();
       if (hash === "#comments" || hash.includes("comment")) setActiveTab("discussion");
       else if (hash === "#reviews" || hash === "#verdicts") setActiveTab("reviews");
@@ -91,8 +92,9 @@ export function MarketingTaskDetail({
       else if (hash === "#bids") setActiveTab("bids");
     };
 
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
   }, []);
 
   return (
@@ -123,22 +125,26 @@ export function MarketingTaskDetail({
         {/* Main Column */}
         <div className="flex min-w-0 flex-[999_1_600px] flex-col gap-5">
           {/* Campaign Focus Banner & Unified Description Card */}
-          <MarketingTaskHeader
-            contentOnly
-            number={bug.number}
-            title={bug.title}
-            description={bug.description}
-            status={bug.status}
-            substatus={bug.substatus}
-            projectName={bug.project.name}
-            projectFocus={bug.project.goal}
-            projectSiteUrl={bug.project.siteUrl}
-            rationale={bug.idea?.rationale}
-            projectSlug={bug.project.slug}
-            revisionCount={bug.revisionCount}
-            maxRevisions={revisionLimit}
-            createdAt={bug.createdAt}
-          />
+          {descriptionSlot ? (
+            descriptionSlot
+          ) : (
+            <MarketingTaskHeader
+              contentOnly
+              number={bug.number}
+              title={bug.title}
+              description={bug.description}
+              status={bug.status}
+              substatus={bug.substatus}
+              projectName={bug.project.name}
+              projectFocus={bug.project.goal}
+              projectSiteUrl={bug.project.siteUrl}
+              rationale={bug.idea?.rationale}
+              projectSlug={bug.project.slug}
+              revisionCount={bug.revisionCount}
+              maxRevisions={revisionLimit}
+              createdAt={bug.createdAt}
+            />
+          )}
 
           {/* Attachments Card (if any files attached) */}
           {attachmentsSlot}
@@ -276,8 +282,11 @@ export function MarketingTaskDetail({
               >
                 {awardSlot ? (
                   <div className="rounded-xl border border-zk-ok-fg/20 bg-zk-ok-bg/20 p-4">
-                    <div className="mb-2 text-xs font-bold uppercase tracking-wider text-zk-ok-fg">
-                      Award Decision
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="text-xs font-bold uppercase tracking-wider text-zk-ok-fg">
+                        Award Decision
+                      </div>
+                      {disputeSlot}
                     </div>
                     {awardSlot}
                   </div>
@@ -313,7 +322,9 @@ export function MarketingTaskDetail({
                 id="panel-reviews"
                 aria-labelledby="tab-reviews"
                 hidden={activeTab !== "reviews"}
+                className="flex flex-col gap-5"
               >
+                {mergeReviewsSlot}
                 <MarketingReviewsPanel
                   bugId={bug.id}
                   reviews={reviews}
@@ -340,6 +351,9 @@ export function MarketingTaskDetail({
               </div>
             </div>
           </div>
+
+          {/* Escalations Slot */}
+          {escalationsSlot}
         </div>
 
         {/* Side Rail (Status, Reward, People, Links, ActivityTimeline) */}
