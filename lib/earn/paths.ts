@@ -13,7 +13,7 @@ export function isEarnConnectPath(pathname: string | null | undefined): boolean 
 /**
  * Earn (#earn-drafts, Mark's call of 5 Nov): on the earn pages an earner sees only what they came for, so the
  * builders' links (Your App, Marketing, Security) and the leaderboard and workstream icons are left out there.
- * Everyone else, and the earner on any other page, sees the site as it always is. The earn pages are light only.
+ * Everyone else, and the earner on any other page, sees the site as it always is.
  */
 export function isEarnPath(pathname: string | null | undefined): boolean {
   if (!pathname) return false;
