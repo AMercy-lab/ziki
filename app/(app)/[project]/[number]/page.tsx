@@ -1224,6 +1224,18 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
             </section>
           ) : null
         }
+        voteButtonSlot={
+          <VoteButton
+            bugId={bug.id}
+            voteCount={bug.voteCount}
+            userVote={userVote}
+            likeCount={voterSummary.likes.count}
+            likeVoters={voterSummary.likes.voters}
+            size="md"
+            showAvatars={false}
+            readOnly={bug.isDeleted}
+          />
+        }
         actionsMenuSlot={
           canMarkDuplicate || canDeleteHere ? (
             <IssueActionsMenu>
@@ -1233,6 +1245,74 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
               ) : null}
             </IssueActionsMenu>
           ) : null
+        }
+        attachmentsSlot={
+          issueAttachments.length > 0 ? (
+            <section className="rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-6">
+              <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-zk-muted">
+                Attachments
+              </h2>
+              <AttachmentList attachments={issueAttachments} />
+            </section>
+          ) : null
+        }
+        alertsSlot={
+          <>
+            {bug.isDeleted ? (
+              <div className="rounded-[20px] border border-zk-bad-bd bg-zk-bad-bg p-4 sm:p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-zk-bad-fg">
+                      This task was deleted
+                    </h3>
+                    <p className="text-xs text-zk-bad-fg/90">
+                      {deletedSummary(keptCounts)}
+                    </p>
+                  </div>
+                  <RestoreIssueButton
+                    bugId={bug.id}
+                    bugTitle={bug.title}
+                    counts={keptCounts}
+                    size="sm"
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {bug.duplicateOf ? (
+              <section
+                aria-label="Duplicate"
+                className="rounded-[20px] border border-zk-warn-bd bg-zk-warn-bg p-4 sm:p-5"
+              >
+                <h2 className="text-sm font-semibold text-zk-warn-fg">
+                  Marked as duplicate of{" "}
+                  <Link
+                    href={issueHref(bug.duplicateOf)}
+                    className="underline hover:text-zk-text"
+                  >
+                    #{bug.duplicateOf.number} {bug.duplicateOf.title}
+                  </Link>
+                </h2>
+              </section>
+            ) : null}
+
+            {resolution ? (
+              <section
+                aria-label="Resolution note"
+                className="rounded-[20px] border border-zk-border bg-zk-ok-bg p-4 sm:p-5"
+              >
+                <h2 className="text-sm font-semibold text-zk-ok-fg">
+                  {resolutionStatusLabel[resolution.status]} by {resolution.by}
+                  <span className="ml-2 text-xs font-normal">
+                    <LocalTime date={resolution.at} />
+                  </span>
+                </h2>
+                <p className="mt-1 whitespace-pre-wrap break-words text-sm text-zk-text">
+                  {resolution.note}
+                </p>
+              </section>
+            ) : null}
+          </>
         }
         sideRailSlot={
           <>

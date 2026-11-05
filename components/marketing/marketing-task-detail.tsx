@@ -37,7 +37,10 @@ export type MarketingTaskDetailProps = {
   nextStepSlot?: ReactNode;
   bannerSlot?: ReactNode;
   commentsSlot?: ReactNode;
+  voteButtonSlot?: ReactNode;
   actionsMenuSlot?: ReactNode;
+  attachmentsSlot?: ReactNode;
+  alertsSlot?: ReactNode;
   sideRailSlot?: ReactNode;
   bidsCount?: number;
   commentsCount?: number;
@@ -57,7 +60,10 @@ export function MarketingTaskDetail({
   nextStepSlot,
   bannerSlot,
   commentsSlot,
+  voteButtonSlot,
   actionsMenuSlot,
+  attachmentsSlot,
+  alertsSlot,
   sideRailSlot,
   bidsCount = 0,
   commentsCount = 0,
@@ -94,7 +100,7 @@ export function MarketingTaskDetail({
 
   return (
     <div className="issue-detail-scope flex flex-col gap-6 pb-12" data-testid="marketing-task-detail">
-      {/* Top Breadcrumb Navigation & Actions */}
+      {/* Top Breadcrumb Navigation & Top Actions (Upvote + Menu) */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zk-divider pb-3">
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs">
           <Link
@@ -112,22 +118,26 @@ export function MarketingTaskDetail({
           </span>
         </nav>
 
-        {actionsMenuSlot ? (
-          <div className="flex items-center gap-2 print:hidden">
-            {actionsMenuSlot}
-          </div>
-        ) : null}
+        <div className="flex items-center gap-2 print:hidden">
+          {voteButtonSlot}
+          {actionsMenuSlot}
+        </div>
       </div>
 
-      {/* Main Grid: Left Primary Content (65%), Right Sidebar (35%) */}
+      {/* Top Alerts (Deleted notice, duplicate notice, resolution note) */}
+      {alertsSlot}
+
+      {/* Main Grid: Left Primary Column (65%), Right Side Rail (35%) */}
       <div className="flex flex-wrap items-start gap-6">
         {/* Main Column */}
         <div className="flex min-w-0 flex-[999_1_640px] flex-col gap-6">
-          {/* Status Alert Banners & Next Step Bar */}
+          {/* Status Alert Banner (DeliveredBanner) */}
           {bannerSlot}
+
+          {/* Next Step Bar (Guidance for next agent action) */}
           {nextStepSlot}
 
-          {/* Marketing Context Header (Focus, Rationale, Rewards, Type, Description) */}
+          {/* Marketing Context Header (Title, Badges, Rationale, Description, Campaign Focus) */}
           <MarketingTaskHeader
             number={bug.number}
             title={bug.title}
@@ -147,6 +157,9 @@ export function MarketingTaskDetail({
             reporterAgent={bug.createdByAgent}
             createdAt={bug.createdAt}
           />
+
+          {/* Attachments Card (if uploaded assets exist) */}
+          {attachmentsSlot}
 
           {/* Active Claim / Award Box (when claimed & in progress) */}
           {hold?.status === "active" && isInProgress ? (
@@ -263,7 +276,7 @@ export function MarketingTaskDetail({
               </div>
             </div>
 
-            {/* Panels Container */}
+            {/* Tab Panels Container */}
             <div className="rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-6">
               {/* Deliverables Panel */}
               <div
@@ -297,7 +310,7 @@ export function MarketingTaskDetail({
                 />
               </div>
 
-              {/* Bids Panel */}
+              {/* Bids & Award Panel */}
               <div
                 role="tabpanel"
                 id="panel-bids"
@@ -341,7 +354,7 @@ export function MarketingTaskDetail({
           </div>
         </div>
 
-        {/* Side Rail */}
+        {/* Side Rail (Status, Reward, People, Links, ActivityTimeline) */}
         {sideRailSlot ? (
           <aside className="flex min-w-[280px] flex-[1_1_320px] flex-col gap-4">
             {sideRailSlot}
