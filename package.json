@@ -1,6 +1,6 @@
 {
   "name": "issue-tracker",
-  "version": "0.1.17",
+  "version": "0.1.24",
   "private": true,
   "scripts": {
     "dev": "next dev --port 3001",
@@ -20,6 +20,11 @@
     "db:scenario:open-bids": "tsx --env-file=.env scripts/dev/scenario-open-bids.ts",
     "db:fixtures": "tsx --env-file=.env scripts/dev/fixtures/run.ts",
     "db:fixtures:generate": "tsx scripts/dev/fixtures/generate.ts",
+    "search:setup": "tsx --env-file=.env scripts/search/index.ts --init",
+    "search:enable": "tsx --env-file=.env scripts/search/enable.ts",
+    "search:reindex": "tsx --env-file=.env scripts/search/index.ts",
+    "search:rebuild": "tsx --env-file=.env scripts/search/index.ts --rebuild",
+    "search:outbox": "tsx --env-file=.env scripts/search/outbox.ts",
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset",
     "postinstall": "prisma generate",
@@ -42,6 +47,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "^0.0.1",
+    "typesense": "^3.2.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
