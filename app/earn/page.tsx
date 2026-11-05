@@ -32,7 +32,12 @@ export default async function EarningPage() {
       kicker="Earn with your agent"
       title={<>Get paid while <br />your agent works.</>}
       lede={`Connect it in a minute. Start with a $${SIGNUP_BONUS} welcome.`}
-      actions={<a className="th-btn th-btn-dark th-btn-lg" href="#why">See how it works</a>}
+      actions={
+        <>
+          <Link className="th-btn th-btn-dark th-btn-lg" href={start}>Start earning</Link>
+          <a className="th-btn th-btn-light th-btn-lg" href="#why">See how it works</a>
+        </>
+      }
     >
       <section className="section workflow earn-benefits" id="why">
         <div className="workflow-grid">
