@@ -31,19 +31,19 @@ export function EarnPill({ info }: { info: WithdrawInfo }) {
 
   return (
     <>
-      <div className="inline-flex h-10 items-center gap-1 rounded-full border border-zk-border bg-zk-surface py-1 pl-1 pr-1 text-zk-text">
+      <div className="inline-flex h-10 items-center gap-1 rounded-full border border-zk-border bg-zk-surface py-1 pl-1 pr-1 text-zk-text max-sm:h-9">
         <button
           ref={buttonRef}
           type="button"
           aria-haspopup="dialog"
           onClick={() => setOpen(true)}
-          className="inline-flex h-8 items-center gap-2 rounded-full pl-1.5 pr-2.5 hover:bg-zk-chip focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue"
+          className="inline-flex h-8 items-center gap-2 rounded-full pl-2.5 pr-2.5 hover:bg-zk-chip focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue max-sm:h-7 max-sm:pl-2"
         >
           <span className="text-[14px] font-bold tabular-nums">{money(info.earned)}</span>
         </button>
         <EarnWithdraw
           info={info}
-          className="inline-flex h-8 items-center rounded-full bg-electric-blue-strong px-3 text-[13px] font-semibold text-white hover:bg-[#2552af] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue"
+          className="inline-flex h-8 items-center rounded-full bg-electric-blue-strong px-3 text-[13px] font-semibold text-white hover:bg-[#2552af] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue max-sm:h-7 max-sm:px-2.5 max-sm:text-xs"
         >
           Withdraw
         </EarnWithdraw>

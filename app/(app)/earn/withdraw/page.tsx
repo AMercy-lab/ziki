@@ -2,10 +2,11 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { formatZ } from "@/lib/points/rules";
-import { CONVERSION_BONUS, WITHDRAW_THRESHOLD, stagePeople, stageTasks } from "@/lib/earn/draft";
-import { sampleBalance } from "@/lib/earn/state";
+import { CONVERSION_BONUS, WITHDRAW_THRESHOLD, earnPreviewEnabled, stagePeople, stageTasks } from "@/lib/earn/draft";
+import { earnBalanceFor } from "@/lib/earn/state";
 import { EarnBar, LockIcon } from "@/components/earn-money";
-import { agentsInputClass, agentsLabelClass, agentsLink, agentsPrimaryBtn, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
+import { agentsLink, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
+import { earnAgentWhere } from "@/lib/earn/earner";
 
 export const metadata = { title: "Withdraw" };
 
@@ -16,14 +17,12 @@ export const metadata = { title: "Withdraw" };
  */
 export default async function EarnWithdrawPage() {
   const user = await requireUser();
-  const balance = await sampleBalance();
+  const balance = await earnBalanceFor(user.id);
   const ready = balance.withdrawable > 0;
   const left = Math.max(0, WITHDRAW_THRESHOLD - balance.earned);
-  const [settings, agent] = await Promise.all([
-    prisma.user.findUnique({ where: { id: user.id }, select: { walletAddress: true } }).catch(() => null),
-    prisma.agent.findFirst({ where: { ownerUserId: user.id, revokedAt: null }, orderBy: { createdAt: "asc" }, select: { name: true } }).catch(() => null),
+  const [agent] = await Promise.all([
+    prisma.agent.findFirst({ where: earnAgentWhere(user.id), orderBy: { createdAt: "asc" }, select: { name: true } }).catch(() => null),
   ]);
-  const wallet = settings?.walletAddress ?? null;
   const tasks = stageTasks(balance.stage);
   const signedUp = stagePeople(balance.stage).filter((person) => person.signedUp).length;
 
@@ -33,7 +32,7 @@ export default async function EarnWithdrawPage() {
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">Withdraw</h1>
         <p className="mt-1 text-sm text-zk-text2">
-          {ready ? "You’ve done the open-source work. Your money is ready." : `Withdrawals open at ${formatZ(WITHDRAW_THRESHOLD)}.`}
+          {ready ? "You’ve reached the threshold." : `Withdrawals open at ${formatZ(WITHDRAW_THRESHOLD)}.`}
         </p>
       </div>
 
@@ -48,20 +47,9 @@ export default async function EarnWithdrawPage() {
             </div>
             <span className="inline-flex items-center gap-1 rounded-full bg-zk-ok-bg px-2.5 py-1 text-xs font-bold text-zk-ok-fg">✓ Ready</span>
           </div>
-          <div className="space-y-1.5">
-            <label htmlFor="withdraw-amount" className={agentsLabelClass}>Amount</label>
-            <input id="withdraw-amount" inputMode="decimal" defaultValue={`$${balance.withdrawable.toFixed(2)}`} className={`${agentsInputClass} tabular-nums`} />
-          </div>
-          <div className="space-y-1.5">
-            <label htmlFor="withdraw-wallet" className={agentsLabelClass}>Wallet address</label>
-            <input id="withdraw-wallet" readOnly value={wallet ?? ""} placeholder="No address yet" className={`${agentsInputClass} font-mono`} />
-            <p className="text-xs text-zk-muted">
-              From your Settings. <Link href="/settings" className={agentsLink}>{wallet ? "Change" : "Add one"}</Link>
-            </p>
-          </div>
-          <button type="button" disabled={!wallet} className={`${agentsPrimaryBtn} w-full`}>
-            Withdraw ${balance.withdrawable.toFixed(2)}
-          </button>
+          <p className="text-sm leading-relaxed text-zk-text2">
+            Your money is ready. We’re still working out how payouts will work, and we’ll tell you as soon as you can take it out.
+          </p>
         </section>
       ) : (
         <section aria-labelledby="available" className={`${agentsSurface} space-y-4 p-5`}>
@@ -140,13 +128,15 @@ export default async function EarnWithdrawPage() {
         Paid to the wallet address in <Link href="/settings" className={agentsLink}>Settings</Link>.
       </p>
 
-      {/* Draft only: see this page at the sample earner's other stages. */}
-      <p className="flex flex-wrap gap-x-3 border-t border-dashed border-zk-border pt-4 text-xs text-zk-muted">
-        Draft preview:
-        <Link href="/earn/preview?state=new" prefetch={false} className={agentsLink}>$5, just signed up</Link>
-        <Link href="/earn/preview?state=progress" prefetch={false} className={agentsLink}>$19, tasks done</Link>
-        <Link href="/earn/preview?state=unlocked" prefetch={false} className={agentsLink}>$30, unlocked</Link>
-      </p>
+      {/* Development only: see this page at the demo stages. */}
+      {earnPreviewEnabled() ? (
+        <p className="flex flex-wrap gap-x-3 border-t border-dashed border-zk-border pt-4 text-xs text-zk-muted">
+          Demo stages:
+          <Link href="/earn/preview?state=new" prefetch={false} className={agentsLink}>Real data</Link>
+          <Link href="/earn/preview?state=progress" prefetch={false} className={agentsLink}>$19, tasks done</Link>
+          <Link href="/earn/preview?state=unlocked" prefetch={false} className={agentsLink}>$30, unlocked</Link>
+        </p>
+      ) : null}
     </div>
   );
 }
