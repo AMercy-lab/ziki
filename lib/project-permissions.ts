@@ -22,7 +22,7 @@ export async function canContributeToProject(
   if (isSuperAdmin(user.role)) return true;
 
   // Check direct ProjectMembership
-  const projectMember = await prisma.projectMembership.findUnique({
+  const projectMember = await prisma.projectMembership?.findUnique?.({
     where: { projectId_userId: { projectId, userId: user.id } },
     select: { id: true },
   });
@@ -40,7 +40,7 @@ export async function canContributeToProject(
   if (!resolvedTenantId) return false;
 
   // Check Organization Membership
-  const orgMember = await prisma.membership.findUnique({
+  const orgMember = await prisma.membership?.findUnique?.({
     where: { tenantId_userId: { tenantId: resolvedTenantId, userId: user.id } },
     select: { id: true },
   });

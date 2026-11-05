@@ -34,6 +34,12 @@ vi.mock("@/lib/prisma", () => ({
         where.id === "project-zedu" && where.tenantId === "tenant-zedu" ? { id: "project-zedu", slug: "zedu" } : null),
     },
     projectArea: { findFirst: vi.fn() },
+    membership: {
+      findUnique: vi.fn(async ({ where }: any) =>
+        where?.tenantId_userId?.tenantId === "tenant-zedu" ? { id: "m-1" } : null
+      ),
+    },
+    projectMembership: { findUnique: vi.fn().mockResolvedValue(null) },
     user: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(),
     $executeRaw: vi.fn(),
