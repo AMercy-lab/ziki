@@ -305,20 +305,39 @@ describe("marketing task types and the report form", () => {
     expect(issueTypes.upsert).toHaveBeenCalled();
   });
 
-  it("proposes with the marketing types, asks for no points (D5) and says nothing was saved", async () => {
-    const { NewMarketingTaskForm, NOT_SAVED_NOTICE } = await import("@/components/marketing/tasks/new-marketing-task-form");
-    render(<NewMarketingTaskForm types={[{ id: "blog", name: "Blog post" }]} />);
+  it("files a marketing idea in this project with the chosen type and rationale, and asks for no points (D5)", async () => {
+    const { NewMarketingTaskForm } = await import("@/components/marketing/tasks/new-marketing-task-form");
+    mockedCreateBug.mockResolvedValue({ ok: true });
+    render(<NewMarketingTaskForm projectId="project-1" types={[{ id: "blog", name: "Blog post" }]} />);
 
-    expect(screen.getByRole("option", { name: "Blog post" })).toBeTruthy();
     expect(screen.queryByLabelText(/points/i)).toBeNull();
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Write a launch post" } });
+    fireEvent.change(screen.getByLabelText("Rationale"), { target: { value: "People keep asking what changed." } });
+    fireEvent.submit(screen.getByRole("button", { name: "Propose task" }).closest("form")!);
+
+    await waitFor(() => expect(mockedCreateBug).toHaveBeenCalledTimes(1));
+    const sent = mockedCreateBug.mock.calls[0]![0];
+    expect(Object.fromEntries(sent.entries())).toMatchObject({
+      track: "marketing",
+      projectId: "project-1",
+      typeId: "blog",
+      title: "Write a launch post",
+      rationale: "People keep asking what changed.",
+    });
+  }, 15000);
+
+  it("shows why a marketing proposal was refused", async () => {
+    const { NewMarketingTaskForm } = await import("@/components/marketing/tasks/new-marketing-task-form");
+    mockedCreateBug.mockResolvedValue({ error: "Say why this is worth doing.", field: "rationale" });
+    render(<NewMarketingTaskForm projectId="project-1" types={[{ id: "blog", name: "Blog post" }]} />);
 
     fireEvent.submit(screen.getByRole("button", { name: "Propose task" }).closest("form")!);
-    expect(screen.getByRole("status").textContent).toBe(NOT_SAVED_NOTICE);
+    expect((await screen.findByRole("alert")).textContent).toBe("Say why this is worth doing.");
   }, 15000);
 
   it("can't be submitted when the workspace has no marketing types", async () => {
     const { NewMarketingTaskForm } = await import("@/components/marketing/tasks/new-marketing-task-form");
-    render(<NewMarketingTaskForm types={[]} />);
+    render(<NewMarketingTaskForm projectId="project-1" types={[]} />);
     expect((screen.getByRole("button", { name: "Propose task" }) as HTMLButtonElement).disabled).toBe(true);
   }, 15000);
 });

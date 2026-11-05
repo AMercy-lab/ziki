@@ -18,6 +18,7 @@ import { TasksBoard } from "@/components/marketing/tasks/tasks-board";
 import { TASK_TABS } from "@/components/marketing/tasks/model";
 import { Proposals } from "@/components/marketing/proposals/proposals";
 import type { ProposalItem, ProposalsResult } from "@/components/marketing/proposals/model";
+import { NewMarketingTaskForm } from "@/components/marketing/tasks/new-marketing-task-form";
 import { createWebhookAction, listWebhooksAction } from "@/app/actions/webhooks";
 
 vi.mock("@/app/actions/issues", () => ({
@@ -151,7 +152,13 @@ describe("component accessibility (axe)", () => {
     const { container } = render(<Proposals slug="acme" projectName="Acme" view="open" initial={initial} />);
     await expectNoA11yViolations(container);
   });
-
+  it("keeps the new marketing task form accessible, with and without task types", async () => {
+    const withTypes = render(<NewMarketingTaskForm projectId="project-1" types={[{ id: "blog", name: "Blog post" }]} />);
+    await expectNoA11yViolations(withTypes.container);
+    withTypes.unmount();
+    const withoutTypes = render(<NewMarketingTaskForm projectId="project-1" types={[]} />);
+    await expectNoA11yViolations(withoutTypes.container);
+  });
   it("VoteButton has no violations", async () => {
     const { container } = render(<VoteButton bugId="b1" voteCount={3} />);
     await expectNoA11yViolations(container);
