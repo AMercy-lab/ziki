@@ -126,6 +126,8 @@ export default async function AppLayout({
 
   let pendingEscalationsCount = 0;
   let dockAgents: DockAgent[] = [];
+  // Members of this workspace, for the Leaderboard link: nobody ranks against no one. Null when it couldn't be read.
+  let memberCount: number | null = null;
   // Earn is a place of its own: on an earn page the agents bar shows the Earn workspace's agents, not the
   // ones in the person's other workspaces.
   const dockTenantId = isEarnPath(requestPath) ? ((await earnWorkspace().catch(() => null))?.id ?? null) : tenantId;
@@ -134,6 +136,11 @@ export default async function AppLayout({
       pendingEscalationsCount = await countPendingEscalations(user.id, tenantId);
     } catch (error) {
       console.error("[layout] pending escalations count failed", error);
+    }
+    try {
+      memberCount = await prisma.membership.count({ where: { tenantId } });
+    } catch (error) {
+      console.error("[layout] member count failed", error);
     }
     try {
       const agents = dockTenantId ? await loadOwnAgents({ userId: user.id, tenantId: dockTenantId }) : [];
@@ -192,6 +199,9 @@ export default async function AppLayout({
           organizationAdmin={tenantId !== null && isOrganizationAdmin(membershipRole, user.role)}
           earned={earnSample ? earnSample.earned : null}
           withdraw={earnSample ? withdrawInfo(earnSample.stage, earnSample.earned) : null}
+          version={appVersionLabel()}
+          memberCount={memberCount}
+          agentCount={dockAgents.length}
         />
         <main
           id={MAIN_CONTENT_ID}
@@ -204,8 +214,8 @@ export default async function AppLayout({
           {children}
         </main>
       </div>
-      {/* The agents dock keeps the page's foot clear of its floor line itself, as tall as what stands on it. */}
-      <AgentsDock agents={dockAgents} defaultProjectSlug={defaultProjectSlug} version={appVersionLabel()} earn={earnSample !== null} />
+      {/* The agents dock keeps the page's foot clear of its floor line itself, as tall as what stands on it, and draws nothing (no spacer either) where it doesn't help. */}
+      <AgentsDock agents={dockAgents} defaultProjectSlug={defaultProjectSlug} version={appVersionLabel()} earn={earnSample !== null} memberCount={memberCount} />
       <FocusMainOnNavigate />
       {welcomeNotice ? <EarnWelcomeToast /> : null}
       <KeyboardShortcuts
