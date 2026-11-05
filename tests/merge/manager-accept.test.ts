@@ -33,11 +33,12 @@ const db = vi.hoisted(() => ({
   agentEvent: { create: vi.fn() },
   webhookSubscription: { findMany: vi.fn() },
   webhookDelivery: { createMany: vi.fn() },
-  issueClaim: { updateMany: vi.fn() },
+  issueClaim: { updateMany: vi.fn(), update: vi.fn() },
   delivery: { findMany: vi.fn(), findFirst: vi.fn() },
   projectWorkflow: { findUnique: vi.fn() },
   project: { findFirst: vi.fn() },
   agentMistake: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), findMany: vi.fn() },
+  $queryRaw: vi.fn(),
   $transaction: vi.fn(),
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
@@ -73,6 +74,7 @@ function bugRow(overrides: Record<string, unknown> = {}) {
     tenantId: "tenant_zedu",
     pullRequestUrl: PR,
     pullRequestHeadSha: "linked-sha",
+    revisionCount: 0,
     status: "open", substatus: "open",
     assigneeId: "ada",
     beneficiaryUserId: "ada",
@@ -81,6 +83,7 @@ function bugRow(overrides: Record<string, unknown> = {}) {
     // The pull request link is in the project's repository (#pr-reports gate).
     project: { repoUrl: "https://github.com/Zedu-Endor/issue-tracker" },
     claims: [{
+      id: "claim1",
       status: "active",
       releasedAt: null,
       agentId: "solver-agent",
@@ -154,6 +157,7 @@ beforeEach(() => {
   state.verdicts = [];
   state.confirmations = [];
   db.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(db));
+  db.$queryRaw.mockResolvedValue([{ id: "bug1" }]);
   db.bug.findFirst.mockResolvedValue(bugRow());
   db.bug.findUnique.mockResolvedValue(bugRow());
   // No delivery filed on the claim holder's behalf unless a test adds one.
@@ -424,6 +428,7 @@ describe("acceptFix: marketing work goes Live (#M-API-5)", () => {
       pullRequestHeadSha: null,
       reporterId: "poster",
       claims: [{
+        id: "claim1",
         status: "active",
         claimedAt: new Date("2026-10-20T10:00:00Z"),
         releasedAt: null,
@@ -546,6 +551,7 @@ describe("acceptFix: marketing work goes Live (#M-API-5)", () => {
     const awards = marketingAcceptAwards({
       bug: { id: "bug1", tenantId: "tenant_zedu", reporterId: "poster" },
       claim: {
+        id: "claim1",
         status: "active",
         claimedAt: new Date("2026-10-20T10:00:00Z"),
         releasedAt: null,
@@ -571,5 +577,115 @@ describe("acceptFix: marketing work goes Live (#M-API-5)", () => {
       "reviewer:bug1:rob",
       "reviewer:bug1:sam",
     ]);
+  });
+
+  it("rejecting marketing work uses up a revision round and keeps the claim", async () => {
+    db.bug.findFirst.mockResolvedValue(marketingBug({ status: "done", substatus: "accepted", revisionCount: 0 }));
+
+    const result = await acceptFix(merger("m1", "mo", "manager"), "bug1", {
+      verdict: "reject",
+      summary: "Needs copy changes.",
+      description: "Headline is unclear.",
+    });
+
+    expect(result).toMatchObject({ status: 200, accepted: false, rejected: true });
+    expect(db.bug.update).toHaveBeenCalledWith({
+      where: { id: "bug1" },
+      data: { status: "in_progress", substatus: "in_progress", revisionCount: 1 },
+    });
+    expect(db.issueClaim.update).not.toHaveBeenCalled();
+  });
+
+  it("rejecting marketing work past the revision limit reopens for bids and releases the claim", async () => {
+    db.bug.findFirst.mockResolvedValue(marketingBug({ status: "done", substatus: "accepted", revisionCount: 2 }));
+
+    const result = await acceptFix(merger("m1", "mo", "manager"), "bug1", {
+      verdict: "reject",
+      summary: "Still not good.",
+      description: "Revision limit reached.",
+    });
+
+    expect(result).toMatchObject({ status: 200, accepted: false, rejected: true });
+    expect(db.bug.update).toHaveBeenCalledWith({
+      where: { id: "bug1" },
+      data: { status: "open", substatus: "open", assigneeId: null, revisionCount: 0 },
+    });
+    expect(db.issueClaim.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "released", releaseReason: "manager_rejected" }),
+      }),
+    );
+  });
+
+  it("does not reject marketing work before peer reviewers approve it", async () => {
+    db.bug.findFirst.mockResolvedValue(marketingBug({ status: "done", substatus: "requires_review", revisionCount: 0 }));
+
+    const result = await acceptFix(merger("m1", "mo", "manager"), "bug1", {
+      verdict: "reject",
+      summary: "Reject early.",
+      description: "Should be blocked.",
+    });
+
+    expect(result).toMatchObject({ status: 409, error: "not_ready", missing: "verdicts" });
+    expect(db.bug.update).not.toHaveBeenCalled();
+  });
+
+  it("refuses reject if concurrent change moved marketing work away from accepted before tx commits", async () => {
+    // 1st call outside tx returns accepted; 2nd call inside tx returns in_progress (e.g. concurrent reject won the race)
+    db.bug.findFirst
+      .mockResolvedValueOnce(marketingBug({ status: "done", substatus: "accepted", revisionCount: 0 }))
+      .mockResolvedValueOnce(marketingBug({ status: "in_progress", substatus: "in_progress", revisionCount: 1 }));
+
+    const result = await acceptFix(merger("m1", "mo", "manager"), "bug1", {
+      verdict: "reject",
+      summary: "Concurrent reject.",
+      description: "Should fail in tx.",
+    });
+
+    expect(result).toMatchObject({ status: 409, error: "not_ready", missing: "verdicts" });
+    expect(db.bug.update).not.toHaveBeenCalled();
+  });
+
+  it("locks the issue row so concurrent rejections race safely and do not duplicate a revision round", async () => {
+    const liveBug = marketingBug({ status: "done", substatus: "accepted", revisionCount: 0 });
+    let lockTail = Promise.resolve();
+
+    db.bug.findFirst.mockImplementation(async () => ({ ...liveBug }));
+    db.bug.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
+      Object.assign(liveBug, data);
+      return { ...liveBug };
+    });
+
+    db.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
+      let releaseLock: (() => void) | undefined;
+      const tx = {
+        ...db,
+        $queryRaw: async () => {
+          const previous = lockTail;
+          lockTail = new Promise<void>((resolve) => { releaseLock = resolve; });
+          await previous;
+          return [{ id: liveBug.id }];
+        },
+      };
+      try {
+        return await callback(tx);
+      } finally {
+        releaseLock?.();
+      }
+    });
+
+    const [first, second] = await Promise.all([
+      acceptFix(merger("m1", "mo1", "manager"), "bug1", { verdict: "reject", summary: "First reject", description: "Reason 1" }),
+      acceptFix(merger("m2", "mo2", "manager"), "bug1", { verdict: "reject", summary: "Second reject", description: "Reason 2" }),
+    ]);
+
+    const results = [first, second];
+    const success = results.find((r) => r.status === 200);
+    const blocked = results.find((r) => r.status === 409);
+
+    expect(success).toMatchObject({ status: 200, rejected: true });
+    expect(blocked).toMatchObject({ status: 409, error: "not_ready", missing: "verdicts" });
+    expect(liveBug.substatus).toBe("in_progress");
+    expect(liveBug.revisionCount).toBe(1);
   });
 });
