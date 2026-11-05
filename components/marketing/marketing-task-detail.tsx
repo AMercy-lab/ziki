@@ -98,7 +98,7 @@ export function MarketingTaskDetail({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zk-divider pb-3">
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs">
           <Link
-            href={marketingPath(bug.project.slug, "tasks")}
+            href={marketingPath(bug.project.slug)}
             className="inline-flex items-center gap-1.5 font-medium text-zk-muted transition-colors hover:text-zk-text"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

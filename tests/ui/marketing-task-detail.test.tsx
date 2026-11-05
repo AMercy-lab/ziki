@@ -49,7 +49,7 @@ describe("MarketingTaskHeader (M-UI-4)", () => {
 
     // Marketing badge & Task Type
     const marketingBadge = screen.getByRole("link", { name: "Marketing" });
-    expect(marketingBadge).toHaveAttribute("href", "/ziki/marketing/tasks");
+    expect(marketingBadge).toHaveAttribute("href", "/ziki/marketing");
     expect(screen.getByText("Video Production")).toBeInTheDocument();
 
     // Reward in formatZ ($250)
@@ -253,7 +253,7 @@ describe("MarketingTaskDetail full integration (M-UI-4)", () => {
 
     // Verify breadcrumb
     const breadcrumbLink = screen.getByRole("link", { name: /Marketing Tasks/i });
-    expect(breadcrumbLink).toHaveAttribute("href", "/ziki/marketing/tasks");
+    expect(breadcrumbLink).toHaveAttribute("href", "/ziki/marketing");
 
     // Verify tab buttons and counts
     expect(screen.getByRole("tab", { name: /Deliverables/i })).toBeInTheDocument();
