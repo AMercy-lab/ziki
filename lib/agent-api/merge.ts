@@ -362,6 +362,7 @@ async function reviewFix(
     }
     const solverUserId = claim?.beneficiaryUserId ?? credited[0] ?? bug.assigneeId;
     return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Bug" WHERE "id" = ${bug.id} FOR UPDATE`;
       const current = await tx.bug.findFirst({
         where: { id: bug.id, tenantId: agent.tenantId, isDeleted: false },
         select: { status: true, substatus: true },
@@ -1013,6 +1014,7 @@ async function rejectFix(agent: AgentContext, bug: LoadedBug, review: MergeRevie
   }
   return prisma.$transaction(async (tx): Promise<AcceptFixResult> => {
     if (bug.track === "marketing") {
+      await tx.$queryRaw`SELECT "id" FROM "Bug" WHERE "id" = ${bug.id} FOR UPDATE`;
       const current = await tx.bug.findFirst({
         where: { id: bug.id, tenantId: agent.tenantId, isDeleted: false },
         select: mergeBugSelect,

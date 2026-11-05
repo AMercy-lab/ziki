@@ -38,6 +38,7 @@ const db = vi.hoisted(() => ({
   projectWorkflow: { findUnique: vi.fn() },
   project: { findFirst: vi.fn() },
   agentMistake: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), findMany: vi.fn() },
+  $queryRaw: vi.fn(),
   $transaction: vi.fn(),
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
@@ -73,6 +74,7 @@ function bugRow(overrides: Record<string, unknown> = {}) {
     tenantId: "tenant_zedu",
     pullRequestUrl: PR,
     pullRequestHeadSha: "linked-sha",
+    revisionCount: 0,
     status: "open", substatus: "open",
     assigneeId: "ada",
     beneficiaryUserId: "ada",
@@ -155,6 +157,7 @@ beforeEach(() => {
   state.verdicts = [];
   state.confirmations = [];
   db.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(db));
+  db.$queryRaw.mockResolvedValue([{ id: "bug1" }]);
   db.bug.findFirst.mockResolvedValue(bugRow());
   db.bug.findUnique.mockResolvedValue(bugRow());
   // No delivery filed on the claim holder's behalf unless a test adds one.
@@ -641,5 +644,48 @@ describe("acceptFix: marketing work goes Live (#M-API-5)", () => {
 
     expect(result).toMatchObject({ status: 409, error: "not_ready", missing: "verdicts" });
     expect(db.bug.update).not.toHaveBeenCalled();
+  });
+
+  it("locks the issue row so concurrent rejections race safely and do not duplicate a revision round", async () => {
+    const liveBug = marketingBug({ status: "done", substatus: "accepted", revisionCount: 0 });
+    let lockTail = Promise.resolve();
+
+    db.bug.findFirst.mockImplementation(async () => ({ ...liveBug }));
+    db.bug.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
+      Object.assign(liveBug, data);
+      return { ...liveBug };
+    });
+
+    db.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
+      let releaseLock: (() => void) | undefined;
+      const tx = {
+        ...db,
+        $queryRaw: async () => {
+          const previous = lockTail;
+          lockTail = new Promise<void>((resolve) => { releaseLock = resolve; });
+          await previous;
+          return [{ id: liveBug.id }];
+        },
+      };
+      try {
+        return await callback(tx);
+      } finally {
+        releaseLock?.();
+      }
+    });
+
+    const [first, second] = await Promise.all([
+      acceptFix(merger("m1", "mo1", "manager"), "bug1", { verdict: "reject", summary: "First reject", description: "Reason 1" }),
+      acceptFix(merger("m2", "mo2", "manager"), "bug1", { verdict: "reject", summary: "Second reject", description: "Reason 2" }),
+    ]);
+
+    const results = [first, second];
+    const success = results.find((r) => r.status === 200);
+    const blocked = results.find((r) => r.status === 409);
+
+    expect(success).toMatchObject({ status: 200, rejected: true });
+    expect(blocked).toMatchObject({ status: 409, error: "not_ready", missing: "verdicts" });
+    expect(liveBug.substatus).toBe("in_progress");
+    expect(liveBug.revisionCount).toBe(1);
   });
 });
