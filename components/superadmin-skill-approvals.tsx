@@ -24,37 +24,29 @@ const INITIAL_ACTIVE: SkillApprovalItem[] = [
     id: "sub-seed-1",
     title: "Next.js App Router Performance Guardian",
     slug: "nextjs-guardian",
-    categoryLabel: "Frontend & Fullstack",
     status: "pending",
     authorName: "Sarah Jenkins",
-    authorEmail: "sarah.j@emerjent.org",
   },
   {
     id: "sub-seed-2",
     title: "PostgreSQL Database Migration Auditor",
     slug: "database-migration",
-    categoryLabel: "DevOps & Infrastructure",
     status: "pending",
     authorName: "Alex Rivera",
-    authorEmail: "alex.r@emerjent.org",
   },
   {
     id: "sub-seed-3",
     title: "WCAG 2.1 AA Accessibility Linter",
     slug: "a11y-linter",
-    categoryLabel: "Testing & QA",
     status: "pending",
     authorName: "Maya Lin",
-    authorEmail: "maya.l@emerjent.org",
   },
   {
     id: "sub-seed-4",
     title: "Flutter Declarative State Engine",
     slug: "flutter-state",
-    categoryLabel: "Mobile Development",
     status: "pending",
     authorName: "David Kim",
-    authorEmail: "david.k@emerjent.org",
   },
 ];
 
@@ -145,7 +137,7 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
   }
 
   return (
-    <div className="w-full space-y-8">
+    <div className="w-full max-w-full space-y-8 overflow-hidden">
       {/* Toast Notification */}
       {toastMessage && (
         <div
@@ -205,8 +197,14 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
             <p className="mt-1 text-xs text-zk-muted">No pending skill submissions in the review queue right now.</p>
           </div>
         ) : (
-          <div className="rounded-[18px] border border-zk-border bg-zk-surface shadow-sm overflow-hidden">
-            <table className="w-full text-left text-sm divide-y divide-zk-border">
+          <div className="rounded-[18px] border border-zk-border bg-zk-surface shadow-sm overflow-hidden w-full">
+            <table className="table-fixed w-full text-left text-sm divide-y divide-zk-border">
+              <colgroup>
+                <col className="w-[42%]" />
+                <col className="w-[20%]" />
+                <col className="w-[18%]" />
+                <col className="w-[20%]" />
+              </colgroup>
               <thead className="bg-zk-tint text-xs font-semibold uppercase tracking-wide text-zk-muted">
                 <tr>
                   <th className="px-4 py-3">Skill Name</th>
@@ -219,52 +217,52 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
                 {activeItems.map((item) => (
                   <tr key={item.id} className="hover:bg-zk-tint/60 transition-colors">
                     {/* Skill Name */}
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5 pr-2">
                       <Link
                         href="/skills"
-                        className="font-medium text-zk-text hover:text-zk-accent transition hover:underline"
-                        title="Click to view in library"
+                        className="font-medium text-zk-text hover:text-zk-accent transition hover:underline line-clamp-1 break-words"
+                        title={item.title}
                       >
                         {item.title}
                       </Link>
                     </td>
 
                     {/* Submitted By */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-2.5">
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
                         <Avatar name={item.authorName} image={item.authorImage} size="sm" />
-                        <span className="text-xs font-medium text-zk-text">{item.authorName}</span>
+                        <span className="text-xs font-medium text-zk-text truncate">{item.authorName}</span>
                       </div>
                     </td>
 
                     {/* Status */}
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-4 py-3.5 whitespace-nowrap">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-xs font-semibold text-blue-600 border border-blue-500/20">
                         <span className="size-1.5 rounded-full bg-blue-500 animate-pulse" />
-                        Pending Review
+                        Pending
                       </span>
                     </td>
 
                     {/* Decision */}
-                    <td className="px-4 py-3 whitespace-nowrap text-right">
-                      <div className="inline-flex items-center gap-2 justify-end">
+                    <td className="px-4 py-3.5 whitespace-nowrap text-right">
+                      <div className="inline-flex items-center gap-1.5 justify-end">
                         <button
                           type="button"
                           onClick={() => handleApprove(item)}
-                          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition shadow-sm"
+                          className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 transition shadow-sm"
                         >
                           Approve
                         </button>
                         <button
                           type="button"
                           onClick={() => handleReject(item)}
-                          className="rounded-lg border border-zk-border bg-zk-surface px-3 py-1.5 text-xs font-semibold text-zk-muted hover:text-zk-text hover:bg-zk-tint transition"
+                          className="rounded-lg border border-zk-border bg-zk-surface px-2.5 py-1 text-xs font-semibold text-zk-muted hover:text-zk-text hover:bg-zk-tint transition"
                         >
                           Reject
                         </button>
                         <Link
                           href="/skills"
-                          className="rounded-lg border border-zk-border bg-zk-surface px-2.5 py-1.5 text-xs font-semibold text-zk-text2 hover:text-zk-text hover:bg-zk-tint transition"
+                          className="rounded-lg border border-zk-border bg-zk-surface px-2 py-1 text-xs font-semibold text-zk-text2 hover:text-zk-text hover:bg-zk-tint transition"
                         >
                           View
                         </Link>
@@ -279,7 +277,7 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
       </section>
 
       {/* SECTION 2: DECISION HISTORY */}
-      <section className="space-y-3 pt-3 border-t border-zk-border">
+      <section className="space-y-3 pt-4 border-t border-zk-border">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-zk-text flex items-center gap-2">
             Decision History
@@ -292,8 +290,14 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
             No reviewed skill history yet.
           </div>
         ) : (
-          <div className="rounded-[18px] border border-zk-border bg-zk-surface shadow-sm overflow-hidden">
-            <table className="w-full text-left text-sm divide-y divide-zk-border">
+          <div className="rounded-[18px] border border-zk-border bg-zk-surface shadow-sm overflow-hidden w-full">
+            <table className="table-fixed w-full text-left text-sm divide-y divide-zk-border">
+              <colgroup>
+                <col className="w-[38%]" />
+                <col className="w-[22%]" />
+                <col className="w-[18%]" />
+                <col className="w-[22%]" />
+              </colgroup>
               <thead className="bg-zk-tint text-xs font-semibold uppercase tracking-wide text-zk-muted">
                 <tr>
                   <th className="px-4 py-3">Skill Name</th>
@@ -306,26 +310,26 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
                 {historyItems.map((item) => (
                   <tr key={item.id} className="hover:bg-zk-tint/60 transition-colors">
                     {/* Skill Name */}
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5 pr-2">
                       <Link
                         href="/skills"
-                        className="font-medium text-zk-text hover:text-zk-accent transition hover:underline"
-                        title="Click to view in library"
+                        className="font-medium text-zk-text hover:text-zk-accent transition hover:underline line-clamp-1 break-words"
+                        title={item.title}
                       >
                         {item.title}
                       </Link>
                     </td>
 
                     {/* Submitted By */}
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-4 py-3.5 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Avatar name={item.authorName} image={item.authorImage} size="sm" />
-                        <span className="text-xs font-medium text-zk-text">{item.authorName}</span>
+                        <span className="text-xs font-medium text-zk-text truncate">{item.authorName}</span>
                       </div>
                     </td>
 
                     {/* Status */}
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-4 py-3.5 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border ${
                           item.status === "approved"
@@ -343,13 +347,16 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
                     </td>
 
                     {/* Outcome Note */}
-                    <td className="px-4 py-3 whitespace-nowrap text-right">
+                    <td className="px-4 py-3.5 text-right">
                       {item.status === "approved" ? (
                         <span className="text-xs text-emerald-600 font-medium">
-                          ✓ Published to library
+                          ✓ Published
                         </span>
                       ) : (
-                        <span className="text-xs text-amber-600 font-medium">
+                        <span
+                          className="text-xs text-amber-700 truncate block max-w-full font-medium"
+                          title={item.rejectionReason ?? "Changes requested"}
+                        >
                           {item.rejectionReason || "Changes requested"}
                         </span>
                       )}
