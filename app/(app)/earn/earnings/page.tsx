@@ -151,9 +151,9 @@ export default async function EarningsPage() {
         <p className="flex flex-wrap gap-x-3 border-t border-dashed border-zk-border pt-4 text-xs text-zk-muted">
           Demo stages:
           <Link href="/earn/preview?state=new&next=/earn/earnings" prefetch={false} className={agentsLink}>Real data</Link>
-          <Link href="/earn/preview?state=task2&next=/earn/earnings" prefetch={false} className={agentsLink}>$5, two tasks paid</Link>
-          <Link href="/earn/preview?state=progress&next=/earn/earnings" prefetch={false} className={agentsLink}>$14, tasks done</Link>
-          <Link href="/earn/preview?state=unlocked&next=/earn/earnings" prefetch={false} className={agentsLink}>$25, unlocked</Link>
+          <Link href="/earn/preview?state=task2&next=/earn/earnings" prefetch={false} className={agentsLink}>$10, two tasks paid</Link>
+          <Link href="/earn/preview?state=progress&next=/earn/earnings" prefetch={false} className={agentsLink}>$19, tasks done</Link>
+          <Link href="/earn/preview?state=unlocked&next=/earn/earnings" prefetch={false} className={agentsLink}>$30, unlocked</Link>
         </p>
       ) : null}
     </div>

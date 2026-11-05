@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
  */
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
-import { confirmTask, paidCount, rejectTask, startNextTask, submitTask, taskStateFor } from "@/lib/earn/progress";
+import { confirmTask, grantWelcome, paidCount, rejectTask, startNextTask, submitTask, taskStateFor } from "@/lib/earn/progress";
 
 type TaskRow = { userId: string; taskKey: string; status: string; proof?: string | null; note?: string | null };
 type Where = { userId?: string; taskKey?: string; status?: string | { in: string[] } };
@@ -33,6 +33,7 @@ function fakeEarnDb(options: { earnTenant?: boolean; memberships?: Array<{ tenan
       }),
     },
     pointEntry: {
+      findUnique: vi.fn(async ({ where }: { where: { sourceKey: string } }) => (state.ledger.some((row) => row.sourceKey === where.sourceKey) ? { id: "e" } : null)),
       createMany: vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
         let count = 0;
         for (const row of data) {
@@ -105,6 +106,17 @@ describe("earn tasks (#earn-tasks)", () => {
     expect(await submitTask(db, "earner", 1, "Bakeries in Lagos without a website")).toEqual({ ok: true });
     expect(state.tasks[0]).toMatchObject({ status: "submitted", note: null });
     expect(state.ledger).toEqual([]);
+  });
+
+  it("pays the $5 welcome once to anyone who comes to earn, in the Earn workspace, and nothing to someone with no workspace", async () => {
+    const { state, db } = fakeEarnDb({ earnTenant: true, memberships: [{ tenantId: "tenant-earn", userId: "earner" }] });
+    expect(await grantWelcome(db, "earner", "ziki-earn")).toBe(true);
+    expect(await grantWelcome(db, "earner", "ziki-earn")).toBe(false);
+    expect(state.ledger).toEqual([expect.objectContaining({ tenantId: "tenant-earn", userId: "earner", role: "signup", points: 5, sourceKey: "earn:welcome:earner" })]);
+
+    const homeless = fakeEarnDb({ memberships: [] });
+    expect(await grantWelcome(homeless.db, "earner", "ziki-earn")).toBe(false);
+    expect(homeless.state.ledger).toEqual([]);
   });
 
   it("starts the next task once, however often it is asked", async () => {

@@ -1,6 +1,6 @@
 import type { EarnTaskProgress, Prisma, PrismaClient } from "@prisma/client";
 import { award } from "@/lib/points/award";
-import { EARN_TASKS, stageForPaid, type EarnStage, type EarnTask } from "@/lib/earn/draft";
+import { EARN_TASKS, SIGNUP_BONUS, stageForPaid, type EarnStage, type EarnTask } from "@/lib/earn/draft";
 
 /**
  * Earn marketing tasks (#earn-tasks): where a person is on each of the four
@@ -135,6 +135,22 @@ export async function creditTenantId(db: Db, userId: string, earnTenantSlug: str
   }
   const first = await db.membership.findFirst({ where: { userId }, orderBy: { createdAt: "asc" }, select: { tenantId: true } });
   return first?.tenantId ?? null;
+}
+
+/**
+ * The $5 welcome for coming to earn (#earn-welcome): paid once to anyone who
+ * opens an earn page, new account or old. It is its own reward, separate from
+ * the sign-up bonus the site pays every account. Under the `earn:` key prefix,
+ * so the earn balance counts it, and unique per person, so asking again pays
+ * nothing. Does nothing for someone who belongs to no workspace (nowhere to
+ * credit). Returns true when it was paid now.
+ */
+export async function grantWelcome(db: Db, userId: string, earnTenantSlug: string): Promise<boolean> {
+  const sourceKey = `${EARN_KEY_PREFIX}welcome:${userId}`;
+  if (await db.pointEntry.findUnique({ where: { sourceKey }, select: { id: true } })) return false;
+  const tenantId = await creditTenantId(db, userId, earnTenantSlug);
+  if (!tenantId) return false;
+  return award(db, { tenantId, userId, bugId: null, role: "signup", points: SIGNUP_BONUS, sourceKey, exact: true });
 }
 
 export type DecideResult = { ok: true } | { ok: false; error: string };

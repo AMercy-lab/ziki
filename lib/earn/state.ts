@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { EARN_PREVIEW_COOKIE, EARN_STAGES, EARN_TASKS, earnBalance, earnPreviewEnabled, tasksPaid, type EarnBalance, type EarnStage } from "@/lib/earn/draft";
-import { earnedFromLedger, loadRows, stageFromRows, startedFromRows, startNextTask, type EarnTaskRow } from "@/lib/earn/progress";
+import { EARN_PREVIEW_COOKIE, EARN_STAGES, EARN_TASKS, EARN_WORKSPACE_SLUG, earnBalance, earnPreviewEnabled, tasksPaid, type EarnBalance, type EarnStage } from "@/lib/earn/draft";
+import { earnedFromLedger, grantWelcome, loadRows, stageFromRows, startedFromRows, startNextTask, type EarnTaskRow } from "@/lib/earn/progress";
 
 /**
  * Where an earner is (#earn-tasks), read from the database: their task rows
@@ -32,6 +32,8 @@ export async function earnState(userId: string): Promise<EarnState> {
     const rows: EarnTaskRow[] = EARN_TASKS.slice(0, tasksPaid(preview)).map((task) => ({ taskKey: task.id, status: "confirmed", note: null }));
     return { stage: preview, balance: earnBalance(preview), started: null, rows };
   }
+  // The $5 welcome is paid the first time someone is here, before the balance is read.
+  await grantWelcome(prisma, userId, EARN_WORKSPACE_SLUG);
   const [rows, earned] = await Promise.all([loadRows(prisma, userId), earnedFromLedger(prisma, userId)]);
   const stage = stageFromRows(rows);
   return { stage, balance: earnBalance(stage, earned), started: startedFromRows(rows), rows };

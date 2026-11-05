@@ -80,11 +80,11 @@ export const EARN_WORKSPACE_SLUG = "ziki-earn";
 export const EARN_LINK = "ziki.dev/r/chloe";
 
 /**
- * A welcome bonus for signing up to earn. Zero until Mark decides: nothing
- * awards it, so counting it would show money that is not in the ledger (the
- * draft showed $5).
+ * The welcome for coming to earn: paid once, to anyone who opens an earn page
+ * for the first time, new account or old (grantWelcome in lib/earn/progress.ts).
+ * Not the site's own sign-up bonus (lib/points/signup-bonus.ts).
  */
-export const SIGNUP_BONUS = 0;
+export const SIGNUP_BONUS = 5;
 
 /** The earner's project in that workspace: its main list holds the Ziki tasks step. */
 export const EARN_PROJECT_SLUG = "ziki-earn";
