@@ -84,6 +84,8 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 import { IssuesList } from "@/app/(app)/[project]/issues/_list/issues-list";
+import { TasksBoard } from "@/components/marketing/tasks/tasks-board";
+import { taskTab, type TaskRow, type TasksBoardData } from "@/components/marketing/tasks/model";
 
 const BUG = {
   id: "bug-1",
@@ -240,6 +242,75 @@ describe("issue list layout", () => {
     expect(counted(statusList(html))).toEqual({ Open: 13, "In progress": 2, Closed: 3, "Possibly delivered": 1 });
   });
 
+});
+
+describe("the marketing tasks board", () => {
+  const ROW = {
+    id: "task-1", number: 41, title: "Write the launch post", href: "/acme/41", status: "open", substatus: "open", closeReason: null,
+    importance: 0, reward: 4, rewardEstimates: 2, rewardFixed: false, typeName: "Blog post", agentName: null, work: null, offeredTo: null,
+    revision: null, bids: 2, comments: 0, updatedAt: new Date("2026-11-01T10:00:00Z"),
+  } satisfies TaskRow;
+  
+  function renderBoard(board: Partial<TasksBoardData> = {}) {
+    return clean(renderToStaticMarkup(
+      <TasksBoard slug="acme" board={{
+        tab: taskTab("open"),
+        counts: { ideas: 2, open: 1, "in-progress": 4, closed: 1, done: 3, live: 2 },
+        sortParam: null,
+        list: { kind: "tasks", rows: [ROW], sort: "importance" },
+        pagination: { page: 1, totalPages: 1, totalCount: 1, from: 1, to: 1 },
+        ...board,
+      }} />,
+    ));
+  }
+
+  it("opens each task on the shared issue route, ready for bids with no confirmation step", () => {
+    const html = renderBoard();
+    expect(html).toContain('href="/acme/41"');
+    expect(html).toContain("2 bids");
+    expect(html).not.toContain("Awaiting Confirmation");
+  });
+
+  it("shows the three stages across the top, each counting its own steps, with Merge left out", () => {
+    const nav = stages(renderBoard());
+    expect(counted(nav)).toEqual({ Ideas: 2, "In Progress": 6, Delivered: 5 });
+    expect(current(nav)).toEqual(["In Progress"]);
+  });
+
+  it("lists a stage's lifecycle steps down the left", () => {
+    const inProgress = statusList(renderBoard());
+    expect(links(inProgress).map(labelOf)).toEqual(["Open", "In progress", "Closed"]);
+    expect(current(inProgress)).toEqual(["Open"]);
+    const delivered = statusList(renderBoard({ tab: taskTab("live") }));
+    expect(links(delivered).map(labelOf)).toEqual(["Done", "Live"]);
+    expect(current(delivered)).toEqual(["Live"]);
+  });
+
+  it("has no lifecycle steps under Ideas", () => {
+    const html = renderBoard({ tab: taskTab("ideas"), list: { kind: "proposals", sort: "score", ideas: [] } });
+    expect(statusList(html)).toBe("");
+    expect(current(stages(html))).toEqual(["Ideas"]);
+  });
+
+  it("lists proposals as ideas, each opening its idea page", () => {
+    const html = renderBoard({
+      tab: taskTab("ideas"),
+      list: { kind: "proposals", sort: "score", ideas: [{
+        id: "idea-1", number: 12, title: "A launch post", score: 2, threshold: 3, createdAt: new Date("2026-11-01T10:00:00Z"),
+        reporterName: "Rita", platform: null, verdicts: 2, good: 3, badVotes: 1,
+      }] },
+    });
+    expect(html).toContain('href="/acme/ideas/12"');
+  });
+
+  it("says why a tab is empty instead of showing an empty list", () => {
+    expect(renderBoard({ list: { kind: "tasks", rows: [], sort: "importance" }, pagination: { page: 1, totalPages: 1, totalCount: 0, from: 0, to: 0 } })).toContain("No open tasks.");
+  });
+
+  it("keeps the tab and sort when paging", () => {
+    const html = renderBoard({ sortParam: "reward", pagination: { page: 1, totalPages: 2, totalCount: 30, from: 1, to: 25 } }).replaceAll("&amp;", "&");
+    expect(html).toContain("/acme/marketing?status=open&sort=reward&page=2");
+  });
 });
 
 describe("keeping marketing work out of the product list", () => {
