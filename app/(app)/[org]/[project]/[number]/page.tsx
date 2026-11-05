@@ -64,6 +64,11 @@ import { mergeReviewEntries } from "@/lib/agent-api/merge";
 import { DeliveriesPanel, MergeReviewsPanel, TestVerdictsPanel, type DeliveryView, type MergeReviewView, type TestVerdictView } from "@/components/issue-review-entries";
 import { Badge } from "@/components/ui/badge";
 import { VoteButton } from "@/components/vote-button";
+import { SpeedButton } from "@/components/speed-button";
+import {
+  InsufficientVotesAuditBanner,
+  WORK_READINESS_VOTE_THRESHOLD,
+} from "@/components/insufficient-votes-audit-banner";
 import { IssueConfirmationsPanel, type ConfirmationBlock, type ConfirmationsData } from "@/components/issue-confirmations";
 import { CONFIRMATION_SUMMARY_MAX_CHARS, listConfirmations, takesConfirmations } from "@/lib/agent-api/confirmations";
 import { DisputeAwardDialog, type DisputeRole } from "@/components/dispute-award-dialog";
@@ -1215,6 +1220,14 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
               showAvatars={false}
               readOnly={bug.isDeleted}
             />
+            {!bug.isDeleted ? (
+              <SpeedButton
+                bugId={bug.id}
+                issueNumber={bug.number}
+                issueTitle={bug.title}
+                isExpedited={bug.isBoosted}
+              />
+            ) : null}
             {canMarkDuplicate || canDeleteHere ? (
               <IssueActionsMenu>
                 {canMarkDuplicate ? <MarkDuplicateButton bugId={bug.id} /> : null}
@@ -1230,6 +1243,15 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
       <div className="flex flex-wrap items-start gap-5">
         {/* MAIN COLUMN */}
         <div className="flex min-w-0 flex-[999_1_600px] flex-col gap-5">
+          {bug.status === "open" && bug.voteCount < WORK_READINESS_VOTE_THRESHOLD ? (
+            <InsufficientVotesAuditBanner
+              issueId={bug.id}
+              voteCount={bug.voteCount}
+              threshold={WORK_READINESS_VOTE_THRESHOLD}
+              canRequestAudit={canTriage || bug.reporterId === user.id}
+            />
+          ) : null}
+
           {/* #1446: the progress report's stage filters the Conversation (#186). */}
           <IssueStageProvider initialStage={currentStage}>
           <EditableIssueDescription
