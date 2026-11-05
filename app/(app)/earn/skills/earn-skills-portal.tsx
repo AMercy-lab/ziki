@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { type SkillCategory } from "@/app/(app)/skills/skills-data";
 
@@ -20,6 +20,13 @@ interface ContributorSubmission {
   summary: string;
   status: "pending" | "approved" | "changes_requested";
   submittedAt: string;
+  tags?: string[];
+  prompt?: string;
+  checklist?: string[];
+  sampleCommand?: string;
+  docUrl?: string;
+  maintainerFeedback?: string;
+  catalogSlug?: string;
 }
 
 const CATEGORY_OPTIONS: { id: SkillCategory; label: string }[] = [
@@ -33,6 +40,7 @@ const CATEGORY_OPTIONS: { id: SkillCategory; label: string }[] = [
 export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
   const [activeTab, setActiveTab] = useState<"submit" | "submissions">("submit");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [selectedSubmission, setSelectedSubmission] = useState<ContributorSubmission | null>(null);
 
   // Form State
   const [title, setTitle] = useState("");
@@ -45,6 +53,19 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
   const [docUrl, setDocUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Close modal on Escape
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setSelectedSubmission(null);
+      }
+    }
+    if (selectedSubmission) {
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [selectedSubmission]);
+
   // Submissions State (seeded with realistic past activities + user additions)
   const [submissions, setSubmissions] = useState<ContributorSubmission[]>([
     {
@@ -55,6 +76,20 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
       summary: "Automates headless Chromium browser user scenarios and checks console errors.",
       status: "approved",
       submittedAt: "Nov 2, 2026",
+      catalogSlug: "playwright-e2e-inspector",
+      tags: ["playwright", "e2e", "browser", "testing"],
+      prompt: `You have the Playwright E2E Browser Inspector skill equipped.
+1. Run target specs under \`e2e/\` using headless browser engine.
+2. Ensure all selectors rely on accessible roles and data attributes rather than fragile CSS classes.
+3. Validate session cookie restoration across protected paths.`,
+      checklist: [
+        "Run `npx playwright test e2e/...`",
+        "Assert proper aria-label and role accessibility on target buttons",
+        "Confirm no unhandled console errors during navigation",
+      ],
+      sampleCommand: "npx playwright test e2e/auth-flow.spec.ts",
+      docUrl: "https://playwright.dev",
+      maintainerFeedback: "Verified clean and passing all headless browser checks. Merged into official skills library catalog.",
     },
     {
       id: "sub-2",
@@ -64,6 +99,20 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
       summary: "Pre-flight gatekeeper scanning for disguised payloads and preventing git bloat.",
       status: "approved",
       submittedAt: "Nov 3, 2026",
+      catalogSlug: "snare-clean-gate",
+      tags: ["security", "git-hygiene", "zero-bloat", "sentinel"],
+      prompt: `You are equipped with the Snare Gatekeeper skill.
+1. NEVER commit binary screenshots or large assets into git history.
+2. Scan all command executions, dependency pulls, and branch checkouts before running.
+3. Abort immediately if any unapproved hook modifies root configuration.`,
+      checklist: [
+        "Run `snare gate -- <cmd>` before every repository execution",
+        "Verify 0 binary assets committed to pull request diff",
+        "Confirm clean line endings (strict LF only)",
+      ],
+      sampleCommand: "snare gate -- npm test",
+      docUrl: "https://ziki.dev/security/gate",
+      maintainerFeedback: "Essential security gatekeeper. Approved for official zero-bloat enforcement.",
     },
     {
       id: "sub-3",
@@ -73,6 +122,18 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
       summary: "Strictly verifies client/server component boundaries and catches hydration mismatches early.",
       status: "pending",
       submittedAt: "Nov 4, 2026",
+      tags: ["nextjs", "app-router", "hydration", "react"],
+      prompt: `You have the Next.js App Router Hydration Auditor skill equipped.
+1. Strictly separate client and server boundary declarations ('use client' vs Server Components).
+2. Verify dynamic route segment parameters are safely unwrapped.
+3. Assert zero hydration mismatch warnings during local build and navigation.`,
+      checklist: [
+        "Run `tsc --noEmit` with 0 errors",
+        "Verify layout constraints and zero overflow warnings",
+        "Confirm clean server-side rendering without client leaks",
+      ],
+      sampleCommand: "npm run build",
+      docUrl: "https://nextjs.org/docs/app",
     },
     {
       id: "sub-4",
@@ -82,6 +143,18 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
       summary: "Analyzes foreign key constraints, detects missing composite indexes, and flags table-lock hazards.",
       status: "pending",
       submittedAt: "Nov 5, 2026",
+      tags: ["postgres", "prisma", "sql", "performance"],
+      prompt: `You have the PostgreSQL Schema Index & Query Tuner skill equipped.
+1. Inspect foreign key columns for missing B-tree indexes.
+2. Flag N+1 query patterns and enforce batch fetching.
+3. Require EXPLAIN ANALYZE on complex subqueries before deploying migrations.`,
+      checklist: [
+        "Run `npx prisma migrate status`",
+        "Verify all foreign keys have indexes",
+        "Validate query execution plan under 50ms",
+      ],
+      sampleCommand: "npx prisma migrate dev --create-only",
+      docUrl: "https://www.prisma.io/docs",
     },
     {
       id: "sub-5",
@@ -91,6 +164,19 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
       summary: "Extracts computed CSS design tokens into clean variables. Review requested: add unit tests for fallback tokens.",
       status: "changes_requested",
       submittedAt: "Nov 1, 2026",
+      tags: ["tailwind", "css", "tokens", "design-system"],
+      prompt: `You have the Tailwind v4 Token & CSS Variable Extractor skill equipped.
+1. Extract CSS custom properties into semantic token abstractions.
+2. Enforce mobile-first responsive utility ordering.
+3. Validate dark/light mode token parity across all views.`,
+      checklist: [
+        "Verify CSS variable declaration in globals.css",
+        "Ensure zero hardcoded hex values in component templates",
+        "Test theme toggle persistence",
+      ],
+      sampleCommand: "npm run lint:css",
+      docUrl: "https://tailwindcss.com",
+      maintainerFeedback: "Please provide fallback tokens for older CSS engines and include unit tests in your PR before re-submitting.",
     },
   ]);
 
@@ -121,6 +207,11 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
         summary: summary.trim(),
         status: "pending",
         submittedAt: "Just now",
+        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+        prompt: prompt.trim(),
+        checklist: checklist.split("\n").map((l) => l.trim()).filter(Boolean),
+        sampleCommand: sampleCommand.trim() || undefined,
+        docUrl: docUrl.trim() || undefined,
       };
 
       setSubmissions((prev) => [newSubmission, ...prev]);
@@ -409,12 +500,17 @@ Confirm passing test suite`}
       {activeTab === "submissions" && (
         <div className="rounded-[24px] border border-zk-border bg-zk-surface shadow-xs overflow-hidden">
           <div className="border-b border-zk-border bg-zk-chip px-6 py-4 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-zk-text">
-              Your Submitted Skills ({submissions.length})
-            </h2>
+            <div>
+              <h2 className="text-sm font-bold text-zk-text">
+                Your Submitted Skills ({submissions.length})
+              </h2>
+              <p className="text-xs text-zk-muted mt-0.5">
+                Click any submission to view verification progress, reviewer notes, and full specifications.
+              </p>
+            </div>
             <button
               onClick={() => setActiveTab("submit")}
-              className="text-xs font-bold text-zk-accent hover:underline"
+              className="text-xs font-bold text-zk-accent hover:underline shrink-0"
             >
               + New Submission
             </button>
@@ -424,7 +520,16 @@ Confirm passing test suite`}
             {submissions.map((sub) => (
               <div
                 key={sub.id}
-                className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:bg-zk-bg/50 transition-colors"
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedSubmission(sub)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelectedSubmission(sub);
+                  }
+                }}
+                className="group p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:bg-zk-chip/50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/50"
               >
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
@@ -434,11 +539,13 @@ Confirm passing test suite`}
                     <span className="text-xs text-zk-muted">•</span>
                     <span className="text-xs text-zk-muted">Submitted {sub.submittedAt}</span>
                   </div>
-                  <h3 className="text-sm font-bold text-zk-text">{sub.title}</h3>
+                  <h3 className="text-sm font-bold text-zk-text group-hover:text-zk-accent transition-colors">
+                    {sub.title}
+                  </h3>
                   <p className="text-xs text-zk-text2 max-w-xl leading-relaxed">{sub.summary}</p>
                 </div>
 
-                <div className="shrink-0">
+                <div className="flex items-center gap-3 shrink-0">
                   <span
                     className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
                       sub.status === "approved"
@@ -454,9 +561,236 @@ Confirm passing test suite`}
                       ? "⏳ In Review"
                       : "⚠️ Changes Requested"}
                   </span>
+                  <svg
+                    className="h-4 w-4 text-zk-muted transition-transform group-hover:translate-x-0.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                  </svg>
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Submission Detail Modal */}
+      {selectedSubmission && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="submission-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+          onClick={() => setSelectedSubmission(null)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-[24px] border border-zk-border bg-zk-surface p-6 sm:p-8 shadow-2xl space-y-6 focus:outline-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 border-b border-zk-divider pb-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-zk-accent">
+                    {selectedSubmission.categoryLabel}
+                  </span>
+                  <span className="text-xs text-zk-muted">•</span>
+                  <span className="text-xs text-zk-muted">Submitted {selectedSubmission.submittedAt}</span>
+                </div>
+                <h3 id="submission-modal-title" className="text-xl sm:text-2xl font-extrabold text-zk-text leading-tight">
+                  {selectedSubmission.title}
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedSubmission(null)}
+                aria-label="Close modal"
+                className="rounded-full p-2 text-zk-muted hover:bg-zk-chip hover:text-zk-text transition"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Status Banner & Maintainer Notes */}
+            {selectedSubmission.status === "approved" && (
+              <div className="rounded-2xl border border-zk-ok-fg/30 bg-zk-ok-bg/15 p-4 flex items-start gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zk-ok-bg text-zk-ok-fg font-bold text-xs">
+                  ✓
+                </span>
+                <div className="space-y-1 text-xs">
+                  <p className="font-bold text-zk-ok-fg text-sm">Verified &amp; Live in Catalog</p>
+                  <p className="text-zk-text2 leading-relaxed">
+                    {selectedSubmission.maintainerFeedback || "This skill has passed automated syntax tests and maintainer verification. It is currently published live in the official Skills Library catalog."}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {selectedSubmission.status === "pending" && (
+              <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 p-4 flex items-start gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-xs">
+                  ⏳
+                </span>
+                <div className="space-y-1 text-xs">
+                  <p className="font-bold text-blue-600 dark:text-blue-400 text-sm">Under Maintainer Review</p>
+                  <p className="text-zk-text2 leading-relaxed">
+                    Queued for static syntax checks and test suite verification. Typical review turnaround time is 24–48 hours.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {selectedSubmission.status === "changes_requested" && (
+              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold text-xs">
+                  ⚠️
+                </span>
+                <div className="space-y-1 text-xs">
+                  <p className="font-bold text-amber-600 dark:text-amber-400 text-sm">Revisions Requested by Maintainer</p>
+                  <p className="text-zk-text2 leading-relaxed">
+                    {selectedSubmission.maintainerFeedback || "Please review the assertion checklist and provide additional unit tests."}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Summary & Tags */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-zk-muted">Summary</h4>
+              <p className="text-sm text-zk-text leading-relaxed">{selectedSubmission.summary}</p>
+              {selectedSubmission.tags && selectedSubmission.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {selectedSubmission.tags.map((t) => (
+                    <span key={t} className="rounded-full bg-zk-chip px-2.5 py-0.5 text-[11px] font-mono text-zk-muted">
+                      #{t}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Agent Instructions (Prompt) */}
+            {selectedSubmission.prompt && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-zk-muted">Agent System Instructions</h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedSubmission.prompt!);
+                      showToast("Copied skill prompt to clipboard!");
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-zk-border bg-zk-chip px-3 py-1 text-xs font-semibold text-zk-text hover:bg-zk-border transition"
+                  >
+                    <svg className="h-3 w-3 text-zk-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <span>Copy Prompt</span>
+                  </button>
+                </div>
+                <pre className="max-h-44 overflow-y-auto rounded-xl border border-zk-border bg-zk-bg p-3.5 font-mono text-xs text-zk-text leading-relaxed whitespace-pre-wrap">
+                  {selectedSubmission.prompt}
+                </pre>
+              </div>
+            )}
+
+            {/* Verification Assertions */}
+            {selectedSubmission.checklist && selectedSubmission.checklist.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-zk-muted">Verification Assertions</h4>
+                <ul className="space-y-1.5 rounded-xl border border-zk-border bg-zk-bg p-3.5 text-xs text-zk-text">
+                  {selectedSubmission.checklist.map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="text-zk-accent font-bold mt-0.5">✓</span>
+                      <span className="font-mono text-zk-text2">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Execution Details: Command & Documentation */}
+            {(selectedSubmission.sampleCommand || selectedSubmission.docUrl) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                {selectedSubmission.sampleCommand && (
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-zk-muted">Test Command</span>
+                    <code className="block rounded-lg bg-zk-chip px-2.5 py-1.5 font-mono text-zk-text truncate">
+                      {selectedSubmission.sampleCommand}
+                    </code>
+                  </div>
+                )}
+                {selectedSubmission.docUrl && (
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-zk-muted">Documentation</span>
+                    <div>
+                      <a
+                        href={selectedSubmission.docUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-zk-accent hover:underline font-semibold pt-1"
+                      >
+                        <span>External Source</span>
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Modal Action Footer */}
+            <div className="pt-4 flex items-center justify-between border-t border-zk-divider">
+              <button
+                type="button"
+                onClick={() => setSelectedSubmission(null)}
+                className="rounded-full border border-zk-border bg-zk-surface px-5 py-2 text-xs font-bold text-zk-text hover:bg-zk-chip transition"
+              >
+                Close
+              </button>
+
+              <div className="flex items-center gap-2">
+                {selectedSubmission.status === "approved" && (
+                  <Link
+                    href={selectedSubmission.catalogSlug ? `/skills/${selectedSubmission.catalogSlug}` : "/skills"}
+                    className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2 text-xs font-bold text-white hover:brightness-105 transition"
+                  >
+                    <span>View in Catalog</span>
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                  </Link>
+                )}
+
+                {selectedSubmission.status === "changes_requested" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTitle(selectedSubmission.title);
+                      setCategory(selectedSubmission.category);
+                      setSummary(selectedSubmission.summary);
+                      setPrompt(selectedSubmission.prompt || "");
+                      setChecklist((selectedSubmission.checklist || []).join("\n"));
+                      setSampleCommand(selectedSubmission.sampleCommand || "");
+                      setDocUrl(selectedSubmission.docUrl || "");
+                      setSelectedSubmission(null);
+                      setActiveTab("submit");
+                      showToast("Loaded submission into form for revision.");
+                    }}
+                    className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2 text-xs font-bold text-white hover:brightness-105 transition"
+                  >
+                    <span>Revise &amp; Resubmit</span>
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
