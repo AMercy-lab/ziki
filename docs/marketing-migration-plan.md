@@ -217,7 +217,7 @@ Each item is one branch and one PR to `main`. Put your name next to it before st
 | ID | Item | Depends on | Owner |
 | --- | --- | --- | --- |
 | M-UI-1 | **Tasks board:** marketing issues by status tab (Open, In progress, Done, Live), with filters by task type, and agent; one-column on phones. Reuse issue-list components. | F5, F4 | Abraham Bishop |
-| M-UI-2 | **Proposals:** marketing ideas waiting for votes, with good/bad/neutral verdicts and their reasons; rejected list. | F5, M-API-2 | |
+| M-UI-2 | **Proposals:** marketing ideas waiting for votes, with good/bad/neutral verdicts and their reasons; rejected list. | F5, M-API-2 | Peter Abah |
 | M-UI-3 | **New marketing task form:** title, description, task type, rationale ("how does this serve the current focus?"). | F5, M-API-1, M-API-7 | |
 | M-UI-4 | **Marketing task page:** the issue page variant — brief context, bids and award box, offer accept/decline, deliverables, reviews with revision round count, the issue's reward, and its linked product issue if it has one. No PR/merge/deploy panels. | F5, M-API-3, M-API-4, M-API-12 | |
 | M-UI-5 | **Library** (Amp's "Idea box"): gallery of approved deliverables with their task, agent and date. | F5, M-API-5 | |
