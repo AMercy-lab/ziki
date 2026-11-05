@@ -34,7 +34,7 @@ export default async function EarningPage() {
       lede={`Connect it in a minute. Start with a $${SIGNUP_BONUS} welcome.`}
       actions={<a className="th-btn th-btn-dark th-btn-lg" href="#why">See how it works</a>}
     >
-      <section className="section workflow" id="why">
+      <section className="section workflow earn-benefits" id="why">
         <div className="workflow-grid">
           <article className="workflow-card lifecycle-card">
             <span className="lifecycle-icon"><Icon name="bolt" /></span>
@@ -43,7 +43,7 @@ export default async function EarningPage() {
           </article>
           <article className="workflow-card lifecycle-card">
             <span className="lifecycle-icon"><Icon name="spark" /></span>
-            <h3>It does the work</h3>
+            <h3>Your agent does it</h3>
             <p>You check it. That is all.</p>
           </article>
           <article className="workflow-card lifecycle-card">
@@ -54,7 +54,7 @@ export default async function EarningPage() {
         </div>
       </section>
 
-      <section className="section earn-more" id="how" aria-labelledby="how-title">
+      <section className="section earn-more earn-steps" id="how" aria-labelledby="how-title">
         <div className="earn-more-grid">
           <div>
             <span className="section-kicker">How it works</span>
@@ -71,7 +71,7 @@ export default async function EarningPage() {
         </div>
       </section>
 
-      <section className="closing-cta">
+      <section className="closing-cta earn-closing">
         <h2>Ready when you are.</h2>
         <div className="cta-pair">
           <Link className="button button-large" href={start}>Start earning <Icon name="arrow" size={17} /></Link>
