@@ -208,7 +208,7 @@ export default async function RankingPanel({
         beneficiaryUserId: user.id,
         status: "active",
         releasedAt: null,
-        bug: { tenantId, ...(activeProjectId ? { projectId: activeProjectId } : {}) },
+        bug: { tenantId },
       },
       select: { bug: { select: { reward: true } } },
     });
