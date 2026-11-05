@@ -362,6 +362,26 @@ async function reviewFix(
     }
     const solverUserId = claim?.beneficiaryUserId ?? credited[0] ?? bug.assigneeId;
     return prisma.$transaction(async (tx) => {
+      const current = await tx.bug.findFirst({
+        where: { id: bug.id, tenantId: agent.tenantId, isDeleted: false },
+        select: { status: true, substatus: true },
+      });
+      if (!current || current.status === "resolved") {
+        return {
+          status: 409,
+          error: "not_ready",
+          missing: "already_accepted",
+          message: "This issue's fix has already been accepted.",
+        };
+      }
+      if (current.substatus !== "accepted") {
+        return {
+          status: 409,
+          error: "not_ready",
+          missing: "verdicts",
+          message: "Marketing work can be accepted once its reviewers approve it (Done · Accepted).",
+        };
+      }
       // Marketing work has no pull request, so its review names neither one nor a head commit.
       const saved = await saveMergeReview(tx, agent, bug, review, null, null);
       return acceptMarketing(tx, agent, bug, claim, solverUserId, reviewers, saved);
@@ -992,48 +1012,61 @@ async function rejectFix(agent: AgentContext, bug: LoadedBug, review: MergeRevie
     };
   }
   return prisma.$transaction(async (tx): Promise<AcceptFixResult> => {
-    const saved = await saveMergeReview(tx, agent, bug, review, pullRequestUrl, bug.pullRequestHeadSha ?? null);
-    if (review.mistake) {
-      await recordMistake(agent, bug.projectId, { ...review.mistake, bugId: bug.id }, tx);
-    }
-    // Threshold-only: only the reject that reaches acceptThreshold sends the issue back.
-    let decision: ThresholdDecision | null = null;
-    if (voting) {
-      await tx.$queryRaw`SELECT "id" FROM "Bug" WHERE "id" = ${bug.id} FOR UPDATE`;
-      const votes = await mergeReviewTally(tx, bug, "reject", voting.managerVoteWeight);
-      if (votes < voting.threshold) return recordReviewVote(tx, agent, bug, saved, votes, voting.threshold);
-      decision = thresholdDecision({ userId: agent.ownerId, agentId: agent.agentId }, votes, voting.threshold);
-    }
-
     if (bug.track === "marketing") {
-      const workflow = await workflowFor(bug.projectId, tx);
-      const sendBack = afterSendBack(bug, workflow.revisionLimit, "manager_reject");
+      const current = await tx.bug.findFirst({
+        where: { id: bug.id, tenantId: agent.tenantId, isDeleted: false },
+        select: mergeBugSelect,
+      });
+      if (!current || current.status === "resolved") {
+        return {
+          status: 409,
+          error: "not_ready",
+          missing: "already_accepted",
+          message: "This issue's fix has already been merged, so it can't be rejected.",
+        };
+      }
+      if (current.substatus !== "accepted") {
+        return {
+          status: 409,
+          error: "not_ready",
+          missing: "verdicts",
+          message: "Marketing work can be reviewed once its reviewers approve it (Done · Accepted).",
+        };
+      }
+
+      const saved = await saveMergeReview(tx, agent, current, review, pullRequestUrl, current.pullRequestHeadSha ?? null);
+      if (review.mistake) {
+        await recordMistake(agent, current.projectId, { ...review.mistake, bugId: current.id }, tx);
+      }
+
+      const workflow = await workflowFor(current.projectId, tx);
+      const sendBack = afterSendBack(current, workflow.revisionLimit, "manager_reject");
       if (sendBack.keepsClaim) {
         await tx.bug.update({
-          where: { id: bug.id },
+          where: { id: current.id },
           data: { ...moveTo(sendBack.substatus), revisionCount: sendBack.revisionCount },
         });
       } else {
         const now = new Date();
-        const held = bug.claims.filter((claim) => !claim.releasedAt && (claim.status === "active" || claim.status === "offered"));
+        const held = current.claims.filter((claim) => !claim.releasedAt && (claim.status === "active" || claim.status === "offered"));
         for (const claim of held) {
           await tx.issueClaim.update({ where: { id: claim.id }, data: { status: "released", releasedAt: now, releaseReason: "manager_rejected" } });
           await publish(tx, {
-            tenantId: bug.tenantId,
+            tenantId: current.tenantId,
             type: "claim.released",
             actorAgentId: null,
-            bugId: bug.id,
-            payload: { claimId: claim.id, issueId: bug.id, beneficiaryUserId: claim.beneficiaryUserId, reason: "manager_rejected" },
+            bugId: current.id,
+            payload: { claimId: claim.id, issueId: current.id, beneficiaryUserId: claim.beneficiaryUserId, reason: "manager_rejected" },
           });
         }
         await tx.bug.update({
-          where: { id: bug.id },
+          where: { id: current.id },
           data: { ...moveTo("open"), assigneeId: null, revisionCount: 0 },
         });
       }
       await tx.bugActivity.create({
         data: {
-          bugId: bug.id,
+          bugId: current.id,
           actorId: agent.ownerId,
           type: "status_changed",
           summary: sendBack.keepsClaim
@@ -1041,7 +1074,7 @@ async function rejectFix(agent: AgentContext, bug: LoadedBug, review: MergeRevie
             : `Work rejected by manager: ${review.summary} and revision limit reached (${workflow.revisionLimit}): reopened for bids`,
           metadata: {
             field: "status",
-            from: bug.substatus,
+            from: current.substatus,
             to: sendBack.substatus,
             rejected: true,
             mergeReviewId: saved.review.id,
@@ -1053,7 +1086,7 @@ async function rejectFix(agent: AgentContext, bug: LoadedBug, review: MergeRevie
       await audit(
         agent,
         "issue.merge_rejected",
-        `bug:${bug.id}`,
+        `bug:${current.id}`,
         {
           ...moveTo(sendBack.substatus),
           rejected: true,
@@ -1064,13 +1097,13 @@ async function rejectFix(agent: AgentContext, bug: LoadedBug, review: MergeRevie
           headSha: saved.review.headSha,
           revisionCount: sendBack.revisionCount,
         },
-        { bugId: bug.id, db: tx },
+        { bugId: current.id, db: tx },
       );
       await publish(tx, {
-        tenantId: bug.tenantId,
+        tenantId: current.tenantId,
         type: "issue.updated",
         payload: {
-          issueId: bug.id,
+          issueId: current.id,
           rejected: true,
           ...moveTo(sendBack.substatus),
           mergeReviewId: saved.review.id,
@@ -1081,9 +1114,22 @@ async function rejectFix(agent: AgentContext, bug: LoadedBug, review: MergeRevie
           revisionCount: sendBack.revisionCount,
         },
         actorAgentId: agent.agentId,
-        bugId: bug.id,
+        bugId: current.id,
       });
       return { status: 200, accepted: false, review: saved.review, replaced: saved.replaced, rejected: true };
+    }
+
+    const saved = await saveMergeReview(tx, agent, bug, review, pullRequestUrl, bug.pullRequestHeadSha ?? null);
+    if (review.mistake) {
+      await recordMistake(agent, bug.projectId, { ...review.mistake, bugId: bug.id }, tx);
+    }
+    // Threshold-only: only the reject that reaches acceptThreshold sends the issue back.
+    let decision: ThresholdDecision | null = null;
+    if (voting) {
+      await tx.$queryRaw`SELECT "id" FROM "Bug" WHERE "id" = ${bug.id} FOR UPDATE`;
+      const votes = await mergeReviewTally(tx, bug, "reject", voting.managerVoteWeight);
+      if (votes < voting.threshold) return recordReviewVote(tx, agent, bug, saved, votes, voting.threshold);
+      decision = thresholdDecision({ userId: agent.ownerId, agentId: agent.agentId }, votes, voting.threshold);
     }
 
     await tx.bug.update({ where: { id: bug.id }, data: moveTo("in_progress") });

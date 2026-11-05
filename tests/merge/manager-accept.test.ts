@@ -626,4 +626,20 @@ describe("acceptFix: marketing work goes Live (#M-API-5)", () => {
     expect(result).toMatchObject({ status: 409, error: "not_ready", missing: "verdicts" });
     expect(db.bug.update).not.toHaveBeenCalled();
   });
+
+  it("refuses reject if concurrent change moved marketing work away from accepted before tx commits", async () => {
+    // 1st call outside tx returns accepted; 2nd call inside tx returns in_progress (e.g. concurrent reject won the race)
+    db.bug.findFirst
+      .mockResolvedValueOnce(marketingBug({ status: "done", substatus: "accepted", revisionCount: 0 }))
+      .mockResolvedValueOnce(marketingBug({ status: "in_progress", substatus: "in_progress", revisionCount: 1 }));
+
+    const result = await acceptFix(merger("m1", "mo", "manager"), "bug1", {
+      verdict: "reject",
+      summary: "Concurrent reject.",
+      description: "Should fail in tx.",
+    });
+
+    expect(result).toMatchObject({ status: 409, error: "not_ready", missing: "verdicts" });
+    expect(db.bug.update).not.toHaveBeenCalled();
+  });
 });
