@@ -250,7 +250,7 @@ export const TOOLS: readonly ToolDef[] = [
         .min(1)
         .max(191)
         .optional()
-        .describe("Optional issue type id. On a marketing idea it must be one of the project's marketing task types (422 wrong_track otherwise)."),
+        .describe("Optional issue type id. On a marketing idea it must be an active marketing task type from ziki_list_marketing_task_types (422 wrong_track otherwise)."),
       platform: z.string().trim().min(1).max(191).optional().describe("Where it shows up: a platform slug from ziki_list_platforms, e.g. desktop, web or mobile. Always give one when you know it."),
       areaId: z.string().optional().describe("Project area id (for example front end or back end)."),
       proofLinks: z
@@ -1375,6 +1375,62 @@ export const TOOLS: readonly ToolDef[] = [
       badCodeSnippet: z.string().trim().max(4000).optional().describe("Example of problematic code."),
       goodCodeSnippet: z.string().trim().max(4000).optional().describe("Example of corrected or recommended code."),
       bugId: z.string().trim().min(1).optional().describe("Associated issue id where the mistake occurred."),
+    },
+  },
+  {
+    name: "ziki_list_marketing_task_types",
+    summary:
+      "List the project's marketing task types (blog post, social post, ...), A-Z. A marketing proposal's typeId (ziki_create_idea with track=marketing) must be one of these. Any agent may read them; includeInactive (owners and admins only) also lists retired types.",
+    level: "working",
+    method: "GET",
+    route: "/projects/{id}/marketing/task-types",
+    query: ["includeInactive"],
+    input: {
+      id: z.string().trim().min(1).describe("Project id or slug."),
+      includeInactive: z.boolean().optional().describe("Also list retired types. Owners and admins only (403 otherwise)."),
+    },
+  },
+  {
+    name: "ziki_create_marketing_task_type",
+    summary:
+      "Create a marketing task type. Only agents of workspace owners and admins may (403 otherwise). Names are unique in the workspace across product and marketing types (409 duplicate_name). Types carry no points: each task pays its own reward.",
+    level: "working",
+    method: "POST",
+    route: "/projects/{id}/marketing/task-types",
+    body: ["name", "description", "isActive"],
+    input: {
+      id: z.string().trim().min(1).describe("Project id or slug."),
+      name: z.string().trim().min(2).max(50).describe("Type name, 2-50 characters, e.g. Blog post."),
+      description: z.string().trim().max(300).optional().describe("What this kind of task delivers, at most 300 characters."),
+      isActive: z.boolean().optional().describe("Whether proposals can use it now (default true)."),
+    },
+  },
+  {
+    name: "ziki_update_marketing_task_type",
+    summary:
+      "Rename, redescribe, retire (isActive=false) or restore a marketing task type. Owners' and admins' agents only. A rename leaves a note on the tasks that carry the type.",
+    level: "working",
+    method: "PATCH",
+    route: "/projects/{id}/marketing/task-types/{typeId}",
+    body: ["name", "description", "isActive"],
+    input: {
+      id: z.string().trim().min(1).describe("Project id or slug."),
+      typeId: z.string().trim().min(1).max(191).describe("Marketing task type id."),
+      name: z.string().trim().min(2).max(50).optional().describe("New name, 2-50 characters."),
+      description: z.string().trim().max(300).nullable().optional().describe("New description; null clears it."),
+      isActive: z.boolean().optional().describe("false retires the type, true restores it."),
+    },
+  },
+  {
+    name: "ziki_delete_marketing_task_type",
+    summary:
+      "Delete a marketing task type that no task or proposal uses. One in use is refused with 409 type_in_use: retire it with ziki_update_marketing_task_type (isActive=false) instead. Owners' and admins' agents only.",
+    level: "working",
+    method: "DELETE",
+    route: "/projects/{id}/marketing/task-types/{typeId}",
+    input: {
+      id: z.string().trim().min(1).describe("Project id or slug."),
+      typeId: z.string().trim().min(1).max(191).describe("Marketing task type id."),
     },
   },
   {

@@ -11,6 +11,7 @@ const typeCreate = vi.hoisted(() => vi.fn());
 const typeUpdate = vi.hoisted(() => vi.fn());
 const typeDelete = vi.hoisted(() => vi.fn());
 const bugCount = vi.hoisted(() => vi.fn());
+const ideaCount = vi.hoisted(() => vi.fn());
 const bugActivityCreateMany = vi.hoisted(() => vi.fn());
 const currentTenantIdFor = vi.hoisted(() => vi.fn());
 const revalidatePath = vi.hoisted(() => vi.fn());
@@ -41,6 +42,7 @@ vi.mock("@/lib/prisma", () => ({
     projectAuditEvent: { create: auditCreate },
     issueType: { findFirst: typeFindFirst, create: typeCreate, update: typeUpdate, delete: typeDelete },
     bug: { count: bugCount },
+    idea: { count: ideaCount },
     bugActivity: { createMany: bugActivityCreateMany },
     $transaction: transaction,
   },
@@ -307,16 +309,18 @@ describe("the marketing settings actions (M-UI-7)", () => {
     await expect(createMarketingIssueTypeAction("web", typeForm({ name: "Email newsletter" }))).resolves.toEqual({
       ok: true,
     });
-    expect(typeCreate).toHaveBeenCalledWith({
-      data: expect.objectContaining({ tenantId: "tenant-1", name: "Email newsletter", track: "marketing" }),
-    });
+    expect(typeCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ tenantId: "tenant-1", name: "Email newsletter", track: "marketing" }),
+      }),
+    );
   });
 
   it("stores a type as inactive when the Active box is unticked", async () => {
     const form = typeForm({ name: "Email newsletter" });
     form.delete("isActive");
     await expect(createMarketingIssueTypeAction("web", form)).resolves.toEqual({ ok: true });
-    expect(typeCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ isActive: false }) });
+    expect(typeCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ isActive: false }) }));
   });
 
   it("refuses a name a type already uses, across tracks", async () => {
@@ -330,6 +334,7 @@ describe("the marketing settings actions (M-UI-7)", () => {
   it("refuses to delete a type marketing tasks still use, and says to deactivate instead", async () => {
     typeFindFirst.mockResolvedValue({ id: "type-1" });
     bugCount.mockResolvedValue(2);
+    ideaCount.mockResolvedValue(0);
     await expect(deleteMarketingIssueTypeAction("web", "type-1")).resolves.toMatchObject({
       error: expect.stringContaining("Deactivate it instead"),
     });
@@ -339,6 +344,7 @@ describe("the marketing settings actions (M-UI-7)", () => {
   it("deletes a type no task uses", async () => {
     typeFindFirst.mockResolvedValue({ id: "type-1" });
     bugCount.mockResolvedValue(0);
+    ideaCount.mockResolvedValue(0);
     await expect(deleteMarketingIssueTypeAction("web", "type-1")).resolves.toEqual({ ok: true });
     expect(typeDelete).toHaveBeenCalledWith({ where: { id: "type-1" } });
   });

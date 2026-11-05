@@ -30,6 +30,7 @@ import { repairPullRequestSchema } from "@/lib/agent-api/repair-pull-request";
 import { pullRequestReportSchema } from "@/lib/validations/pull-request-report";
 import { deploymentSchema } from "@/lib/agent-api/deployment";
 import { archiveIdeaSchema, withdrawIdeaSchema } from "@/lib/idea-archive";
+import { createMarketingTaskTypeSchema, updateMarketingTaskTypeSchema } from "@/lib/marketing/task-types";
 
 /** The HTTP contract agents rely on: unknown routes and methods answer JSON errors with the allowed methods, and every MCP/CLI tool sends exactly the fields its route accepts. */
 describe("agent API HTTP errors", () => {
@@ -111,6 +112,8 @@ const ROUTE_SCHEMAS: Record<string, z.ZodType> = {
   ziki_report_deployment: deploymentSchema,
   ziki_archive_idea: archiveIdeaSchema,
   ziki_withdraw_idea: withdrawIdeaSchema,
+  ziki_create_marketing_task_type: createMarketingTaskTypeSchema,
+  ziki_update_marketing_task_type: updateMarketingTaskTypeSchema,
 };
 
 // The agent comment route extends the shared comment schema with attachmentIds; idea
