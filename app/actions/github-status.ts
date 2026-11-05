@@ -89,8 +89,8 @@ async function guard(bugId: unknown, power: keyof GitHubStatusPowers): Promise<L
 
 const isResult = (value: Loaded | GitHubActionResult): value is GitHubActionResult => "ok" in value;
 
-function refresh(bug: Loaded["bug"]) {
-  revalidatePath(`/${bug.project.slug}/${bug.number}`);
+function refresh() {
+  revalidatePath("/[org]/[project]", "layout");
 }
 
 function failure(error: unknown): GitHubActionResult {
@@ -104,7 +104,7 @@ export async function refreshGitHubStatusAction(bugId: string): Promise<GitHubAc
   const loaded = await guard(bugId, "refresh");
   if (isResult(loaded)) return loaded;
   const result = await syncPullRequestStatus(loaded.bug.id, { actorUserId: loaded.user.id });
-  refresh(loaded.bug);
+  refresh();
   if (!result.ok) return { ok: false, error: result.message };
   return { ok: true, message: result.status.diagnosis.headline };
 }
@@ -140,7 +140,7 @@ export async function updatePullRequestBranchAction(bugId: string): Promise<GitH
     await updateBranch(client, ref, status.snapshot.headSha!);
     await syncPullRequestStatus(loaded.bug.id, { actorUserId: loaded.user.id });
     await note(loaded, `Updated the pull request branch with ${status.snapshot.baseRef ?? "its base branch"} from Ziki. The checks run again on the new commit.`);
-    refresh(loaded.bug);
+    refresh();
     return { ok: true, message: "GitHub is updating the branch. The checks will run again; Ziki picks up the result." };
   } catch (error) {
     return failure(error);
@@ -155,7 +155,7 @@ export async function rerunFailedChecksAction(bugId: string): Promise<GitHubActi
     const { status, ref, client } = await freshRead(loaded);
     const restarted = await rerunFailedChecks(client, ref, status.snapshot);
     await syncPullRequestStatus(loaded.bug.id, { actorUserId: loaded.user.id });
-    refresh(loaded.bug);
+    refresh();
     return { ok: true, message: `Re-running ${restarted} failed ${restarted === 1 ? "run" : "runs"}. If it fails again, send it back to the fixer.` };
   } catch (error) {
     return failure(error);
@@ -173,7 +173,7 @@ export async function mergePullRequestAction(bugId: string): Promise<GitHubActio
     const merged = await mergePullRequest(client, ref, { headSha: status.snapshot.headSha, title: status.snapshot.title, issueNumber: loaded.bug.number });
     await syncPullRequestStatus(loaded.bug.id, { actorUserId: loaded.user.id });
     await note(loaded, `Merged pull request #${ref.number} on GitHub from Ziki (${merged.method}, ${merged.sha.slice(0, 7)}). A manager agent resolves it to make it Live and pay the points.`);
-    refresh(loaded.bug);
+    refresh();
     return { ok: true, message: `Merged (${merged.method}). A manager agent resolves it next.` };
   } catch (error) {
     return failure(error);
@@ -243,6 +243,6 @@ export async function sendBackToFixerAction(bugId: string, rawNote: string): Pro
     reason: summary,
     fromAgentName: user.name ?? "A reviewer",
   });
-  refresh(bug);
+  refresh();
   return { ok: true, message: claim?.agent ? `Sent back to ${claim.agent.name}. It's In progress again.` : "Sent back. It's In progress again." };
 }
