@@ -4,15 +4,16 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { type SkillCategory } from "@/app/(app)/skills/skills-data";
 
-interface EarnSkillsPortalProps {
+export interface EarnSkillsPortalProps {
   user: {
     id: string;
     name: string;
     email: string;
   };
+  initialSubmissions?: ContributorSubmission[];
 }
 
-interface ContributorSubmission {
+export interface ContributorSubmission {
   id: string;
   title: string;
   category: SkillCategory;
@@ -37,7 +38,7 @@ const CATEGORY_OPTIONS: { id: SkillCategory; label: string }[] = [
   { id: "marketing", label: "SEO & Marketing" },
 ];
 
-export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
+export function EarnSkillsPortal({ user, initialSubmissions = [] }: EarnSkillsPortalProps) {
   const [activeTab, setActiveTab] = useState<"submit" | "submissions">("submit");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selectedSubmission, setSelectedSubmission] = useState<ContributorSubmission | null>(null);
@@ -67,119 +68,7 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
   }, [selectedSubmission]);
 
   // Submissions State (seeded with realistic past activities + user additions)
-  const [submissions, setSubmissions] = useState<ContributorSubmission[]>([
-    {
-      id: "sub-1",
-      title: "Playwright E2E Browser Inspector",
-      category: "testing",
-      categoryLabel: "Testing & QA",
-      summary: "Automates headless Chromium browser user scenarios and checks console errors.",
-      status: "approved",
-      submittedAt: "Nov 2, 2026",
-      catalogSlug: "playwright-e2e-inspector",
-      tags: ["playwright", "e2e", "browser", "testing"],
-      prompt: `You have the Playwright E2E Browser Inspector skill equipped.
-1. Run target specs under \`e2e/\` using headless browser engine.
-2. Ensure all selectors rely on accessible roles and data attributes rather than fragile CSS classes.
-3. Validate session cookie restoration across protected paths.`,
-      checklist: [
-        "Run `npx playwright test e2e/...`",
-        "Assert proper aria-label and role accessibility on target buttons",
-        "Confirm no unhandled console errors during navigation",
-      ],
-      sampleCommand: "npx playwright test e2e/auth-flow.spec.ts",
-      docUrl: "https://playwright.dev",
-      maintainerFeedback: "Verified clean and passing all headless browser checks. Merged into official skills library catalog.",
-    },
-    {
-      id: "sub-2",
-      title: "Snare Security & Clean Gate",
-      category: "security",
-      categoryLabel: "Security",
-      summary: "Pre-flight gatekeeper scanning for disguised payloads and preventing git bloat.",
-      status: "approved",
-      submittedAt: "Nov 3, 2026",
-      catalogSlug: "snare-clean-gate",
-      tags: ["security", "git-hygiene", "zero-bloat", "sentinel"],
-      prompt: `You are equipped with the Snare Gatekeeper skill.
-1. NEVER commit binary screenshots or large assets into git history.
-2. Scan all command executions, dependency pulls, and branch checkouts before running.
-3. Abort immediately if any unapproved hook modifies root configuration.`,
-      checklist: [
-        "Run `snare gate -- <cmd>` before every repository execution",
-        "Verify 0 binary assets committed to pull request diff",
-        "Confirm clean line endings (strict LF only)",
-      ],
-      sampleCommand: "snare gate -- npm test",
-      docUrl: "https://ziki.dev/security/gate",
-      maintainerFeedback: "Essential security gatekeeper. Approved for official zero-bloat enforcement.",
-    },
-    {
-      id: "sub-3",
-      title: "Next.js App Router Hydration Auditor",
-      category: "testing",
-      categoryLabel: "Testing & QA",
-      summary: "Strictly verifies client/server component boundaries and catches hydration mismatches early.",
-      status: "pending",
-      submittedAt: "Nov 4, 2026",
-      tags: ["nextjs", "app-router", "hydration", "react"],
-      prompt: `You have the Next.js App Router Hydration Auditor skill equipped.
-1. Strictly separate client and server boundary declarations ('use client' vs Server Components).
-2. Verify dynamic route segment parameters are safely unwrapped.
-3. Assert zero hydration mismatch warnings during local build and navigation.`,
-      checklist: [
-        "Run `tsc --noEmit` with 0 errors",
-        "Verify layout constraints and zero overflow warnings",
-        "Confirm clean server-side rendering without client leaks",
-      ],
-      sampleCommand: "npm run build",
-      docUrl: "https://nextjs.org/docs/app",
-    },
-    {
-      id: "sub-4",
-      title: "PostgreSQL Schema Index & Query Tuner",
-      category: "backend",
-      categoryLabel: "Backend & Database",
-      summary: "Analyzes foreign key constraints, detects missing composite indexes, and flags table-lock hazards.",
-      status: "pending",
-      submittedAt: "Nov 5, 2026",
-      tags: ["postgres", "prisma", "sql", "performance"],
-      prompt: `You have the PostgreSQL Schema Index & Query Tuner skill equipped.
-1. Inspect foreign key columns for missing B-tree indexes.
-2. Flag N+1 query patterns and enforce batch fetching.
-3. Require EXPLAIN ANALYZE on complex subqueries before deploying migrations.`,
-      checklist: [
-        "Run `npx prisma migrate status`",
-        "Verify all foreign keys have indexes",
-        "Validate query execution plan under 50ms",
-      ],
-      sampleCommand: "npx prisma migrate dev --create-only",
-      docUrl: "https://www.prisma.io/docs",
-    },
-    {
-      id: "sub-5",
-      title: "Tailwind v4 Token & CSS Variable Extractor",
-      category: "design",
-      categoryLabel: "Design & UI",
-      summary: "Extracts computed CSS design tokens into clean variables. Review requested: add unit tests for fallback tokens.",
-      status: "changes_requested",
-      submittedAt: "Nov 1, 2026",
-      tags: ["tailwind", "css", "tokens", "design-system"],
-      prompt: `You have the Tailwind v4 Token & CSS Variable Extractor skill equipped.
-1. Extract CSS custom properties into semantic token abstractions.
-2. Enforce mobile-first responsive utility ordering.
-3. Validate dark/light mode token parity across all views.`,
-      checklist: [
-        "Verify CSS variable declaration in globals.css",
-        "Ensure zero hardcoded hex values in component templates",
-        "Test theme toggle persistence",
-      ],
-      sampleCommand: "npm run lint:css",
-      docUrl: "https://tailwindcss.com",
-      maintainerFeedback: "Please provide fallback tokens for older CSS engines and include unit tests in your PR before re-submitting.",
-    },
-  ]);
-
+  const [submissions, setSubmissions] = useState<ContributorSubmission[]>(initialSubmissions);
   const activeCategoryConfig = CATEGORY_OPTIONS.find((c) => c.id === category) || CATEGORY_OPTIONS[0];
 
   function showToast(msg: string) {
@@ -545,8 +434,31 @@ Confirm passing test suite`}
             </button>
           </div>
 
-          <div className="divide-y divide-zk-divider">
-            {submissions.map((sub) => (
+          {submissions.length === 0 ? (
+            <div className="p-12 text-center space-y-3">
+              <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-zk-chip text-zk-muted">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="12" y1="18" x2="12" y2="12" />
+                  <line x1="9" y1="15" x2="15" y2="15" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-semibold text-zk-text">No skill submissions yet</h3>
+              <p className="text-xs text-zk-muted max-w-sm mx-auto">
+                Once you submit a skill above, it will appear here with its review status and maintainer notes.
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveTab("submit")}
+                className="inline-flex items-center gap-2 rounded-xl bg-zk-accent px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition shadow-sm"
+              >
+                Submit Your First Skill
+              </button>
+            </div>
+          ) : (
+            <div className="divide-y divide-zk-divider">
+              {submissions.map((sub) => (
               <div
                 key={sub.id}
                 role="button"
@@ -602,6 +514,7 @@ Confirm passing test suite`}
               </div>
             ))}
           </div>
+          )}
         </div>
       )}
 

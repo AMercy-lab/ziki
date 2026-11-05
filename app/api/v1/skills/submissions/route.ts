@@ -17,9 +17,11 @@ const createSubmissionSchema = z.object({
 });
 
 export async function GET() {
-  await requireSuperAdmin();
+  const user = await requireUser();
+  const isSuper = Boolean(user.isRealSuperAdmin || user.role === "super_admin");
 
   const submissions = await prisma.skillSubmission.findMany({
+    where: isSuper ? undefined : { submittedById: user.id },
     orderBy: [{ createdAt: "desc" }],
     select: {
       id: true,

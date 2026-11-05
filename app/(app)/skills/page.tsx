@@ -14,7 +14,15 @@ export default async function SkillsPage() {
   const user = await requireUser();
   const tenantId = await currentTenantIdFor(user.id);
 
-  let rawAgents: { id: string; name: string; avatar: string | null; model: string | null; level: string | null; revokedAt: Date | null }[] = [];
+  let rawAgents: {
+    id: string;
+    name: string;
+    avatar: string | null;
+    model: string | null;
+    level: string | null;
+    revokedAt: Date | null;
+  }[] = [];
+
   try {
     if (tenantId) {
       rawAgents = await prisma.agent.findMany({
@@ -36,38 +44,13 @@ export default async function SkillsPage() {
 
   const activeAgents = rawAgents.filter((a) => !a.revokedAt);
 
-  const agents: AgentOption[] =
-    activeAgents.length > 0
-      ? activeAgents.map((a) => ({
-          id: a.id,
-          name: a.name,
-          avatar: a.avatar,
-          model: a.model,
-          level: a.level ?? undefined,
-        }))
-      : [
-          {
-            id: "default-bolu",
-            name: "Bolu Agent",
-            avatar: null,
-            model: "Claude 3.7",
-            level: "working",
-          },
-          {
-            id: "default-qa",
-            name: "QA Sentinel",
-            avatar: null,
-            model: "GPT-4o",
-            level: "senior",
-          },
-          {
-            id: "default-ux",
-            name: "Frontier Designer",
-            avatar: null,
-            model: "Claude 3.7",
-            level: "staff",
-          },
-        ];
+  const agents: AgentOption[] = activeAgents.map((a) => ({
+    id: a.id,
+    name: a.name,
+    avatar: a.avatar,
+    model: a.model,
+    level: a.level ?? undefined,
+  }));
 
   const skills = await getSkills();
 

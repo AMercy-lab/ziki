@@ -19,86 +19,17 @@ export interface SkillApprovalItem {
   rejectionReason?: string | null;
 }
 
-const INITIAL_ACTIVE: SkillApprovalItem[] = [
-  {
-    id: "sub-seed-1",
-    title: "Next.js App Router Performance Guardian",
-    slug: "nextjs-guardian",
-    status: "pending",
-    authorName: "Sarah Jenkins",
-  },
-  {
-    id: "sub-seed-2",
-    title: "PostgreSQL Database Migration Auditor",
-    slug: "database-migration",
-    status: "pending",
-    authorName: "Alex Rivera",
-  },
-  {
-    id: "sub-seed-3",
-    title: "WCAG 2.1 AA Accessibility Linter",
-    slug: "a11y-linter",
-    status: "pending",
-    authorName: "Maya Lin",
-  },
-  {
-    id: "sub-seed-4",
-    title: "Flutter Declarative State Engine",
-    slug: "flutter-state",
-    status: "pending",
-    authorName: "David Kim",
-  },
-];
-
-const INITIAL_HISTORY: SkillApprovalItem[] = [
-  {
-    id: "sub-seed-5",
-    title: "Zero-Bloat Git Hygiene Enforcer",
-    slug: "git-hygiene",
-    status: "approved",
-    authorName: "Bolu",
-    reviewedByName: "Super Admin",
-  },
-  {
-    id: "sub-seed-6",
-    title: "Playwright E2E Integration Suite",
-    slug: "playwright-suite",
-    status: "approved",
-    authorName: "Goodness Mbakara",
-    reviewedByName: "Super Admin",
-  },
-  {
-    id: "sub-seed-7",
-    title: "Automated Memory Leak Detector",
-    slug: "memory-leak",
-    status: "rejected",
-    authorName: "Kenji Sato",
-    reviewedByName: "Super Admin",
-    rejectionReason: "Requires automated unit tests before approval",
-  },
-  {
-    id: "sub-seed-8",
-    title: "Vercel Fluid Compute Optimizer",
-    slug: "vercel-optimizer",
-    status: "approved",
-    authorName: "Debby Angel",
-    reviewedByName: "Super Admin",
-  },
-];
-
-interface SkillApprovalsManagerProps {
+export interface SkillApprovalsManagerProps {
   initialSubmissions?: SkillApprovalItem[];
 }
 
 export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApprovalsManagerProps) {
   const [activeItems, setActiveItems] = useState<SkillApprovalItem[]>(() => {
-    const dbPending = initialSubmissions.filter((s) => s.status === "pending");
-    return dbPending.length > 0 ? [...dbPending, ...INITIAL_ACTIVE] : INITIAL_ACTIVE;
+    return initialSubmissions.filter((s: SkillApprovalItem) => s.status === "pending");
   });
 
   const [historyItems, setHistoryItems] = useState<SkillApprovalItem[]>(() => {
-    const dbHistory = initialSubmissions.filter((s) => s.status !== "pending");
-    return dbHistory.length > 0 ? [...dbHistory, ...INITIAL_HISTORY] : INITIAL_HISTORY;
+    return initialSubmissions.filter((s: SkillApprovalItem) => s.status !== "pending");
   });
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -109,32 +40,56 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
     setTimeout(() => setToastMessage(null), 3000);
   }
 
-  function handleApprove(item: SkillApprovalItem) {
-    const updated: SkillApprovalItem = {
-      ...item,
-      status: "approved",
-      reviewedByName: "Super Admin",
-    };
-
-    setActiveItems((prev) => prev.filter((i) => i.id !== item.id));
-    setHistoryItems((prev) => [updated, ...prev]);
-    showToast(`Approved "${item.title}". Published to Skills Library!`);
+  async function handleApprove(item: SkillApprovalItem) {
+    try {
+      const res = await fetch(`/api/v1/skills/submissions/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "approved" }),
+      });
+      if (!res.ok) {
+        showToast("Failed to update status on server.");
+        return;
+      }
+      const updated: SkillApprovalItem = {
+        ...item,
+        status: "approved",
+        reviewedByName: "Super Admin",
+      };
+      setActiveItems((prev) => prev.filter((i) => i.id !== item.id));
+      setHistoryItems((prev) => [updated, ...prev]);
+      showToast(`Approved "${item.title}". Published to Skills Library!`);
+    } catch {
+      showToast("Network error updating submission.");
+    }
   }
 
-  function handleReject(item: SkillApprovalItem) {
-    const reason = prompt("Enter brief reason for requesting changes:", "Requires unit test suite before sign-off.");
+  async function handleReject(item: SkillApprovalItem) {
+    const reason = prompt("Enter brief reason for requesting changes:", "Requires unit test assertions before sign-off.");
     if (reason === null) return;
 
-    const updated: SkillApprovalItem = {
-      ...item,
-      status: "rejected",
-      reviewedByName: "Super Admin",
-      rejectionReason: reason || "Changes requested.",
-    };
-
-    setActiveItems((prev) => prev.filter((i) => i.id !== item.id));
-    setHistoryItems((prev) => [updated, ...prev]);
-    showToast(`Marked "${item.title}" for revision.`);
+    try {
+      const res = await fetch(`/api/v1/skills/submissions/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "rejected", rejectionReason: reason || "Changes requested." }),
+      });
+      if (!res.ok) {
+        showToast("Failed to update status on server.");
+        return;
+      }
+      const updated: SkillApprovalItem = {
+        ...item,
+        status: "rejected",
+        reviewedByName: "Super Admin",
+        rejectionReason: reason || "Changes requested.",
+      };
+      setActiveItems((prev) => prev.filter((i) => i.id !== item.id));
+      setHistoryItems((prev) => [updated, ...prev]);
+      showToast(`Marked "${item.title}" for revision.`);
+    } catch {
+      showToast("Network error updating submission.");
+    }
   }
 
   return (

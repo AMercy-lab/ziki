@@ -196,7 +196,31 @@ export function SkillsDirectory({ skills, agents, userId }: SkillsDirectoryProps
         </Link>
       </div>
 
-      {/* Filter and Search Bar */}
+      {skills.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-[24px] border border-zk-border bg-zk-surface p-12 sm:p-16 text-center space-y-4">
+          <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-zk-chip text-zk-muted">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
+              <path d="M6 6h10" />
+              <path d="M6 10h10" />
+            </svg>
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-zk-text">No skills published in the library yet</h3>
+            <p className="text-xs text-zk-muted max-w-md mx-auto">
+              When skills submitted by contributors are approved by maintainers, they will automatically appear here in the public directory.
+            </p>
+          </div>
+          <Link
+            href="/earn/skills"
+            className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition"
+          >
+            + Submit a Skill
+          </Link>
+        </div>
+      ) : (
+        <>
+          {/* Filter and Search Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         {/* Category Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs sm:pb-0">
@@ -388,6 +412,8 @@ export function SkillsDirectory({ skills, agents, userId }: SkillsDirectoryProps
             );
           })}
         </div>
+      )}
+        </>
       )}
     </div>
   );
