@@ -1,4 +1,4 @@
-import { PRODUCT_TRACK } from "@/lib/marketing/track";
+import { parseTrackFilter, trackFilter } from "@/lib/marketing/track";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import type { AgentLevel, Prisma } from "@prisma/client";
@@ -145,7 +145,7 @@ export async function issueProject(agent: AgentContext, params: URLSearchParams,
 
 type Scope = { tenantId: string; projectId: string };
 export const issueSelect = {
-  id: true, number: true, title: true, summary: true, description: true, status: true, substatus: true,
+  id: true, number: true, title: true, summary: true, description: true, status: true, substatus: true, track: true,
   // #close-reasons: why, on what evidence and when a closed issue was closed.
   closeReason: true, closeEvidence: true, closedAt: true,
   categoryId: true, typeId: true, reporterId: true, assigneeId: true, beneficiaryUserId: true,
@@ -181,6 +181,8 @@ export function requireKnownFilter(name: "platform" | "area", raw: string | null
 }
 
 export async function listAgentIssues(scope: Scope, params: URLSearchParams) {
+  const parsedTrack = parseTrackFilter(params.get("track"));
+  if (!parsedTrack.ok) throw new IssueApiError(400, parsedTrack.message, { error: "invalid_request", field: "track" });
   const status = enumFilter("status", params.get("status"), statusSchema.options);
   const substatus = enumFilter("substatus", params.get("substatus"), substatusSchema.options);
   const assignee = params.get("assignee");
@@ -215,7 +217,7 @@ export async function listAgentIssues(scope: Scope, params: URLSearchParams) {
       ] }] }
     : {};
   const filtered: Prisma.BugWhereInput = {
-    ...scope, ...PRODUCT_TRACK, isDeleted: false, ...search,
+    ...scope, ...trackFilter(parsedTrack.track), isDeleted: false, ...search,
     ...(status ? { status } : {}),
     ...(substatus ? { substatus } : {}),
     ...(assigneeId !== undefined ? { assigneeId } : {}),
@@ -299,14 +301,17 @@ export async function readAgentIssue(scope: Scope, id: string) {
 
 /**
  * How many issues sit in each status, and ideas in each idea status, in one
- * project: the numbers the issue tabs show. Deleted ones are not counted.
+ * project and track: the numbers the issue tabs show. Deleted ones are not counted.
  * `all` is every issue.
  */
-export async function countAgentIssues(scope: Scope) {
+export async function countAgentIssues(scope: Scope, params: URLSearchParams) {
+  const parsedTrack = parseTrackFilter(params.get("track"));
+  if (!parsedTrack.ok) throw new IssueApiError(400, parsedTrack.message, { error: "invalid_request", field: "track" });
+  const selectedTrack = trackFilter(parsedTrack.track);
   const [issueRows, substatusRows, ideaRows] = await Promise.all([
-    prisma.bug.groupBy({ by: ["status"], where: { ...scope, ...PRODUCT_TRACK, isDeleted: false }, _count: { _all: true } }),
-    prisma.bug.groupBy({ by: ["substatus"], where: { ...scope, ...PRODUCT_TRACK, isDeleted: false }, _count: { _all: true } }),
-    prisma.idea.groupBy({ by: ["status"], where: { ...scope, ...PRODUCT_TRACK, isDeleted: false }, _count: { _all: true } }),
+    prisma.bug.groupBy({ by: ["status"], where: { ...scope, ...selectedTrack, isDeleted: false }, _count: { _all: true } }),
+    prisma.bug.groupBy({ by: ["substatus"], where: { ...scope, ...selectedTrack, isDeleted: false }, _count: { _all: true } }),
+    prisma.idea.groupBy({ by: ["status"], where: { ...scope, ...selectedTrack, isDeleted: false }, _count: { _all: true } }),
   ]);
   const issues = Object.fromEntries(statusSchema.options.map((status) => [status, 0])) as Record<(typeof statusSchema.options)[number], number>;
   for (const row of issueRows) issues[row.status] = row._count._all;
