@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { ideasPath, orgPath, type ProjectRef } from "@/lib/project-paths";
 import { useProjectRef } from "@/lib/use-project-ref";
 import { SignOutButton } from "@/components/sign-out-button";
-import { WorkspaceSwitcher, type WorkspaceChoice } from "@/components/workspace-switcher";
+import { WorkspaceSwitcher, type WorkspaceChoice, type ExternalProjectChoice } from "@/components/workspace-switcher";
 import {
   MANAGE_AGENTS_HREF,
   AGENTS_DIRECTORY_HREF,
@@ -270,6 +270,7 @@ export function AppHeader({
   pendingEscalationsCount = 0,
   userId,
   workspaces = [],
+  externalProjects = [],
   activeTenantId = null,
   reportFormUrl,
   organizationAdmin = false,
@@ -292,6 +293,7 @@ export function AppHeader({
   pendingEscalationsCount?: number;
   userId?: string | null;
   workspaces?: WorkspaceChoice[];
+  externalProjects?: ExternalProjectChoice[];
   activeTenantId?: string | null;
   reportFormUrl?: string;
   /** Owner or admin of the current organization, or the site super admin: shows /org in the menus. */
@@ -328,7 +330,7 @@ export function AppHeader({
             <ZikiMark className="h-8 w-auto text-zk-text max-sm:h-7" />
           </Link>
           <span aria-hidden="true" className="h-[18px] w-px shrink-0 bg-zk-border max-sm:hidden" />
-          <WorkspaceSwitcher workspaces={workspaces} activeTenantId={activeTenantId} canManage={organizationAdmin} orgHref={projectSlug ? orgPath(projectSlug) : null} tone="bar" className={`min-w-0 max-sm:max-w-44 ${earnQuiet ? "max-sm:hidden" : ""}`} />
+          <WorkspaceSwitcher workspaces={workspaces} externalProjects={externalProjects} activeTenantId={activeTenantId} canManage={organizationAdmin} orgHref={projectSlug ? orgPath(projectSlug) : null} tone="bar" className={`min-w-0 max-sm:max-w-44 ${earnQuiet ? "max-sm:hidden" : ""}`} />
         </div>
 
         {/* Earn (#earn-drafts): an earner on the earn pages sees none of the builders' links. */}

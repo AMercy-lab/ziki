@@ -12,7 +12,7 @@ import { PAGE_CONTAINER_CLASS } from "@/components/page-container";
 import { FocusMainOnNavigate } from "@/components/focus-main-on-navigate";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { isOrganizationAdmin, type OrganizationRole } from "@/lib/organization-role";
-import type { WorkspaceChoice } from "@/components/workspace-switcher";
+import type { WorkspaceChoice, ExternalProjectChoice } from "@/components/workspace-switcher";
 import { prisma } from "@/lib/prisma";
 import { currentTenantIdFor } from "@/lib/tenant-context";
 import { firstProjectRefFor } from "@/lib/project-route";
@@ -99,6 +99,7 @@ export default async function AppLayout({
   // The header lists this person's workspaces. Pages still resolve the active
   // project inside the current workspace, so a foreign project id is ignored.
   let workspaces: WorkspaceChoice[] = [];
+  let externalProjects: ExternalProjectChoice[] = [];
   let activeTenantId: string | null = null;
   let tenantId: string | null = null;
   let membershipRole: OrganizationRole | null = null;
@@ -107,9 +108,60 @@ export default async function AppLayout({
     activeTenantId = tenantId;
     const memberships = await tenantsForUser(prisma, user.id, user.role);
     membershipRole = memberships.find((tenant) => tenant.id === tenantId)?.role ?? null;
-    workspaces = memberships
-      .filter((tenant) => tenant.archivedAt === null)
-      .map((tenant) => ({ id: tenant.id, name: tenant.name, slug: tenant.slug }));
+    const activeWorkspaces = memberships.filter((tenant) => tenant.archivedAt === null);
+    const workspaceTenantIds = activeWorkspaces.map((t) => t.id);
+
+    const [workspaceProjects, userProjectMemberships] = await Promise.all([
+      prisma.project.findMany({
+        where: { tenantId: { in: workspaceTenantIds }, archivedAt: null },
+        select: { id: true, name: true, slug: true, tenantId: true },
+        orderBy: { name: "asc" },
+      }),
+      prisma.projectMembership.findMany({
+        where: {
+          userId: user.id,
+          project: {
+            archivedAt: null,
+            tenant: { archivedAt: null },
+            ...(tenantId ? { tenantId: { not: tenantId } } : {}),
+          },
+        },
+        select: {
+          project: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              tenantId: true,
+              tenant: { select: { id: true, name: true, slug: true } },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const projectsByTenant = new Map<string, Array<{ id: string; name: string; slug: string }>>();
+    for (const p of workspaceProjects) {
+      const list = projectsByTenant.get(p.tenantId) ?? [];
+      list.push({ id: p.id, name: p.name, slug: p.slug });
+      projectsByTenant.set(p.tenantId, list);
+    }
+
+    workspaces = activeWorkspaces.map((tenant) => ({
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      projects: projectsByTenant.get(tenant.id) ?? [],
+    }));
+
+    externalProjects = userProjectMemberships.map((m) => ({
+      id: m.project.id,
+      name: m.project.name,
+      slug: m.project.slug,
+      tenantId: m.project.tenantId,
+      tenantName: m.project.tenant.name,
+      tenantSlug: m.project.tenant.slug,
+    }));
   } catch (error) {
     console.error("[layout] workspace context failed", error);
   }
@@ -188,6 +240,7 @@ export default async function AppLayout({
           pendingEscalationsCount={pendingEscalationsCount}
           userId={user.id}
           workspaces={workspaces}
+          externalProjects={externalProjects}
           activeTenantId={activeTenantId}
           defaultProjectSlug={defaultProjectSlug}
           reportFormUrl={REPORT_FORM_URL}

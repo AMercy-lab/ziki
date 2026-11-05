@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ProjectJoinModal } from "@/components/project-join-modal";
-import { overviewPath } from "@/lib/project-paths";
+import { projectPath, projectRef } from "@/lib/project-paths";
 
 export type DiscoverableProject = {
   id: string;
@@ -42,7 +42,7 @@ export function DiscoverProjectCard({ project }: { project: DiscoverableProject 
                 {project.tenant.name}
               </span>
               <h3 className="text-lg font-bold text-zk-text">
-                <Link href={overviewPath(project.slug)} className="hover:text-zk-accent hover:underline">
+                <Link href={projectPath(projectRef(project.tenant.slug, project.slug))} className="hover:text-zk-accent hover:underline">
                   {project.name}
                 </Link>
               </h3>
@@ -105,7 +105,7 @@ export function DiscoverProjectCard({ project }: { project: DiscoverableProject 
                 </Button>
               </Link>
             ) : currentStatus === "member" ? (
-              <Link href={overviewPath(project.slug)}>
+              <Link href={projectPath(projectRef(project.tenant.slug, project.slug))}>
                 <Button variant="secondary" className="text-xs">
                   Open Project →
                 </Button>
@@ -123,7 +123,7 @@ export function DiscoverProjectCard({ project }: { project: DiscoverableProject 
                 {currentStatus === "rejected" ? "Re-apply to Join" : "Request to Join"}
               </Button>
             ) : (
-              <Link href={overviewPath(project.slug)}>
+              <Link href={projectPath(projectRef(project.tenant.slug, project.slug))}>
                 <Button variant="secondary" className="text-xs">
                   Browse Issues
                 </Button>
