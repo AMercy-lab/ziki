@@ -7,6 +7,7 @@ const links = [
   { href: "/superadmin/users", label: "Users" },
   { href: "/superadmin/orgs", label: "Organisations" },
   { href: "/superadmin/rewards", label: "Platform rewards" },
+  { href: "/superadmin/earn", label: "Earn tasks" },
   { href: "/superadmin/compare", label: "Compare directory" },
 ];
 
