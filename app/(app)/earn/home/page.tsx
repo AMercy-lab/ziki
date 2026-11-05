@@ -133,9 +133,6 @@ export default async function EarnHomePage() {
                 </li>
               ))}
             </ul>
-            <p className="border-t border-zk-divider pt-3 text-xs leading-relaxed text-zk-muted">
-              Marketing alone won’t reach $30. Finish its tasks and Open source pays the rest.
-            </p>
           </aside>
         </div>
 
