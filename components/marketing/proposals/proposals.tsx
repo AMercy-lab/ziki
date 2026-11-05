@@ -43,11 +43,11 @@ function StateChip({ item }: { item: ProposalItem }) {
   if (item.status === "archived") {
     return <span className={`${chip} bg-zk-chip text-zk-muted`}>Archived</span>;
   }
-  if (item.convertible) {
-    return <span className={`${chip} bg-zk-ok-bg text-zk-ok-fg`}>Ready to open</span>;
-  }
   if (item.bad) {
     return <span className={`${chip} bg-zk-bad-bg text-zk-bad-fg`}>Reject advised</span>;
+  }
+  if (item.convertible) {
+    return <span className={`${chip} bg-zk-ok-bg text-zk-ok-fg`}>Ready to open</span>;
   }
   return <span className={`${chip} bg-zk-tint text-zk-accent`}>Waiting for votes</span>;
 }
