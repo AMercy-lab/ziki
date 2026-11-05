@@ -662,7 +662,7 @@ function Strip({ height, links, children }: { height: number; links: ReactNode; 
 }
 
 /** Right side of the strip: the leaderboard, with the workstream as an icon under it, and the running version (#workstream). */
-function DockLinks({ projectSlug, version, quiet = false }: { projectSlug: string | null; version?: string; /** Earn: no leaderboard or workstream (#earn-drafts). */ quiet?: boolean }) {
+function DockLinks({ projectSlug, version, quiet = false }: { projectSlug: ProjectRef | null; version?: string; /** Earn: no leaderboard or workstream (#earn-drafts). */ quiet?: boolean }) {
   return (
     <div className="flex shrink-0 flex-col items-end gap-0.5">
       {quiet ? null : (

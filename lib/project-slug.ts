@@ -110,8 +110,3 @@ export function isProjectIssuePath(path: string, { subpages = false }: { subpage
 export function unreservedProjectSlug(slug: string): string {
   return isReservedProjectSlug(slug) || /^[0-9]+$/.test(slug) ? `${slug}${RESERVED_SUFFIX}` : slug;
 }
-
-/** `slug`, or `slug-org` when it names a top-level route: an organisation's slug is the first segment of its addresses. */
-export function unreservedOrgSlug(slug: string): string {
-  return isReservedProjectSlug(slug) ? `${slug}-org` : slug;
-}
