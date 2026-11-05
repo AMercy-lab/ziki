@@ -1,4 +1,4 @@
-import { PRODUCT_TRACK } from "@/lib/marketing/track";
+// import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import { IdeasWelcome } from "@/components/ideas-welcome";
 import { IdeaChat } from "@/components/idea-chat";
 import { LocalTime } from "@/components/local-time";
@@ -19,7 +19,7 @@ import { StatusFilterChips } from "@/components/status-filter-chips";
 import { ToolbarFilterMenu, type ToolbarFilterGroup, type ToolbarFilterOption } from "@/components/toolbar-filter-menu";
 import { IdeasMoreFilters } from "@/components/ideas-more-filters";
 import { IDEA_AUTHOR_PARAM, parseIdeaAuthorFilter } from "@/lib/idea-filters";
-import { MY_WORK_PARAM, myWorkWhere, parseMyWorkFilter } from "@/lib/my-work-filter";
+import { MY_WORK_PARAM, TRACK_PARAM, myWorkWhere, parseMyWorkFilter, parseTrackFilter, trackWhere } from "@/lib/my-work-filter";
 import { IDEA_SORT_COOKIE, ISSUE_SORT_COOKIE, getIdeaOrderBy, parseIdeaSort } from "@/lib/list-sort";
 import { SortHeader } from "@/components/sort-header";
 import { PROJECT_LINKS_SLOT_ID, ProjectLinks } from "@/components/project-links";
@@ -252,6 +252,7 @@ export async function IssuesList({
   const deletedParam = toSingleQueryParam(params.deleted);
   const mineFilter = parseMineFilter(params.mine);
   const ideaAuthor = parseIdeaAuthorFilter(params[IDEA_AUTHOR_PARAM]);
+  const trackFilter = parseTrackFilter(params[TRACK_PARAM]);
   const isDeletedView = canDelete && deletedParam === "true";
   // Workspace-wide view (`?all=1`). Absent → unchanged project scope.
   const allProjects = showsAllProjects(params[PROJECT_ALL_PARAM]);
@@ -266,7 +267,7 @@ export async function IssuesList({
   const where: Prisma.BugWhereInput = {
     ...bugInTenant(tenantId),
     ...(projectId && !allProjects ? { projectId } : {}),
-    ...PRODUCT_TRACK,
+    ...trackWhere(trackFilter),
     isDeleted: isDeletedView,
     ...mineFilterWhere(mineFilter, userId),
     ...duplicatesWhere(showDuplicates),
@@ -639,7 +640,7 @@ export async function IssuesList({
           "my work",
           () =>
             prisma.bug.count({
-              where: { ...bugInTenant(tenantId), ...(projectId && !allProjects ? { projectId } : {}), ...PRODUCT_TRACK, isDeleted: false, ...myWorkWhere(userId) },
+              where: { ...bugInTenant(tenantId), ...(projectId && !allProjects ? { projectId } : {}), ...trackWhere(trackFilter), isDeleted: false, ...myWorkWhere(userId) },
             }),
           0,
         )
@@ -861,19 +862,39 @@ export async function IssuesList({
     else next.set(MY_WORK_PARAM, "1");
     return listHref(next);
   })();
-  // The toolbar's Filter menu: on the All tab, All / Rejected / Duplicates (pick one); then My Work (on or off).
+  // Track filter: Product / Marketing / All
+  const trackHref = (() => {
+    const next = new URLSearchParams(currentQuery);
+    next.delete("page");
+    if (trackFilter === "product") next.delete(TRACK_PARAM);
+    else next.set(TRACK_PARAM, trackFilter);
+    return listHref(next);
+  })();
+  const trackFilterOptions: ToolbarFilterOption[] = [
+    { label: "Product", count: 0, href: trackHref, selected: trackFilter === "product" },
+    { label: "Marketing", count: 0, href: trackHref.replace("product", "marketing"), selected: trackFilter === "marketing" },
+    { label: "All", count: 0, href: trackHref.replace("product", "all"), selected: trackFilter === "all" },
+  ];
+  // The toolbar's Filter menu: on the All tab, All / Rejected / Duplicates (pick one); then My Work (on or off); then Track filter.
   const allTabFilters: ToolbarFilterOption[] = !isDeletedView && allSelected
     ? ALL_FILTERS.map(({ value, label }) => ({ label, count: allFilterCount(value), href: statusHref(value), selected: statusParam === value }))
     : [];
   const myWorkFilter: ToolbarFilterOption[] = myWorkCount > 0 || myWorkOn ? [{ label: "My Work", count: myWorkCount, href: myWorkHref, selected: myWorkOn }] : [];
+  const trackFilterToolbar: ToolbarFilterOption[] = trackFilter !== "product" ? [{ label: "Track", count: 0, href: trackHref, selected: true }] : [];
   const filterGroups: ToolbarFilterGroup[] = [
     ...(allTabFilters.length ? [{ label: "Show", options: allTabFilters }] : []),
     ...(myWorkFilter.length ? [{ options: myWorkFilter }] : []),
+    ...(trackFilterToolbar.length ? [{ label: "Track", options: [
+      { label: "Product", count: 0, href: (() => { const n = new URLSearchParams(currentQuery); n.delete("page"); n.delete(TRACK_PARAM); return listHref(n); })(), selected: trackFilter === "product" },
+      { label: "Marketing", count: 0, href: (() => { const n = new URLSearchParams(currentQuery); n.delete("page"); n.set(TRACK_PARAM, "marketing"); return listHref(n); })(), selected: trackFilter === "marketing" },
+      { label: "All", count: 0, href: (() => { const n = new URLSearchParams(currentQuery); n.delete("page"); n.set(TRACK_PARAM, "all"); return listHref(n); })(), selected: trackFilter === "all" },
+    ]}] : []),
   ];
   // What the Filter button names while closed: anything beyond the default "All".
   const filterSummary = [
     ...allTabFilters.filter((option) => option.selected && option.label !== "All").map((option) => option.label),
     ...(myWorkOn ? ["My Work"] : []),
+    ...(trackFilter !== "product" ? [trackFilter === "all" ? "Track: All" : `Track: ${trackFilter.charAt(0).toUpperCase() + trackFilter.slice(1)}`] : []),
   ].join(" · ");
   // Only a status tab is picked (no search or other filter): an empty list then
   // just means that tab is empty, so the empty state names the tab.
