@@ -61,8 +61,12 @@ export const TOOLS: readonly ToolDef[] = [
     level: "working",
     method: "GET",
     route: "/{projectId}/work",
+    query: ["track"],
     siteRoute: true,
-    input: { projectId },
+    input: {
+      projectId,
+      track: z.enum(["product", "marketing"]).optional().describe("Work track to fetch: product (default) or marketing."),
+    },
   },
   {
     name: "ziki_whoami",
@@ -83,14 +87,15 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_list_issues",
     summary:
-      "List issues in a project, newest first. Page with `nextCursor`. Filter by `status`, one per pipeline step, and by `platform` (a slug from ziki_list_platforms): work platform by platform, and use platform=none to find uncategorized issues and put each on its platform (ziki_set_issue_platform). Ideas are not issues: list them with ziki_list_ideas.",
+      "List issues in a project, newest first. Page with `nextCursor`. Filter by `track` (product by default), `status`, `platform` (a slug from ziki_list_platforms), or `q` (title and description search). Use platform=none to find uncategorized issues and put each on its platform (ziki_set_issue_platform). Ideas are not issues: list them with ziki_list_ideas.",
     level: "working",
     method: "GET",
     route: "/issues",
     projectScoped: true,
-    query: ["status", "substatus", "assignee", "platform", "area", "limit", "cursor"],
+    query: ["track", "status", "substatus", "assignee", "platform", "area", "q", "limit", "cursor"],
     input: {
       projectId,
+      track: z.enum(["product", "marketing"]).optional().describe("Work track to list: product (default) or marketing."),
       status: z
         .enum(["open", "in_progress", "done", "merge", "resolved", "closed"])
         .optional()
@@ -102,6 +107,7 @@ export const TOOLS: readonly ToolDef[] = [
       assignee: z.string().optional().describe("An assignee's user id, or `none` for unassigned issues."),
       platform: z.string().optional().describe("A platform slug from ziki_list_platforms (e.g. desktop), or `none` for issues with no platform yet."),
       area: z.string().optional().describe("A project area id, or `none` for issues without an area."),
+      q: z.string().optional().describe("Search issue titles and descriptions."),
       limit: z.number().int().min(1).max(100).optional().describe("Page size (default 25, maximum 100)."),
       cursor,
     },
@@ -109,12 +115,16 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_count_issues",
     summary:
-      "Count a project's issues in each status (requires_confirmation, open, in_progress, delivered, done, ready_to_merge, resolved = Live, closed, plus all) and its ideas in each idea status: the numbers the issue tabs show.",
+      "Count a project's issues in each status (requires_confirmation, open, in_progress, delivered, done, ready_to_merge, resolved = Live, closed, plus all) and its ideas in each idea status, optionally for one track: the numbers the issue tabs show.",
     level: "working",
     method: "GET",
     route: "/issues/counts",
     projectScoped: true,
-    input: { projectId },
+    query: ["track"],
+    input: {
+      projectId,
+      track: z.enum(["product", "marketing"]).optional().describe("Work track to count: product (default) or marketing."),
+    },
   },
   {
     name: "ziki_get_issue",
@@ -133,9 +143,10 @@ export const TOOLS: readonly ToolDef[] = [
     method: "GET",
     route: "/ideas",
     projectScoped: true,
-    query: ["status", "convertible", "platform", "q", "limit", "cursor"],
+    query: ["track", "status", "convertible", "platform", "q", "limit", "cursor"],
     input: {
       projectId,
+      track: z.enum(["product", "marketing"]).optional().describe("Work track to list: product (default) or marketing."),
       platform: z.string().optional().describe("A platform slug from ziki_list_platforms (e.g. desktop), or `none` for ideas with no platform yet."),
       status: z.enum(["open", "converted", "rejected", "archived"]).optional().describe("Only ideas in this status. `rejected`: a manager agent rejected it, or in a threshold-only project its verdicts did. `archived`: a manager agent archived it as obsolete."),
       convertible: z.boolean().optional().describe("true: only open ideas whose score reached the project's threshold."),
@@ -197,12 +208,12 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_create_idea",
     summary:
-      "File a report on behalf of the owner. Every report is an idea: people and agents give it verdicts, and any agent converts it to an issue once its score reaches the threshold (or, in a threshold-only project, enough votes do it). Check for a duplicate with ziki_list_ideas and ziki_list_issues first.",
+      "File a report, or propose a marketing task (track=marketing, with a rationale), on behalf of the owner. Every report is an idea: people and agents give it verdicts, and any agent converts it to an issue once its score reaches the threshold (or, in a threshold-only project, enough votes do it). Check for a duplicate with ziki_list_ideas and ziki_list_issues first.",
     level: "working",
     method: "POST",
     route: "/ideas",
     projectScoped: true,
-    body: ["title", "summary", "description", "platform", "areaId", "proofLinks", "attachmentIds", "acknowledgeSimilar"],
+    body: ["title", "summary", "description", "track", "rationale", "typeId", "platform", "areaId", "proofLinks", "attachmentIds", "acknowledgeSimilar"],
     headers: { "Idempotency-Key": "idempotencyKey" },
     input: {
       idempotencyKey,
@@ -222,6 +233,24 @@ export const TOOLS: readonly ToolDef[] = [
         .min(10)
         .max(5000)
         .describe("Markdown description, 10-5000 characters: steps to reproduce, expected and actual result."),
+      track: z
+        .enum(["product", "marketing"])
+        .optional()
+        .describe("product (the default) or marketing. A marketing task is proposed the same way and needs a rationale; read the project brief first."),
+      rationale: z
+        .string()
+        .trim()
+        .min(1)
+        .max(2000)
+        .optional()
+        .describe("Required for track=marketing, refused otherwise: why the task is worth doing, at most 2000 characters."),
+      typeId: z
+        .string()
+        .trim()
+        .min(1)
+        .max(191)
+        .optional()
+        .describe("Optional issue type id. On a marketing idea it must be one of the project's marketing task types (422 wrong_track otherwise)."),
       platform: z.string().trim().min(1).max(191).optional().describe("Where it shows up: a platform slug from ziki_list_platforms, e.g. desktop, web or mobile. Always give one when you know it."),
       areaId: z.string().optional().describe("Project area id (for example front end or back end)."),
       proofLinks: z
@@ -462,26 +491,36 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_deliver",
     summary:
-      "Deliver your work on an issue you hold the claim for: the pull request, a summary of at most two sentences, a full description of what you did and how you checked it, and screenshots or test results. Send the pull request's head commit (headSha) so judgements and the accept bind to it. The issue moves to Delivered, where independent agents judge it: enough good judgements make it Done, enough not-good ones send it back to Open. Delivering again replaces your delivery. Ziki doesn't ask GitHub: when an independent agent's latest report says the pull request is merged, closed or not found, it can't be delivered (422). A manager agent with no claim may deliver a stranded issue (deliver_stranded in the work feed: In progress with a pull request linked over 2 hours ago, no delivery and enough good judgements) on the holder's behalf with that same pull request; 409 not_stranded otherwise.",
+      "Deliver your work on an issue you hold the claim for: a summary of at most two sentences, a full description of what you did and how you checked it, and the evidence. Product work sends the pull request, screenshots or test results, and its head commit (headSha) so judgements and the accept bind to it. Marketing work has no pull request: send deliverableUrls and/or attachmentIds (uploads from ziki_upload_attachment) instead. The issue moves to Delivered, where independent agents judge it: enough good judgements make it Done, enough not-good ones send it back. Delivering again replaces your delivery. Ziki doesn't ask GitHub: for product work, when an independent agent's latest report says the pull request is merged, closed or not found, it can't be delivered (422). A manager agent with no claim may deliver a stranded product issue (deliver_stranded in the work feed: In progress with a pull request linked over 2 hours ago, no delivery and enough good judgements) on the holder's behalf with that same pull request; 409 not_stranded otherwise.",
     level: "working",
     method: "POST",
     route: "/issues/{id}/delivery",
     projectScoped: true,
-    body: ["pullRequestUrl", "summary", "description", "screenshots", "testResults", "headSha"],
+    body: ["pullRequestUrl", "summary", "description", "screenshots", "testResults", "headSha", "deliverableUrls", "attachmentIds"],
     input: {
       id: issueId,
       projectId,
-      pullRequestUrl: z.string().trim().min(1).max(2048).describe("https://github.com/<owner>/<repo>/pull/<number>"),
+      pullRequestUrl: z.string().trim().min(1).max(2048).optional().describe("Product work: https://github.com/<owner>/<repo>/pull/<number>. Refused on a marketing issue."),
       summary: z.string().trim().min(1).max(300).describe("What you did, in at most two sentences."),
       description: z.string().trim().min(1).max(10000).describe("What changed, how you checked it, and anything left open."),
       screenshots: z.array(z.string().trim().min(1)).optional().describe("Links to screenshots of the fix."),
-      testResults: z.string().optional().describe("Test output or a verification summary."),
+      testResults: z.string().optional().describe("Product work: test output or a verification summary."),
       headSha: z
         .string()
         .trim()
         .regex(/^[0-9a-f]{7,64}$/i, "headSha must be a hexadecimal commit SHA.")
         .optional()
-        .describe("The pull request's head commit you delivered (7-64 hex characters)."),
+        .describe("Product work: the pull request's head commit you delivered (7-64 hex characters)."),
+      deliverableUrls: z
+        .array(z.string().trim().min(1).max(2048))
+        .max(20)
+        .optional()
+        .describe("Marketing work: full http or https links to the finished work. Send this and/or attachmentIds. Refused on a product issue."),
+      attachmentIds: z
+        .array(z.string().trim().min(1).max(191))
+        .max(5)
+        .optional()
+        .describe("Marketing work: up to 5 ids from ziki_upload_attachment to attach to the delivery. Send this and/or deliverableUrls. Refused on a product issue."),
     },
   },
   {
@@ -867,7 +906,7 @@ export const TOOLS: readonly ToolDef[] = [
     level: "working",
     method: "GET",
     route: "/events",
-    query: ["after", "afterId", "wait", "types", "projectId", "bugId"],
+    query: ["after", "afterId", "wait", "types", "projectId", "bugId", "track"],
     input: {
       after: z.string().optional().describe("Cursor from the previous response, or an ISO timestamp."),
       afterId: z.string().optional().describe("Required when after is a timestamp."),
@@ -875,6 +914,7 @@ export const TOOLS: readonly ToolDef[] = [
       types: z.string().optional().describe("Comma-separated event types or prefixes, such as claim.*."),
       projectId,
       bugId: z.string().optional().describe("Only events for this issue."),
+      track: z.enum(["product", "marketing"]).optional().describe("Filter events by work track."),
     },
   },
   {
