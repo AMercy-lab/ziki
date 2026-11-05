@@ -5,9 +5,11 @@ vi.mock("@/lib/prisma", () => ({
     membership: {
       findUnique: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn(),
     },
     projectMembership: {
       findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
       upsert: vi.fn(),
       deleteMany: vi.fn(),
     },
@@ -135,6 +137,7 @@ describe("Project Discovery and Hierarchy Permissions", () => {
         tenantId: "t-1",
         isOpenForContributors: true,
         visibility: "public",
+        tenant: { slug: "test-org" },
       });
       (prisma.membership.findUnique as any).mockResolvedValue({ id: "m-1" });
       (prisma.projectMembership.findUnique as any).mockResolvedValue(null);
@@ -154,6 +157,7 @@ describe("Project Discovery and Hierarchy Permissions", () => {
         tenantId: "t-1",
         isOpenForContributors: false,
         visibility: "private",
+        tenant: { slug: "test-org" },
       });
       (prisma.membership.findUnique as any).mockResolvedValue(null);
       (prisma.projectMembership.findUnique as any).mockResolvedValue(null);
@@ -173,6 +177,7 @@ describe("Project Discovery and Hierarchy Permissions", () => {
         tenantId: "t-1",
         isOpenForContributors: true,
         visibility: "public",
+        tenant: { slug: "test-org" },
       });
       (prisma.membership.findUnique as any).mockResolvedValue(null);
       (prisma.projectMembership.findUnique as any).mockResolvedValue(null);
