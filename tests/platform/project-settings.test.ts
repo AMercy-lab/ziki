@@ -1,19 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-/** Project settings (#595, #vote-governance): only workspace admins change a project's workflow, values are range-checked, and a saved change takes effect at once. */
+/** Project settings (#595, #vote-governance): only workspace admins change a project's workflow, values are range-checked, and a saved change takes effect at once. The marketing settings actions (M-UI-7) share the area, at the bottom. */
 const requireUser = vi.hoisted(() => vi.fn());
+const requireProject = vi.hoisted(() => vi.fn());
 const isTenantAdmin = vi.hoisted(() => vi.fn());
+const assertMarketingSettingsAccess = vi.hoisted(() => vi.fn());
+const updateMarketingSettings = vi.hoisted(() => vi.fn());
+const typeFindFirst = vi.hoisted(() => vi.fn());
+const typeCreate = vi.hoisted(() => vi.fn());
+const typeUpdate = vi.hoisted(() => vi.fn());
+const typeDelete = vi.hoisted(() => vi.fn());
+const bugCount = vi.hoisted(() => vi.fn());
+const bugActivityCreateMany = vi.hoisted(() => vi.fn());
 const currentTenantIdFor = vi.hoisted(() => vi.fn());
 const revalidatePath = vi.hoisted(() => vi.fn());
+const updateTag = vi.hoisted(() => vi.fn());
 const invalidateWorkflow = vi.hoisted(() => vi.fn());
 const findFirst = vi.hoisted(() => vi.fn());
 const upsert = vi.hoisted(() => vi.fn());
 const auditCreate = vi.hoisted(() => vi.fn());
 const transaction = vi.hoisted(() => vi.fn());
 
-vi.mock("next/cache", () => ({ revalidatePath }));
+vi.mock("next/cache", () => ({ revalidatePath, updateTag }));
 vi.mock("@/lib/auth-helpers", () => ({ requireUser }));
-vi.mock("@/lib/agents/membership", () => ({ isTenantAdmin }));
+vi.mock("@/lib/project-route", () => ({ requireProject }));
+vi.mock("@/lib/marketing/settings", () => ({ assertMarketingSettingsAccess, updateMarketingSettings }));
+vi.mock("@/lib/agents/membership", () => ({
+  isTenantAdmin,
+  isTenantAdminRole: vi.fn(),
+}));
 vi.mock("@/lib/tenant-context", () => ({
   currentTenantIdFor,
   NO_TENANT_MESSAGE: "You're not a member of a workspace yet.",
@@ -24,11 +39,20 @@ vi.mock("@/lib/prisma", () => ({
     project: { findFirst },
     projectWorkflow: { upsert },
     projectAuditEvent: { create: auditCreate },
+    issueType: { findFirst: typeFindFirst, create: typeCreate, update: typeUpdate, delete: typeDelete },
+    bug: { count: bugCount },
+    bugActivity: { createMany: bugActivityCreateMany },
     $transaction: transaction,
   },
 }));
 
 import { updateProjectWorkflowAction } from "@/app/(app)/projects/[slug]/settings/workflow-actions";
+import {
+  createMarketingIssueTypeAction,
+  deleteMarketingIssueTypeAction,
+  updateMarketingRevisionLimitAction,
+} from "@/app/(app)/[project]/marketing/settings/actions";
+import { IssueApiError } from "@/lib/agent-api/errors";
 import {
   DEFAULT_PROJECT_WORKFLOW,
   revisionLimitSchema,
@@ -226,5 +250,96 @@ describe("the marketing revision limit", () => {
     expect(stored.projectWorkflow.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({ select: expect.objectContaining({ revisionLimit: true }) }),
     );
+  });
+});
+
+describe("the marketing settings actions (M-UI-7)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireProject.mockResolvedValue({
+      user: { id: "admin", role: null },
+      tenantId: "tenant-1",
+      project: { id: "project-1", slug: "web", name: "Web", tenantId: "tenant-1" },
+    });
+    assertMarketingSettingsAccess.mockResolvedValue(undefined);
+    typeFindFirst.mockResolvedValue(null);
+  });
+
+  function revisionForm(value: string | number) {
+    const data = new FormData();
+    data.set("revisionLimit", String(value));
+    return data;
+  }
+
+  function typeForm(values: Record<string, string> = {}) {
+    const data = new FormData();
+    data.set("name", values.name ?? "Email newsletter");
+    data.set("description", values.description ?? "");
+    data.set("isActive", "true");
+    return data;
+  }
+
+  it("saves the revision limit through the marketing lib and revalidates the section", async () => {
+    updateMarketingSettings.mockResolvedValue({ projectId: "project-1", slug: "web", name: "Web", revisionLimit: 3 });
+    await expect(updateMarketingRevisionLimitAction("web", revisionForm(3))).resolves.toEqual({ ok: true });
+    expect(updateMarketingSettings).toHaveBeenCalledWith("tenant-1", "project-1", "admin", { revisionLimit: 3 });
+    expect(revalidatePath).toHaveBeenCalledWith("/web/marketing/settings");
+  });
+
+  it("refuses a limit outside 1 to 10 without saving", async () => {
+    await expect(updateMarketingRevisionLimitAction("web", revisionForm(11))).resolves.toMatchObject({
+      error: expect.any(String),
+    });
+    expect(updateMarketingSettings).not.toHaveBeenCalled();
+  });
+
+  it("refuses a member before saving", async () => {
+    assertMarketingSettingsAccess.mockRejectedValue(
+      new IssueApiError(403, "Only workspace owners and admins can change marketing settings."),
+    );
+    await expect(updateMarketingRevisionLimitAction("web", revisionForm(3))).resolves.toMatchObject({
+      error: expect.stringContaining("owners and admins"),
+    });
+    expect(updateMarketingSettings).not.toHaveBeenCalled();
+  });
+
+  it("stores a new type on the marketing track", async () => {
+    await expect(createMarketingIssueTypeAction("web", typeForm({ name: "Email newsletter" }))).resolves.toEqual({
+      ok: true,
+    });
+    expect(typeCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ tenantId: "tenant-1", name: "Email newsletter", track: "marketing" }),
+    });
+  });
+
+  it("refuses a name a type already uses, across tracks", async () => {
+    typeFindFirst.mockResolvedValueOnce({ name: "Blog post" });
+    await expect(createMarketingIssueTypeAction("web", typeForm({ name: "blog post" }))).resolves.toMatchObject({
+      error: expect.stringContaining("Blog post"),
+    });
+    expect(typeCreate).not.toHaveBeenCalled();
+  });
+
+  it("refuses to delete a type marketing tasks still use, and says to deactivate instead", async () => {
+    typeFindFirst.mockResolvedValue({ id: "type-1" });
+    bugCount.mockResolvedValue(2);
+    await expect(deleteMarketingIssueTypeAction("web", "type-1")).resolves.toMatchObject({
+      error: expect.stringContaining("Deactivate it instead"),
+    });
+    expect(typeDelete).not.toHaveBeenCalled();
+  });
+
+  it("deletes a type no task uses", async () => {
+    typeFindFirst.mockResolvedValue({ id: "type-1" });
+    bugCount.mockResolvedValue(0);
+    await expect(deleteMarketingIssueTypeAction("web", "type-1")).resolves.toEqual({ ok: true });
+    expect(typeDelete).toHaveBeenCalledWith({ where: { id: "type-1" } });
+  });
+
+  it("creating a type never writes task activity", async () => {
+    await expect(createMarketingIssueTypeAction("web", typeForm({ name: "Social post" }))).resolves.toEqual({
+      ok: true,
+    });
+    expect(bugActivityCreateMany).not.toHaveBeenCalled();
   });
 });
