@@ -33,7 +33,9 @@ import { trackRules } from "@/lib/marketing/track";
  *
  * When the score reaches the project's `ideaThreshold`, any agent may
  * convert the idea, which creates an issue.
- * Product issues then need confirmation; marketing issues open immediately.
+ * Product issues then need confirmation. A marketing idea doesn't wait for an
+ * agent: the verdict that brings it to the threshold opens it, unless its votes
+ * make it a bad idea, which a manager agent rejects.
  * The verdicts stay with the idea. In a threshold-only project
  * (#vote-governance) the verdict that makes the idea bad rejects it, and the
  * one that brings the score to the threshold converts it; a manager agent's
@@ -151,7 +153,8 @@ export type GivenVerdict = {
   pointsAwarded: number;
   /**
    * What this verdict did in a threshold-only project (#vote-governance): it
-   * converted the idea (with the new issue) or rejected it. Null otherwise.
+   * converted the idea (with the new issue) or rejected it. A marketing idea's
+   * deciding verdict converts it in any project. Null otherwise.
    */
   decided: { outcome: "converted"; issueId: string; issueNumber: number } | { outcome: "rejected" } | null;
 };
@@ -181,6 +184,7 @@ export async function giveIdeaVerdict(
     const idea = await lockedIdea(tx, { tenantId: giver.tenantId, projectId }, ideaRef);
     assertOpenIdea(idea);
     const ideaId = idea.id;
+    const { opensAtThreshold } = trackRules(idea.track);
     // One verdict per person per class: a manager agent's and a worker's (or the person's) are separate.
     const weightClass = allowed > 1 ? "manager" : "working";
     const key = { ideaId_onBehalfOfUserId_weightClass: { ideaId, onBehalfOfUserId: giver.userId, weightClass } };
@@ -190,7 +194,7 @@ export async function giveIdeaVerdict(
     // a person may still rewrite their own good verdict. In a threshold-only
     // project an idea only sits at the threshold after the threshold was
     // lowered, and the next verdict converts it.
-    if (!thresholdOnly && input.opinion === "good" && idea.score >= ideaThreshold && existing?.opinion !== "good") {
+    if (!thresholdOnly && !opensAtThreshold && input.opinion === "good" && idea.score >= ideaThreshold && existing?.opinion !== "good") {
       const message = `This idea already has the score it needs (${idea.score} of ${ideaThreshold}) and is waiting for an agent to convert it. Another good verdict changes nothing; give a bad one only if you found a real problem.`;
       throw new IssueApiError(409, message, { error: "enough_verdicts", message, ideaScore: idea.score, ideaThreshold });
     }
@@ -253,6 +257,15 @@ export async function giveIdeaVerdict(
         await rejectLocked(tx, scope, { ...idea, score: ideaScore }, by, tally, thresholdDecision(by, tally.total, ideaThreshold));
         decided = { outcome: "rejected" };
       } else if (ideaScore >= ideaThreshold) {
+        const issue = await convertLocked(tx, scope, { ...idea, score: ideaScore }, by, ideaThreshold, thresholdDecision(by, ideaScore, ideaThreshold));
+        decided = { outcome: "converted", issueId: issue.issueId, issueNumber: issue.issueNumber };
+      }
+    } else if (opensAtThreshold && ideaScore >= ideaThreshold) {
+      // A marketing idea opens on the vote that reaches its threshold. A bad one waits for a manager agent to reject it.
+      const by = { userId: giver.userId, agentId: giver.agent?.id ?? null };
+      const tally = ideaVotes(await tx.ideaVerdict.findMany({ where: { ideaId }, select: { opinion: true, votes: true } }));
+      if (!isBadIdea(tally, ideaThreshold)) {
+        const scope = { tenantId: giver.tenantId, projectId };
         const issue = await convertLocked(tx, scope, { ...idea, score: ideaScore }, by, ideaThreshold, thresholdDecision(by, ideaScore, ideaThreshold));
         decided = { outcome: "converted", issueId: issue.issueId, issueNumber: issue.issueNumber };
       }

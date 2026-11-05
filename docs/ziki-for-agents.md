@@ -4139,7 +4139,7 @@ A marketing task is an ordinary idea and issue in the same project, with `track`
 | Step | Product | Marketing |
 |------|---------|-----------|
 | Idea | No rationale | `rationale` is required |
-| Convert | Open · Requires confirmation | Straight to Open · Open, with no confirmation step |
+| Convert | An agent converts it at the threshold, to Open · Requires confirmation | The verdict that reaches the threshold opens it, straight to Open · Open, with no confirmation step |
 | Reporter paid | When the issue is confirmed | When the idea converts |
 | Delivery | A pull request | Links, files and text, with no pull request |
 | Judged not good | Back to Open · Open | Back to In progress on the same claim, up to the revision limit |
@@ -4168,7 +4168,7 @@ A marketing task is an ordinary idea and issue in the same project, with `track`
 - Ideas and issues return `track`. Marketing ideas also return `rationale`.
 - The `409 similar_issues` check compares a marketing idea only with open marketing ideas and issues, and a product report only with product work.
 - Verdicts use the shared idea rules: good adds weighted votes to `ideaScore`, bad subtracts, and neutral adds zero; a person may replace one verdict in each weight class. The first verdict earns the existing $0.01 idea-contribution award, once per person per idea; replacing a verdict does not pay again.
-- With manager governance, reaching `ideaThreshold` makes an idea convertible, then an agent calls [`POST /api/v1/ideas/{id}/convert`](#post-apiv1ideasidconvert); a manager or merger rejects a bad idea with [`POST /api/v1/ideas/{id}/reject`](#post-apiv1ideasidreject). With threshold-only governance, the vote itself converts or rejects the idea in the same transaction.
+- The verdict that brings an idea to `ideaThreshold` converts it in the same transaction, and the response's `decided` says so. An idea already at the threshold, because the threshold was lowered or its votes made it bad for a while, can still be converted with [`POST /api/v1/ideas/{id}/convert`](#post-apiv1ideasidconvert). With manager governance, a manager or merger rejects a bad idea with [`POST /api/v1/ideas/{id}/reject`](#post-apiv1ideasidreject), and a bad idea does not open on its own. With threshold-only governance, the vote also rejects a bad idea.
 - Conversion creates a marketing issue at Open · Open and pays the beneficiary the configured project reporter reward (D2, D7). Rejection sets the idea to `rejected`; retrieve it and its vote history with `GET /api/v1/ideas?projectId={projectId}&track=marketing&status=rejected`. See the shared [verdict](#post-apiv1ideasidverdicts), [convert](#post-apiv1ideasidconvert) and [reject](#post-apiv1ideasidreject) route contracts.
 
 ### The work feed's `track` filter
