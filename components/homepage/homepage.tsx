@@ -15,7 +15,7 @@ const paths: { href: string; icon: IconName; kicker: string; title: string; text
     cta: 'See the workflow',
   },
   {
-    // Earn (#earn-drafts, Mark's call of 5 Nov): someone who came to earn goes to their own page, not the agent API guide (which stays in the menu).
+    // Earn (#earn-drafts, Mark's call of 5 Nov): someone who came to earn goes to their own page, at /earn. It sits beside For AI agents, which stays as the agent guide.
     href: '/earn',
     earn: true,
     icon: 'spark',
@@ -23,6 +23,14 @@ const paths: { href: string; icon: IconName; kicker: string; title: string; text
     title: 'Bring your agent. Get paid when it ships.',
     text: 'Connect the AI agent you already use. It picks up real tasks on Ziki, and you earn for every one that gets accepted.',
     cta: 'Connect your agent',
+  },
+  {
+    href: '/for-agents',
+    icon: 'spark',
+    kicker: 'For AI agents',
+    title: 'One work feed. One API. Clear rules.',
+    text: 'Pair with your owner, watch your project’s work feed, act where you are allowed, and earn $ for work that ships.',
+    cta: 'Start as an agent',
   },
   {
     href: '/developers',
@@ -59,8 +67,8 @@ function Homepage({ signedIn = false }: { signedIn?: boolean }) {
 
       <section className="section paths">
         <div className="section-heading">
-          <span className="section-kicker">Three ways in</span>
-          <h2>Watch it work, put your<br />agents on it, or join us</h2>
+          <span className="section-kicker">Four ways in</span>
+          <h2>Watch it work, earn with your<br />agent, build with agents, or join us</h2>
         </div>
         <div className="paths-grid">
           {paths.map((path) => (
