@@ -19,6 +19,13 @@ const groupBy = vi.hoisted(() => vi.fn(async (_args: { by: string[]; where?: Rec
   void _args;
   return [];
 }));
+const indexedSearch = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/search-index", () => ({
+  searchWorkItems: indexedSearch,
+  bugSearchSort: () => "createdAt:desc,sourceId:desc",
+  ideaSearchSort: () => "score:desc,createdAt:desc,sourceId:desc",
+  typesenseFilter: (field: string, value: unknown) => value === undefined ? null : `${field}:=${String(value)}`,
+}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
@@ -152,6 +159,7 @@ beforeEach(() => {
   ideaCount.mockResolvedValue(4);
   ideaFindMany.mockResolvedValue([IDEA]);
   ideaVerdictGroupBy.mockResolvedValue([]);
+  indexedSearch.mockRejectedValue(new Error("Typesense is unavailable in this test."));
 });
 
 describe("issue list layout", () => {
@@ -212,6 +220,31 @@ describe("issue list layout", () => {
     expect(where).not.toHaveProperty("id");
     expect(where).not.toHaveProperty("status");
     expect(current(stages(html))).toEqual([]);
+  });
+
+  it("uses Typesense for issue text hits and rechecks the current tenant-scoped rows in PostgreSQL", async () => {
+    indexedSearch.mockResolvedValue({ found: 1, hits: [{ id: "bug-1", kind: "bug", score: 10 }] });
+    await renderList({ q: "login", status: "all" });
+    expect(indexedSearch).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "bug", tenantId: "tenant-acme", projectId: "project-acme", track: "product",
+      extraFilters: expect.arrayContaining(["isDeleted:=false"]),
+    }));
+    const rowQuery = findMany.mock.calls.at(-1)![0];
+    expect(rowQuery.where.id).toEqual({ in: ["bug-1"] });
+    expect(rowQuery.where).not.toHaveProperty("OR");
+    expect(rowQuery.where).toMatchObject({ tenantId: "tenant-acme", projectId: "project-acme", track: "product", isDeleted: false });
+  });
+
+  it("uses Typesense for Idea text hits while retaining project and track predicates", async () => {
+    indexedSearch.mockResolvedValue({ found: 1, hits: [{ id: "idea-1", kind: "idea", score: 10 }] });
+    await renderList({ q: "export", status: "ideas" });
+    expect(indexedSearch).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "idea", tenantId: "tenant-acme", projectId: "project-acme", track: "product",
+    }));
+    const rowQuery = ideaFindMany.mock.calls.at(-1)![0];
+    expect(rowQuery.where.id).toEqual({ in: ["idea-1"] });
+    expect(rowQuery.where).not.toHaveProperty("OR");
+    expect(rowQuery.where).toMatchObject({ tenantId: "tenant-acme", projectId: "project-acme", track: "product", isDeleted: false });
   });
 
   it("lists each tab by its main status (Ziki #713, #substatus)", async () => {

@@ -31,6 +31,7 @@ import { boundSearchTerm, escapeSearchQuery } from "@/lib/search";
 import { parseIssueRef } from "@/lib/issue-ref";
 import { workflowFor } from "@/lib/workflow";
 import { ideaVoteTotals, NO_VOTES } from "@/lib/idea-vote-totals";
+import { searchWorkItems } from "@/lib/search-index";
 import { agentAttachmentUrl } from "@/lib/agent-api/attachment-read";
 
 /**
@@ -138,7 +139,7 @@ export async function listAgentIdeas(scope: Scope, params: URLSearchParams) {
     ? await prisma.category.findMany({ where: { tenantId: scope.tenantId }, select: { id: true, name: true, slug: true } })
     : [];
   const platform = requireKnownFilter("platform", rawPlatform, parsePlatformFilter(rawPlatform, platforms));
-  const where: Prisma.IdeaWhereInput = {
+  const baseWhere: Prisma.IdeaWhereInput = {
     ...scope,
     track: track.track,
     isDeleted: false,
@@ -146,17 +147,45 @@ export async function listAgentIdeas(scope: Scope, params: URLSearchParams) {
     ...(rawStatus ? { status: rawStatus as IdeaStatus } : {}),
     ...(convertibleRaw === "true" ? { status: "open", score: { gte: ideaThreshold } } : {}),
     ...(convertibleRaw === "false" ? { NOT: { status: "open", score: { gte: ideaThreshold } } } : {}),
-    ...(term
-      ? { AND: [{ OR: [{ title: { contains: term, mode: "insensitive" } }, { description: { contains: term, mode: "insensitive" } }] }] }
-      : {}),
-    ...(cursor ? ideaCursorWhere(cursor) : {}),
   };
-  const rows = await prisma.idea.findMany({
-    where,
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: limit + 1,
-    select: ideaSelect,
-  });
+  let rows;
+  if (q && boundSearchTerm(q).length >= 3) {
+    try {
+      const filters = [
+        ...(rawStatus ? [`status:=${rawStatus}`] : []),
+        ...(convertibleRaw === "true" ? ["status:=open", `score:>=${ideaThreshold}`] : []),
+        ...(convertibleRaw === "false" ? [`(status:!=open || score:<${ideaThreshold})`] : []),
+        ...(platform === PLATFORM_NONE ? ["hasCategory:=false"] : platform ? [`categoryId:=${platform}`] : []),
+        // Typesense supports numeric ranges, not string range filters. Fetch
+        // through the cursor timestamp, then apply the full (time, id) cursor
+        // predicate in PostgreSQL before counting the page.
+        ...(cursor ? [`createdAt:<=${cursor.createdAt.getTime()}`] : []),
+      ];
+      const batchSize = limit + 1;
+      const ids: string[] = [];
+      let pageNumber = 1;
+      let found = 0;
+      while (true) {
+        const batch = await searchWorkItems({ query: boundSearchTerm(q), kind: "idea", tenantId: scope.tenantId, projectId: scope.projectId, track: track.track, page: pageNumber, perPage: batchSize, sortBy: "createdAt:desc,sourceId:desc", queryBy: "title(infix:always),description(infix:always)", extraFilters: filters });
+        found = batch.found;
+        if (pageNumber === 1 && found === 0) throw new Error("Typesense returned no candidates; verifying with PostgreSQL.");
+        ids.push(...batch.hits.map((hit) => hit.id));
+        const currentRows = await prisma.idea.findMany({
+          where: { ...baseWhere, ...(cursor ? ideaCursorWhere(cursor) : {}), id: { in: ids } },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: limit + 1, select: ideaSelect,
+        });
+        const literalQuery = boundSearchTerm(q).toLocaleLowerCase();
+        rows = currentRows.filter((row) => row.title.toLocaleLowerCase().includes(literalQuery) || row.description.toLocaleLowerCase().includes(literalQuery));
+        if (rows.length > limit || pageNumber * batchSize >= found || batch.hits.length === 0) break;
+        pageNumber += 1;
+      }
+    } catch (error) {
+      console.error("[agent-api/ideas] Typesense search failed; using PostgreSQL", error);
+      rows = await prisma.idea.findMany({ where: { ...baseWhere, ...(term ? { AND: [{ OR: [{ title: { contains: term, mode: "insensitive" as const } }, { description: { contains: term, mode: "insensitive" as const } }] }] } : {}), ...(cursor ? ideaCursorWhere(cursor) : {}) }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: limit + 1, select: ideaSelect });
+    }
+  } else {
+    rows = await prisma.idea.findMany({ where: { ...baseWhere, ...(term ? { AND: [{ OR: [{ title: { contains: term, mode: "insensitive" as const } }, { description: { contains: term, mode: "insensitive" as const } }] }] } : {}), ...(cursor ? ideaCursorWhere(cursor) : {}) }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: limit + 1, select: ideaSelect });
+  }
   const page = toPage(rows, limit);
   // #724: each idea's weighted good, bad and neutral votes, as the Ideas list shows them.
   const totals = await ideaVoteTotals(prisma, page.items.map((row) => row.id));

@@ -16,7 +16,9 @@ const db = vi.hoisted(() => ({
   $queryRaw: vi.fn(),
   $transaction: vi.fn(),
 }));
+const indexedSearch = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
+vi.mock("@/lib/search-index", () => ({ searchWorkItems: indexedSearch }));
 
 // Claude, for structuring an idea as it is submitted (#idea-intake). No network in tests.
 const claude = vi.hoisted(() => ({ parse: vi.fn() }));
@@ -36,7 +38,7 @@ vi.mock("@anthropic-ai/sdk", () => {
 });
 vi.mock("@anthropic-ai/sdk/helpers/zod", () => ({ zodOutputFormat: (schema: unknown) => schema }));
 
-import { createIdeaWithPolicy, type CreatePolicyInput } from "@/lib/agent-api/create-policy";
+import { createIdeaWithPolicy, encodeCursor, type CreatePolicyInput } from "@/lib/agent-api/create-policy";
 import { listAgentIdeas, readAgentIdea } from "@/lib/agent-api/ideas";
 import { structureIdea } from "@/lib/idea-structuring";
 import { parseIdeaTrack } from "@/lib/marketing/idea-track";
@@ -74,6 +76,7 @@ beforeEach(() => {
   db.idea.findMany.mockResolvedValue([idea]);
   db.idea.findFirst.mockResolvedValue({ id: "i1" });
   db.idea.findUniqueOrThrow.mockResolvedValue({ ...idea, attachments: [] });
+  indexedSearch.mockRejectedValue(new Error("Typesense is unavailable in this test."));
   insert.mockResolvedValue({ id: "new-idea" });
 });
 
@@ -173,6 +176,31 @@ describe("seeing an idea", () => {
     });
     expect(page.items[0]).toMatchObject({ track: "marketing", rationale: "Supports the launch focus.", status: "rejected" });
     await expect(listAgentIdeas(scope, new URLSearchParams("track=web"))).rejects.toMatchObject({ status: 400, body: { field: "track" } });
+  });
+
+  it("uses the Typesense match set, then applies the authenticated project scope and cursor order in PostgreSQL", async () => {
+    indexedSearch.mockResolvedValue({ found: 1, hits: [{ id: "i1", kind: "idea", score: 10 }] });
+    const result = await listAgentIdeas(scope, new URLSearchParams("q=Export%20activity%20as%20CSV&limit=1"));
+    expect(result.items).toHaveLength(1);
+    const query = db.idea.findMany.mock.calls.at(-1)![0];
+    expect(query.where.id).toEqual({ in: ["i1"] });
+    expect(query.where).toMatchObject({ tenantId: "t1", projectId: "p1", track: "product", isDeleted: false });
+    expect(query.where).not.toHaveProperty("AND");
+    expect(query.orderBy).toEqual([{ createdAt: "desc" }, { id: "desc" }]);
+    expect(indexedSearch).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "idea", tenantId: "t1", projectId: "p1", track: "product",
+      sortBy: "createdAt:desc,sourceId:desc", perPage: 2,
+    }));
+  });
+
+  it("uses only the numeric timestamp in Typesense cursor filters, then keeps the full cursor predicate in PostgreSQL", async () => {
+    indexedSearch.mockResolvedValue({ found: 1, hits: [{ id: "i1", kind: "idea", score: 10 }] });
+    const cursor = encodeCursor({ createdAt: idea.createdAt, id: "idea-cursor" });
+    await listAgentIdeas(scope, new URLSearchParams(`q=Export&limit=1&cursor=${cursor}`));
+    expect(indexedSearch).toHaveBeenCalledWith(expect.objectContaining({
+      extraFilters: expect.arrayContaining([`createdAt:<=${idea.createdAt.getTime()}`]),
+    }));
+    expect(db.idea.findMany.mock.calls.at(-1)![0].where).toHaveProperty("OR");
   });
 });
 

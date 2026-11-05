@@ -1519,6 +1519,35 @@ model IdeaVerdict {
   @@index([ideaId])
 }
 
+/// Durable work-item changes waiting to be applied to the Typesense index.
+/// No foreign key: hard deletes must leave a searchable tombstone event.
+model SearchIndexOutbox {
+  id          BigInt    @id @default(autoincrement())
+  kind        String
+  sourceId    String
+  action      String
+  tenantId    String?
+  projectId   String?
+  status      String    @default("pending")
+  attempts    Int       @default(0)
+  availableAt DateTime  @default(now())
+  claimedAt   DateTime?
+  processedAt DateTime?
+  lastError   String?
+  createdAt   DateTime  @default(now())
+
+  @@index([status, availableAt, id])
+  @@index([status, processedAt, id])
+  @@index([kind, sourceId, status, id])
+}
+
+/// Prevents the outbox worker from racing a full Typesense backfill/rebuild.
+model SearchIndexControl {
+  id        Int       @id
+  leaseOwner String?
+  leaseUntil DateTime?
+}
+
 /// One person's confirmation entry on an issue at Requires confirmation
 /// (#issue-confirmations): confirm (real and not a duplicate), reject (not
 /// real, or a duplicate of `duplicateOfId`) or neutral, always with a summary

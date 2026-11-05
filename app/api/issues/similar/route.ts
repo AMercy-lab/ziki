@@ -39,6 +39,11 @@ async function trigramMatches(query: string, tenantId: string | null): Promise<S
     LIMIT ${CANDIDATES}`;
 }
 
+// Keep this retrieval in PostgreSQL: Typesense token/infix matches cannot
+// guarantee the recall of pg_trgm's `%` and `<%` operators. The established
+// score, 0.35 threshold, and vote-count ranking must remain exact until a
+// parity-tested candidate strategy is available.
+
 /** Without pg_trgm (the extension needs privileges some hosts lack). */
 async function plainMatches(query: string, tenantId: string | null): Promise<SimilarIssue[]> {
   const terms = fallbackTerms(query);

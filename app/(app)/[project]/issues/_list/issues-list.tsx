@@ -101,6 +101,7 @@ import { openIssueConfirmations, parseIssueStageView, type IssueStage } from "@/
 import { issueHref } from "@/lib/issue-ref";
 import { PROJECT_ALL_PARAM, showsAllProjects } from "@/lib/issue-list-filters";
 import { ideaVoteTotals, NO_VOTES } from "@/lib/idea-vote-totals";
+import { bugSearchSort, ideaSearchSort, searchWorkItems, typesenseFilter } from "@/lib/search-index";
 
 /* Distinct browser-tab title; the root layout appends "· Ziki". */
 export const metadata = { title: "Issues" };
@@ -376,9 +377,27 @@ export async function IssuesList({
     if (asNumber !== null) where.OR.push({ number: asNumber });
   }
 
+  const complexBugSearchFilter = Boolean(
+    mineFilter || (parseMyWorkFilter(params[MY_WORK_PARAM]) && userId)
+      || statusParam === REJECTED_STATUS || statusParam === POSSIBLY_DELIVERED
+      || toSingleQueryParam(params.stage),
+  );
+  const bugSearchExtraFilters = ["status", "substatus", "typeId", "categoryId", "areaId", "milestoneId", "reporterId", "assigneeId", "duplicateOfId", "isBoosted", "isDeleted"]
+    .map((field) => typesenseFilter(field, (where as Record<string, unknown>)[field]))
+    .filter((filter): filter is string => filter !== null);
+  let typesenseBugSearch: { found: number } | null = null;
+  if (qParam && boundSearchTerm(qParam).length >= 3 && tenantId && !isIdeasView && !complexBugSearchFilter) {
+    try {
+      const indexed = await searchWorkItems({ query: boundSearchTerm(qParam), kind: "bug", tenantId, ...(projectId && !allProjects ? { projectId } : {}), track: "product", includeDeleted: isDeletedView, page: 1, perPage: 1, sortBy: bugSearchSort(currentSort, !isWatchingView), extraFilters: bugSearchExtraFilters });
+      if (indexed.found > 0) typesenseBugSearch = indexed;
+    } catch (error) {
+      console.error("[issues] Typesense search failed; using PostgreSQL", error);
+    }
+  }
+
   let totalCount = 0;
   try {
-    totalCount = await prisma.bug.count({ where });
+    totalCount = typesenseBugSearch?.found ?? await prisma.bug.count({ where });
   } catch (error) {
     const reference = logLoadFailure("[bugs] list count failed", error);
     const missingColumn = isMissingTenantColumnError(error);
@@ -541,9 +560,23 @@ export async function IssuesList({
 
   // Select only what the list shows: no `description` (up to 5000 chars
   // each), which the list never displays (#217).
-  const listed = await prisma.bug
+  let indexedBugIds: string[] | null = null;
+  if (typesenseBugSearch && tenantId && qParam) {
+    try {
+      const result = await searchWorkItems({ query: boundSearchTerm(qParam), kind: "bug", tenantId, ...(projectId && !allProjects ? { projectId } : {}), track: "product", includeDeleted: isDeletedView, page: pagination.page, perPage: pagination.take, sortBy: bugSearchSort(currentSort, !isWatchingView), extraFilters: bugSearchExtraFilters });
+      indexedBugIds = result.hits.map((hit) => hit.id);
+    } catch (error) {
+      console.error("[issues] Typesense result lookup failed; using PostgreSQL", error);
+    }
+  }
+  const issueRowWhere = { ...where };
+  if (indexedBugIds) {
+    delete issueRowWhere.OR;
+    issueRowWhere.id = { in: indexedBugIds };
+  }
+  let listed = await prisma.bug
     .findMany({
-      where,
+      where: issueRowWhere,
       select: {
         id: true,
         number: true,
@@ -591,11 +624,44 @@ export async function IssuesList({
       },
       // A personal list reads newest-activity-first; boosts are for the shared one.
       orderBy: getBugOrderBy(currentSort, { boostFirst: !isWatchingView }),
-      skip: pagination.skip,
-      take: pagination.take,
+      skip: indexedBugIds ? 0 : pagination.skip,
+      take: indexedBugIds ? indexedBugIds.length : pagination.take,
     })
     .then((bugs) => ({ bugs }))
     .catch((error: unknown) => ({ reference: logLoadFailure("[bugs] list query failed", error) }));
+  let forcePgFallback = false;
+  if (indexedBugIds && "bugs" in listed && qParam) {
+    try {
+      const literalQuery = boundSearchTerm(qParam).toLocaleLowerCase();
+      const exactNumber = parseIssueNumberQuery(qParam);
+      const descriptionsNeeded = listed.bugs.filter((bug) => !bug.title.toLocaleLowerCase().includes(literalQuery) && bug.number !== exactNumber).map((bug) => bug.id);
+      const descriptions = descriptionsNeeded.length
+        ? await prisma.bug.findMany({ where: { ...issueRowWhere, id: { in: descriptionsNeeded } }, select: { id: true, description: true } })
+        : [];
+      const byId = new Map(descriptions.map((row) => [row.id, row.description]));
+      const matched = listed.bugs.filter((bug) => bug.title.toLocaleLowerCase().includes(literalQuery)
+        || bug.number === exactNumber || (byId.get(bug.id)?.toLocaleLowerCase().includes(literalQuery) ?? false));
+      if (matched.length !== listed.bugs.length) listed = { bugs: matched };
+    } catch (error) {
+      console.error("[issues] could not validate indexed text results; using PostgreSQL", error);
+      forcePgFallback = true;
+    }
+  }
+  if (indexedBugIds && "bugs" in listed && (forcePgFallback || listed.bugs.length < Math.min(pagination.take, Math.max(0, totalCount - pagination.skip)))) {
+    // The index is eventually consistent. If validation drops a stale hit, use the established query for this request rather than render a short page.
+    listed = await prisma.bug.findMany({ where, select: {
+      id: true, number: true, title: true, status: true, substatus: true, closeReason: true, voteCount: true,
+      projectId: true, project: { select: { slug: true } }, isDeleted: true, isBoosted: true, createdAt: true, updatedAt: true,
+      pullRequestUrl: true, type: { select: { name: true } }, reporter: { select: { name: true, role: true, image: true } },
+      assignee: { select: { name: true, role: true, image: true } },
+      claims: { where: { status: { in: ["active", "offered"] }, releasedAt: null }, select: { status: true, claimedAt: true, createdAt: true, beneficiary: { select: { name: true } } }, orderBy: { createdAt: "desc" }, take: 2 },
+      category: { select: { id: true, name: true } }, area: { select: { id: true, name: true } }, reward: true, rewardEstimateCount: true, rewardFixedAt: true,
+      duplicateOf: showDuplicates ? { select: { number: true } } : false,
+      _count: { select: { comments: true, attachments: true, bids: { where: OPEN_BID_WHERE } } },
+    }, orderBy: getBugOrderBy(currentSort, { boostFirst: !isWatchingView }), skip: pagination.skip, take: pagination.take })
+      .then((bugs) => ({ bugs }))
+      .catch((error: unknown) => ({ reference: logLoadFailure("[bugs] list query failed", error) }));
+  }
   if ("reference" in listed) {
     return issuesQueryError(listed.reference);
   }
@@ -627,6 +693,23 @@ export async function IssuesList({
   // Rejected ideas (#idea-rejected), with the same scope and search as new
   // ones. Archived ideas (#idea-archive) show here too, labelled Archived.
   const rejectedIdeaWhere: Prisma.IdeaWhereInput = { ...ideaWhere, status: { in: ["rejected", "archived"] } };
+  let typesenseIdeaCounts: { open: number; rejected: number } | null = null;
+  if (qParam && boundSearchTerm(qParam).length >= 3 && tenantId && !isDeletedView) {
+    const commonFilters = [
+      ...(selectedPlatform ? [typesenseFilter("categoryId", selectedPlatform === PLATFORM_NONE ? null : selectedPlatform)!] : []),
+      ...(ideaAuthor === "agents" ? ["hasAgentCreator:=true"] : ideaAuthor === "people" ? ["hasAgentCreator:=false"] : []),
+      ...(mineFilter === "created" && userId ? [`reporterId:=${userId}`] : []),
+    ];
+    try {
+      const [open, rejected] = await Promise.all([
+        searchWorkItems({ query: boundSearchTerm(qParam), kind: "idea", tenantId, ...(projectId && !allProjects ? { projectId } : {}), track: "product", page: 1, perPage: 1, sortBy: ideaSearchSort(currentIdeaSort), extraFilters: ["status:=open", ...commonFilters] }),
+        searchWorkItems({ query: boundSearchTerm(qParam), kind: "idea", tenantId, ...(projectId && !allProjects ? { projectId } : {}), track: "product", page: 1, perPage: 1, sortBy: ideaSearchSort(currentIdeaSort), extraFilters: ["status:[rejected,archived]", ...commonFilters] }),
+      ]);
+      if (open.found + rejected.found > 0) typesenseIdeaCounts = { open: open.found, rejected: rejected.found };
+    } catch (error) {
+      console.error("[ideas] Typesense search failed; using PostgreSQL", error);
+    }
+  }
   // #project-links: the project's site and GitHub repository, and whether you can set them.
   const [projectLinks, canEditProjectLinks] = await Promise.all([
     loadOrEmpty("project links", () => prisma.project.findUnique({ where: { id: project.id }, select: { siteUrl: true, repoUrl: true } }), null),
@@ -646,8 +729,8 @@ export async function IssuesList({
       : 0;
   // The Ideas tab's counts show on every tab; drafts only while Ideas is open.
   const [ideasCount, rejectedIdeasCount, draftIds] = await Promise.all([
-    tenantId && !isDeletedView ? loadOrEmpty("ideas tab", () => prisma.idea.count({ where: ideaWhere }), 0) : 0,
-    tenantId && !isDeletedView ? loadOrEmpty("rejected ideas tab", () => prisma.idea.count({ where: rejectedIdeaWhere }), 0) : 0,
+    tenantId && !isDeletedView ? (typesenseIdeaCounts?.open ?? loadOrEmpty("ideas tab", () => prisma.idea.count({ where: ideaWhere }), 0)) : 0,
+    tenantId && !isDeletedView ? (typesenseIdeaCounts?.rejected ?? loadOrEmpty("rejected ideas tab", () => prisma.idea.count({ where: rejectedIdeaWhere }), 0)) : 0,
     tenantId && isIdeasView
       ? loadOrEmpty(
           "drafted ideas",
@@ -671,11 +754,32 @@ export async function IssuesList({
   );
   const ideaRows: IdeaListRow[] = isIdeasView && tenantId
     ? await loadOrEmpty("ideas list", async () => {
-        const rows = await prisma.idea.findMany({
-          where: ideasView === "drafts" ? { ...ideaWhere, id: { in: draftIds } } : ideasView === "rejected" ? rejectedIdeaWhere : ideaWhere,
+        const originalIdeaWhere = ideasView === "drafts" ? { ...ideaWhere, id: { in: draftIds } } : ideasView === "rejected" ? rejectedIdeaWhere : ideaWhere;
+        let indexedIdeaIds: string[] | null = null;
+        if (qParam && boundSearchTerm(qParam).length >= 3 && ideasView !== "drafts") {
+          try {
+            const filters = [
+              ...(ideasView === "rejected" ? ["status:[rejected,archived]"] : ["status:=open"]),
+              ...(selectedPlatform ? [typesenseFilter("categoryId", selectedPlatform === PLATFORM_NONE ? null : selectedPlatform)!] : []),
+              ...(ideaAuthor === "agents" ? ["hasAgentCreator:=true"] : ideaAuthor === "people" ? ["hasAgentCreator:=false"] : []),
+              ...(mineFilter === "created" && userId ? [`reporterId:=${userId}`] : []),
+            ];
+            const indexed = await searchWorkItems({ query: boundSearchTerm(qParam), kind: "idea", tenantId, ...(projectId && !allProjects ? { projectId } : {}), track: "product", page: ideaPagination.page, perPage: ideaPagination.take, sortBy: ideaSearchSort(currentIdeaSort), extraFilters: filters });
+            indexedIdeaIds = indexed.hits.map((hit) => hit.id);
+          } catch (error) {
+            console.error("[ideas] Typesense result lookup failed; using PostgreSQL", error);
+          }
+        }
+        const ideaRowWhere = { ...originalIdeaWhere };
+        if (indexedIdeaIds) {
+          delete ideaRowWhere.OR;
+          ideaRowWhere.id = { in: indexedIdeaIds };
+        }
+        let rows = await prisma.idea.findMany({
+          where: ideaRowWhere,
           orderBy: getIdeaOrderBy(currentIdeaSort),
-          skip: ideaPagination.skip,
-          take: ideaPagination.take,
+          skip: indexedIdeaIds ? 0 : ideaPagination.skip,
+          take: indexedIdeaIds ? indexedIdeaIds.length : ideaPagination.take,
           select: {
             id: true, number: true, title: true, score: true, projectId: true, createdAt: true, updatedAt: true,
             status: true, archiveReason: true, archiveDuplicateOf: true, rejectedAt: true, archivedAt: true,
@@ -686,6 +790,30 @@ export async function IssuesList({
             _count: { select: { verdicts: true } },
           },
         });
+        let validatedRows = rows;
+        let forcePgIdeaFallback = false;
+        if (indexedIdeaIds && qParam) {
+          try {
+            const literalQuery = boundSearchTerm(qParam).toLocaleLowerCase();
+            const descriptionsNeeded = rows.filter((row) => !row.title.toLocaleLowerCase().includes(literalQuery)).map((row) => row.id);
+            const descriptions = descriptionsNeeded.length
+              ? await prisma.idea.findMany({ where: { ...ideaRowWhere, id: { in: descriptionsNeeded } }, select: { id: true, description: true } })
+              : [];
+            const byId = new Map(descriptions.map((row) => [row.id, row.description]));
+            validatedRows = rows.filter((row) => row.title.toLocaleLowerCase().includes(literalQuery) || (byId.get(row.id)?.toLocaleLowerCase().includes(literalQuery) ?? false));
+          } catch (error) {
+            console.error("[ideas] could not validate indexed text results; using PostgreSQL", error);
+            forcePgIdeaFallback = true;
+          }
+        }
+        if (indexedIdeaIds && (forcePgIdeaFallback || validatedRows.length < Math.min(ideaPagination.take, Math.max(0, ideaPagination.totalCount - ideaPagination.skip)))) {
+          rows = await prisma.idea.findMany({ where: originalIdeaWhere, orderBy: getIdeaOrderBy(currentIdeaSort), skip: ideaPagination.skip, take: ideaPagination.take, select: {
+            id: true, number: true, title: true, score: true, projectId: true, createdAt: true, updatedAt: true,
+            status: true, archiveReason: true, archiveDuplicateOf: true, rejectedAt: true, archivedAt: true,
+            verdicts: { orderBy: { updatedAt: "desc" }, take: 1, select: { updatedAt: true } },
+            reporter: { select: { name: true } }, category: { select: { name: true } }, _count: { select: { verdicts: true } },
+          } });
+        } else rows = validatedRows;
         const thresholds = new Map<string, number | null>();
         for (const id of new Set(rows.map((row) => row.projectId))) {
           thresholds.set(id, await workflowFor(id).then((w) => w.ideaThreshold).catch(() => null));
