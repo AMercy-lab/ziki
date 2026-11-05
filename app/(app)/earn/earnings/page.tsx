@@ -44,7 +44,8 @@ export default async function EarningsPage() {
 
       {/* The started page (Mark's four pages): how the agent is doing comes first. */}
       {agent ? (
-        <div className={`${agentsSurface} flex flex-wrap items-center gap-3 p-4`}>
+        // Click the agent to open its page, where its look and name are edited.
+        <Link href={agentPageHref(agent.username)} aria-label={`${agent.name}: open its page to edit it`} className={`${agentsSurface} flex items-center gap-3 p-4 transition hover:border-electric-blue/50 hover:shadow-[0_10px_28px_rgba(11,23,51,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue`}>
           <span className="relative shrink-0">
             <EarnAgentPortrait agentId={agent.id} agentName={agent.name} avatar={agent.avatar} size={48} />
             <span aria-hidden="true" className="absolute -right-0.5 bottom-0 h-3 w-3 rounded-full border-2 border-zk-surface bg-zk-ok-fg motion-safe:animate-pulse" />
@@ -53,9 +54,8 @@ export default async function EarningsPage() {
             <span className="block text-sm font-extrabold text-zk-text">{agent.name}</span>
             <span className="block text-sm text-zk-text2">{earnAgentActivity(balance.stage)}</span>
           </span>
-          <Link href="/earn/marketing" className={agentsSecondaryBtn}>Marketing tasks</Link>
-          <Link href={agentPageHref(agent.username)} className={agentsLink}>Change its look</Link>
-        </div>
+          <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-zk-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+        </Link>
       ) : null}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
