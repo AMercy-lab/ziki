@@ -1,4 +1,4 @@
-import { PRODUCT_TRACK } from "@/lib/marketing/track";
+import { parseTrackFilter, trackFilter } from "@/lib/marketing/track";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -32,6 +32,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: RATE_LIMIT_MESSAGE }, { status: 429 });
   }
 
+  const parsedTrack = parseTrackFilter(req.nextUrl.searchParams.get("track"));
+  if (!parsedTrack.ok) {
+    return NextResponse.json({ error: "invalid_request", field: "track" }, { status: 400 });
+  }
+
   const query = normalizeSuggestQuery(req.nextUrl.searchParams.get("q"));
   if (!shouldSuggest(query)) return NextResponse.json({ issues: [] });
 
@@ -48,17 +53,18 @@ export async function GET(req: NextRequest) {
       const matches: Prisma.BugWhereInput[] = [{ title: { contains, mode: "insensitive" } }];
       if (asNumber !== null) matches.push({ number: asNumber });
       const fallback = await prisma.bug.findMany({
-        where: { ...bugInTenant(tenantId), ...(projectId ? { projectId } : {}), ...PRODUCT_TRACK, isDeleted: false, OR: matches },
+        where: { ...bugInTenant(tenantId), ...(projectId ? { projectId } : {}), ...trackFilter(parsedTrack.track), isDeleted: false, OR: matches },
         select: { id: true }, orderBy: { updatedAt: "desc" }, take: SUGGEST_LIMIT,
       });
       return fallback.map((row) => row.id);
     };
-    if (query.length < 3) {
+    const usedPostgresCandidates = query.length < 3;
+    if (usedPostgresCandidates) {
       candidateIds = await postgresCandidates();
     } else try {
       const [text, exact] = await Promise.all([
-        searchWorkItems({ query, kind: "bug", tenantId, ...(projectId ? { projectId } : {}), track: "product", page: 1, perPage: 250, queryBy: "title(infix:always)", sortBy: "updatedAt:desc" }),
-        asNumber === null ? Promise.resolve({ hits: [] as Array<{ id: string }> }) : searchWorkItems({ query: "*", kind: "bug", tenantId, ...(projectId ? { projectId } : {}), track: "product", page: 1, perPage: 5, queryBy: "title", sortBy: "updatedAt:desc", extraFilters: [`number:=${asNumber}`] }),
+        searchWorkItems({ query, kind: "bug", tenantId, ...(projectId ? { projectId } : {}), track: parsedTrack.track, page: 1, perPage: 250, queryBy: "title(infix:always)", sortBy: "updatedAt:desc" }),
+        asNumber === null ? Promise.resolve({ hits: [] as Array<{ id: string }> }) : searchWorkItems({ query: "*", kind: "bug", tenantId, ...(projectId ? { projectId } : {}), track: parsedTrack.track, page: 1, perPage: 5, queryBy: "title", sortBy: "updatedAt:desc", extraFilters: [`number:=${asNumber}`] }),
       ]);
       candidateIds = [...new Set([...text.hits.map((hit) => hit.id), ...exact.hits.map((hit) => hit.id)])];
       if (candidateIds.length === 0) candidateIds = await postgresCandidates();
@@ -70,11 +76,11 @@ export async function GET(req: NextRequest) {
       where: {
         ...bugInTenant(tenantId),
         ...(projectId ? { projectId } : {}),
-        ...PRODUCT_TRACK,
+        ...trackFilter(parsedTrack.track),
         isDeleted: false,
         id: { in: candidateIds },
       },
-      select: { id: true, number: true, title: true, status: true, project: { select: { slug: true } } },
+      select: { id: true, number: true, title: true, status: true, track: true, project: { select: { slug: true } } },
       orderBy: { updatedAt: "desc" },
       take: SUGGEST_LIMIT,
     });
@@ -82,17 +88,17 @@ export async function GET(req: NextRequest) {
     // PostgreSQL `contains` query would not. Keep suggestions behavior exact;
     // if a candidate fails revalidation, refill from the source-of-truth query.
     const validRows = rows.filter((row) => row.title.toLocaleLowerCase().includes(query.toLocaleLowerCase()) || row.number === asNumber);
-    if (validRows.length !== rows.length) {
+    if (validRows.length !== rows.length || (!usedPostgresCandidates && rows.length < SUGGEST_LIMIT)) {
       const fallbackIds = await postgresCandidates();
       rows = await prisma.bug.findMany({
         where: {
           ...bugInTenant(tenantId),
           ...(projectId ? { projectId } : {}),
-          ...PRODUCT_TRACK,
+          ...trackFilter(parsedTrack.track),
           isDeleted: false,
           id: { in: fallbackIds },
         },
-        select: { id: true, number: true, title: true, status: true, project: { select: { slug: true } } },
+        select: { id: true, number: true, title: true, status: true, track: true, project: { select: { slug: true } } },
         orderBy: { updatedAt: "desc" },
         take: SUGGEST_LIMIT,
       });

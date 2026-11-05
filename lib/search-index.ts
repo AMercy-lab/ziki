@@ -1,7 +1,7 @@
 import "server-only";
 import type { Bug, Idea } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { documentId, ensureWorkItemsCollection, epoch, getTypesenseClient, WORK_ITEMS_COLLECTION, type WorkItemDocument } from "@/lib/typesense";
+import { documentId, ensureWorkItemsCollection, epoch, getTypesenseClient, typesenseConfig, WORK_ITEMS_COLLECTION, type WorkItemDocument } from "@/lib/typesense";
 
 const SUBSTATUS_ORDER = ["requires_confirmation", "open", "in_progress", "requires_review", "accepted", "ready_to_merge", "error", "on_dev", "on_staging", "on_prod", "published", "closed"];
 
@@ -170,8 +170,13 @@ async function applyEvent(event: OutboxEvent): Promise<void> {
   throw new Error(`Unknown search-index kind: ${event.kind}`);
 }
 
-export async function processSearchOutbox(limit = 100): Promise<{ processed: number; failed: number }> {
+export async function processSearchOutbox(limit = 100): Promise<{ processed: number; failed: number; skipped?: "disabled" | "unconfigured" }> {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new Error("Outbox processing limit must be an integer from 1 to 1000.");
+  let configured = true;
+  try { typesenseConfig(); } catch { configured = false; }
+  if (!configured) return { processed: 0, failed: 0, skipped: "unconfigured" };
+  const [control] = await prisma.$queryRaw<Array<{ indexingEnabled: boolean }>>`SELECT "indexingEnabled" FROM "SearchIndexControl" WHERE "id"=1`;
+  if (!control?.indexingEnabled) return { processed: 0, failed: 0, skipped: "disabled" };
   const { maxAttempts } = searchOutboxPolicy();
   let processed = 0;
   let failed = 0;
@@ -260,6 +265,11 @@ export async function indexAllWorkItems(batchSize = 200, afterBatch?: () => Prom
 }
 
 export async function searchWorkItems(input: { query: string; kind: "bug" | "idea"; tenantId: string; projectId?: string; track?: string; includeDeleted?: boolean; page?: number; perPage?: number; sortBy?: string; queryBy?: string; extraFilters?: string[] }) {
+  // A configured endpoint is not enough: until durable capture is enabled,
+  // the collection may be stale or empty and PostgreSQL must remain the path.
+  typesenseConfig();
+  const [control] = await prisma.$queryRaw<Array<{ indexingEnabled: boolean }>>`SELECT "indexingEnabled" FROM "SearchIndexControl" WHERE "id"=1`;
+  if (!control?.indexingEnabled) throw new Error("Typesense indexing is disabled; use PostgreSQL search.");
   await ensureWorkItemsCollection();
   const filters = [`kind:=${input.kind}`, `tenantId:=${input.tenantId}`];
   if (input.projectId) filters.push(`projectId:=${input.projectId}`);

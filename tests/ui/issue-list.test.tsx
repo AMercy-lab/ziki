@@ -236,6 +236,7 @@ describe("issue list layout", () => {
   });
 
   it("uses Typesense for Idea text hits while retaining project and track predicates", async () => {
+    ideaCount.mockResolvedValue(1);
     indexedSearch.mockResolvedValue({ found: 1, hits: [{ id: "idea-1", kind: "idea", score: 10 }] });
     await renderList({ q: "export", status: "ideas" });
     expect(indexedSearch).toHaveBeenCalledWith(expect.objectContaining({
@@ -245,6 +246,40 @@ describe("issue list layout", () => {
     expect(rowQuery.where.id).toEqual({ in: ["idea-1"] });
     expect(rowQuery.where).not.toHaveProperty("OR");
     expect(rowQuery.where).toMatchObject({ tenantId: "tenant-acme", projectId: "project-acme", track: "product", isDeleted: false });
+  });
+
+  it("falls back to PostgreSQL for issue text search when Typesense is unavailable", async () => {
+    const html = await renderList({ q: "login", status: "all" });
+    expect(html).toContain("Issues");
+    expect(indexedSearch).toHaveBeenCalled();
+    const rowQuery = findMany.mock.calls.at(-1)![0];
+    expect(rowQuery.where).toMatchObject({ tenantId: "tenant-acme", projectId: "project-acme", track: "product" });
+    expect(rowQuery.where).toHaveProperty("OR");
+  });
+
+  it("falls back to PostgreSQL for idea text search and keeps its source-of-truth count", async () => {
+    const html = await renderList({ q: "export", status: "ideas" });
+    expect(html).toContain("Export activity as CSV");
+    expect(indexedSearch).toHaveBeenCalled();
+    const rowQuery = ideaFindMany.mock.calls.at(-1)![0];
+    expect(rowQuery.where).toMatchObject({ tenantId: "tenant-acme", projectId: "project-acme", track: "product" });
+    expect(rowQuery.where).toHaveProperty("OR");
+    expect(ideaCount).toHaveBeenCalled();
+  });
+
+  it("refills a stale Typesense page from PostgreSQL instead of returning a short page", async () => {
+    indexedSearch.mockResolvedValue({ found: 1, hits: [{ id: "deleted-or-missing", kind: "bug", score: 10 }] });
+    findMany.mockImplementation(async (args: { where?: Record<string, unknown> }) => args.where?.id ? [] : [BUG]);
+    await renderList({ q: "login", status: "all" });
+    expect(findMany.mock.calls.at(-1)![0].where).not.toHaveProperty("id");
+    expect(findMany.mock.calls.at(-1)![0].where).toHaveProperty("OR");
+  });
+
+  it("uses PostgreSQL rows when the indexed total disagrees with the exact database count", async () => {
+    indexedSearch.mockResolvedValue({ found: 99, hits: [{ id: "bug-1", kind: "bug", score: 10 }] });
+    await renderList({ q: "login", status: "all" });
+    expect(findMany.mock.calls.at(-1)![0].where).not.toHaveProperty("id");
+    expect(findMany.mock.calls.at(-1)![0].where).toHaveProperty("OR");
   });
 
   it("lists each tab by its main status (Ziki #713, #substatus)", async () => {

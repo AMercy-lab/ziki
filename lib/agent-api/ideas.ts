@@ -179,6 +179,8 @@ export async function listAgentIdeas(scope: Scope, params: URLSearchParams) {
         if (rows.length > limit || pageNumber * batchSize >= found || batch.hits.length === 0) break;
         pageNumber += 1;
       }
+      const sourceCount = await prisma.idea.count({ where: { ...baseWhere, ...(term ? { AND: [{ OR: [{ title: { contains: term, mode: "insensitive" as const } }, { description: { contains: term, mode: "insensitive" as const } }] }] } : {}), ...(cursor ? ideaCursorWhere(cursor) : {}) } });
+      if (rows.length < Math.min(limit + 1, sourceCount)) throw new Error("Typesense candidate page is incomplete; verifying with PostgreSQL.");
     } catch (error) {
       console.error("[agent-api/ideas] Typesense search failed; using PostgreSQL", error);
       rows = await prisma.idea.findMany({ where: { ...baseWhere, ...(term ? { AND: [{ OR: [{ title: { contains: term, mode: "insensitive" as const } }, { description: { contains: term, mode: "insensitive" as const } }] }] } : {}), ...(cursor ? ideaCursorWhere(cursor) : {}) }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: limit + 1, select: ideaSelect });

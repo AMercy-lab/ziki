@@ -397,7 +397,8 @@ export async function IssuesList({
 
   let totalCount = 0;
   try {
-    totalCount = typesenseBugSearch?.found ?? await prisma.bug.count({ where });
+    // PostgreSQL is authoritative for pagination totals while the index is asynchronous.
+    totalCount = await prisma.bug.count({ where });
   } catch (error) {
     const reference = logLoadFailure("[bugs] list count failed", error);
     const missingColumn = isMissingTenantColumnError(error);
@@ -420,6 +421,9 @@ export async function IssuesList({
       return issuesQueryError(reference);
     }
   }
+  // A cardinality mismatch means the asynchronous index cannot safely define
+  // this request's page set. Use PostgreSQL for both rows and exact total.
+  if (typesenseBugSearch && typesenseBugSearch.found !== totalCount) typesenseBugSearch = null;
 
   const stageView: IssueStage | null = isDeletedView || isIdeasView
     ? null
@@ -693,23 +697,6 @@ export async function IssuesList({
   // Rejected ideas (#idea-rejected), with the same scope and search as new
   // ones. Archived ideas (#idea-archive) show here too, labelled Archived.
   const rejectedIdeaWhere: Prisma.IdeaWhereInput = { ...ideaWhere, status: { in: ["rejected", "archived"] } };
-  let typesenseIdeaCounts: { open: number; rejected: number } | null = null;
-  if (qParam && boundSearchTerm(qParam).length >= 3 && tenantId && !isDeletedView) {
-    const commonFilters = [
-      ...(selectedPlatform ? [typesenseFilter("categoryId", selectedPlatform === PLATFORM_NONE ? null : selectedPlatform)!] : []),
-      ...(ideaAuthor === "agents" ? ["hasAgentCreator:=true"] : ideaAuthor === "people" ? ["hasAgentCreator:=false"] : []),
-      ...(mineFilter === "created" && userId ? [`reporterId:=${userId}`] : []),
-    ];
-    try {
-      const [open, rejected] = await Promise.all([
-        searchWorkItems({ query: boundSearchTerm(qParam), kind: "idea", tenantId, ...(projectId && !allProjects ? { projectId } : {}), track: "product", page: 1, perPage: 1, sortBy: ideaSearchSort(currentIdeaSort), extraFilters: ["status:=open", ...commonFilters] }),
-        searchWorkItems({ query: boundSearchTerm(qParam), kind: "idea", tenantId, ...(projectId && !allProjects ? { projectId } : {}), track: "product", page: 1, perPage: 1, sortBy: ideaSearchSort(currentIdeaSort), extraFilters: ["status:[rejected,archived]", ...commonFilters] }),
-      ]);
-      if (open.found + rejected.found > 0) typesenseIdeaCounts = { open: open.found, rejected: rejected.found };
-    } catch (error) {
-      console.error("[ideas] Typesense search failed; using PostgreSQL", error);
-    }
-  }
   // #project-links: the project's site and GitHub repository, and whether you can set them.
   const [projectLinks, canEditProjectLinks] = await Promise.all([
     loadOrEmpty("project links", () => prisma.project.findUnique({ where: { id: project.id }, select: { siteUrl: true, repoUrl: true } }), null),
@@ -729,8 +716,8 @@ export async function IssuesList({
       : 0;
   // The Ideas tab's counts show on every tab; drafts only while Ideas is open.
   const [ideasCount, rejectedIdeasCount, draftIds] = await Promise.all([
-    tenantId && !isDeletedView ? (typesenseIdeaCounts?.open ?? loadOrEmpty("ideas tab", () => prisma.idea.count({ where: ideaWhere }), 0)) : 0,
-    tenantId && !isDeletedView ? (typesenseIdeaCounts?.rejected ?? loadOrEmpty("rejected ideas tab", () => prisma.idea.count({ where: rejectedIdeaWhere }), 0)) : 0,
+    tenantId && !isDeletedView ? loadOrEmpty("ideas tab", () => prisma.idea.count({ where: ideaWhere }), 0) : 0,
+    tenantId && !isDeletedView ? loadOrEmpty("rejected ideas tab", () => prisma.idea.count({ where: rejectedIdeaWhere }), 0) : 0,
     tenantId && isIdeasView
       ? loadOrEmpty(
           "drafted ideas",
@@ -765,7 +752,7 @@ export async function IssuesList({
               ...(mineFilter === "created" && userId ? [`reporterId:=${userId}`] : []),
             ];
             const indexed = await searchWorkItems({ query: boundSearchTerm(qParam), kind: "idea", tenantId, ...(projectId && !allProjects ? { projectId } : {}), track: "product", page: ideaPagination.page, perPage: ideaPagination.take, sortBy: ideaSearchSort(currentIdeaSort), extraFilters: filters });
-            indexedIdeaIds = indexed.hits.map((hit) => hit.id);
+            if (indexed.found === ideaPagination.totalCount) indexedIdeaIds = indexed.hits.map((hit) => hit.id);
           } catch (error) {
             console.error("[ideas] Typesense result lookup failed; using PostgreSQL", error);
           }

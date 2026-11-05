@@ -23,6 +23,7 @@ CREATE INDEX "SearchIndexOutbox_kind_sourceId_status_id_idx"
 
 CREATE TABLE "SearchIndexControl" (
   "id" INTEGER PRIMARY KEY CHECK ("id" = 1),
+  "indexingEnabled" BOOLEAN NOT NULL DEFAULT FALSE,
   "leaseOwner" TEXT,
   "leaseUntil" TIMESTAMP(3)
 );
@@ -33,7 +34,13 @@ DECLARE
   row_id TEXT;
   row_tenant TEXT;
   row_project TEXT;
+  enabled BOOLEAN;
 BEGIN
+  SELECT "indexingEnabled" INTO enabled FROM "SearchIndexControl" WHERE "id"=1;
+  IF NOT COALESCE(enabled, FALSE) THEN
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+  END IF;
   IF TG_OP = 'DELETE' THEN
     row_id := OLD."id";
     row_tenant := OLD."tenantId";

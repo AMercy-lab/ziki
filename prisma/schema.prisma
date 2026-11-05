@@ -1543,9 +1543,10 @@ model SearchIndexOutbox {
 
 /// Prevents the outbox worker from racing a full Typesense backfill/rebuild.
 model SearchIndexControl {
-  id        Int       @id
-  leaseOwner String?
-  leaseUntil DateTime?
+  id              Int       @id
+  indexingEnabled Boolean   @default(false)
+  leaseOwner      String?
+  leaseUntil      DateTime?
 }
 
 /// One person's confirmation entry on an issue at Requires confirmation

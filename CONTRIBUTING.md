@@ -171,25 +171,6 @@ Open [http://localhost:3001](http://localhost:3001). `GET /api/health` returns `
 - Without `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, the log shows `googleConfigured: false`. That is expected locally: email/password sign-in is on.
 - These warnings in the log are expected: "Slow filesystem detected" (Windows) and "The `middleware` file convention is deprecated".
 
-### Typesense search (local)
-
-The local Compose stack includes PostgreSQL and Typesense. PostgreSQL remains the source of truth; Typesense stores a searchable index of Bugs and Ideas. Configure `TYPESENSE_HOST`, `TYPESENSE_PORT`, `TYPESENSE_PROTOCOL`, `TYPESENSE_API_KEY` and `TYPESENSE_TIMEOUT_SECONDS` in `.env`. The example key is only for local Docker and must never be used in production.
-
-```bash
-docker compose up -d
-docker compose ps
-pnpm search:setup
-pnpm search:reindex
-```
-
-`search:setup` creates or validates `ziki_work_items_v1`. `search:reindex` performs an idempotent keyset-paginated backfill and drains pending outbox events without changing Bug or Idea source rows. To rebuild only the search index, use `pnpm search:rebuild`; it recreates the Typesense collection, so searches use their PostgreSQL fallback while the index is rebuilt. Stop services with `docker compose stop`; the Typesense data volume is named `ziki_typesense`.
-
-PostgreSQL remains the source of truth. Bug and Idea changes are captured by PostgreSQL triggers in the same transaction and stored in `SearchIndexOutbox`. The platform cron worker applies them to Typesense with exponential-backoff retries, up to `SEARCH_OUTBOX_MAX_ATTEMPTS` (default 10); a permanently failing event remains in `failed` for investigation and does not block later events for that record. Typesense outages do not block normal database writes.
-
-Inspect failed events with `pnpm search:outbox -- --failed [limit] [after-id]`; the output's `nextAfter` value is the cursor for the next page. Manually requeue one with `pnpm search:outbox -- --retry <event-id>`. A requeued event starts a fresh retry cycle; the worker rereads the current Bug or Idea from PostgreSQL before indexing. If the record changes during that operation, its newer outbox event is processed afterward. Successfully processed outbox events older than `SEARCH_OUTBOX_RETENTION_DAYS` (default 30 days) are deleted in bounded batches of `SEARCH_OUTBOX_CLEANUP_BATCH_SIZE` (default 500) by the platform cron. Failed, pending and processing events are never removed by this cleanup.
-
-Typesense currently serves supported searches in the main Issues and Ideas lists, issue suggestions, and agent issue/idea search. Short queries (under three characters) and unsupported filter combinations use PostgreSQL. Similar-issue discovery remains PostgreSQL-backed and uses its existing trigram similarity logic. PostgreSQL rechecks the indexed candidates for current scope and record state; because indexing is asynchronous, search counts and page boundaries can temporarily differ while events are catching up. The admin API key stays server-side. Production must use separately managed credentials and persistent storage.
-
 Demo accounts and more detail: see [README.md](./README.md).
 
 ## Code hygiene

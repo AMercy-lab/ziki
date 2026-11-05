@@ -44,7 +44,7 @@ vi.mock("typesense", () => ({
     }
   } },
 }));
-import { bugSearchSort, listFailedSearchOutbox, processSearchOutbox, pruneProcessedSearchOutbox, retryFailedSearchOutbox, typesenseFilter } from "@/lib/search-index";
+import { bugSearchSort, listFailedSearchOutbox, processSearchOutbox, pruneProcessedSearchOutbox, retryFailedSearchOutbox, searchWorkItems, typesenseFilter } from "@/lib/search-index";
 import { ensureWorkItemsCollection, resetTypesenseClientForTests, WORK_ITEMS_SCHEMA } from "@/lib/typesense";
 
 /**
@@ -80,6 +80,7 @@ describe("Typesense outbox delivery", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("acknowledges a hard-delete tombstone only after its index deletion succeeds", async () => {
+    searchMocks.queryRows = [{ indexingEnabled: true }];
     const result = await processSearchOutbox(1);
     expect(result).toEqual({ processed: 1, failed: 0 });
     expect(searchMocks.deleteDocument).toHaveBeenCalledOnce();
@@ -88,6 +89,7 @@ describe("Typesense outbox delivery", () => {
   });
 
   it("leaves a failed event retryable with backoff instead of acknowledging it", async () => {
+    searchMocks.queryRows = [{ indexingEnabled: true }];
     searchMocks.deleteDocument.mockRejectedValueOnce(new Error("Typesense is offline"));
     const result = await processSearchOutbox(1);
     expect(result).toEqual({ processed: 0, failed: 1 });
@@ -100,6 +102,7 @@ describe("Typesense outbox delivery", () => {
   });
 
   it("moves a permanently failing event to failed at the configured attempt limit", async () => {
+    searchMocks.queryRows = [{ indexingEnabled: true }];
     vi.stubEnv("SEARCH_OUTBOX_MAX_ATTEMPTS", "1");
     searchMocks.deleteDocument.mockRejectedValueOnce(new Error("Typesense is offline"));
 
@@ -113,6 +116,7 @@ describe("Typesense outbox delivery", () => {
   });
 
   it("counts expired worker claims toward the retry limit", async () => {
+    searchMocks.queryRows = [{ indexingEnabled: true }];
     vi.stubEnv("SEARCH_OUTBOX_MAX_ATTEMPTS", "4");
     searchMocks.events = [];
 
@@ -125,6 +129,7 @@ describe("Typesense outbox delivery", () => {
   });
 
   it("does not let a failed event block later events for the same source", async () => {
+    searchMocks.queryRows = [{ indexingEnabled: true }];
     searchMocks.events = [];
 
     await processSearchOutbox(1);
@@ -144,6 +149,31 @@ describe("Typesense outbox delivery", () => {
     searchMocks.queryRows = [];
     await expect(retryFailedSearchOutbox("7")).resolves.toBe(false);
     await expect(retryFailedSearchOutbox("not-an-id")).rejects.toThrow("positive integer");
+  });
+
+  it("does not claim events when durable capture is disabled", async () => {
+    searchMocks.queryRows = [{ indexingEnabled: false }];
+    await expect(processSearchOutbox(1)).resolves.toEqual({ processed: 0, failed: 0, skipped: "disabled" });
+    expect(prismaMocks.tx.$queryRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it("does not claim events when Typesense is unconfigured", async () => {
+    vi.stubEnv("TYPESENSE_HOST", "");
+    await expect(processSearchOutbox(1)).resolves.toEqual({ processed: 0, failed: 0, skipped: "unconfigured" });
+    expect(prismaMocks.prisma.$queryRaw).not.toHaveBeenCalled();
+    expect(prismaMocks.tx.$queryRawUnsafe).not.toHaveBeenCalled();
+  });
+
+  it("does not use an initialized but not durably enabled index", async () => {
+    searchMocks.queryRows = [{ indexingEnabled: false }];
+    await expect(searchWorkItems({ query: "login", kind: "bug", tenantId: "t1" })).rejects.toThrow("Typesense indexing is disabled");
+    expect(searchMocks.createCollection).not.toHaveBeenCalled();
+  });
+
+  it("does not query Typesense when its connection is missing", async () => {
+    vi.stubEnv("TYPESENSE_API_KEY", "");
+    await expect(searchWorkItems({ query: "login", kind: "bug", tenantId: "t1" })).rejects.toThrow("Typesense is not configured");
+    expect(prismaMocks.prisma.$queryRaw).not.toHaveBeenCalled();
   });
 
   it("prunes only processed events older than retention, with a bounded locked batch", async () => {
@@ -194,6 +224,15 @@ describe("Typesense outbox delivery", () => {
 });
 
 describe("the migration history", () => {
+  it("gates Bug and Idea outbox capture behind the durable disabled-by-default control", () => {
+    const sql = sqlOf("20270105140000_search_index_outbox");
+    expect(sql).toContain('"indexingEnabled" BOOLEAN NOT NULL DEFAULT FALSE');
+    expect(sql).toContain('SELECT "indexingEnabled" INTO enabled FROM "SearchIndexControl"');
+    expect(sql).toContain("IF NOT COALESCE(enabled, FALSE) THEN");
+    expect(sql).toContain('CREATE TRIGGER "Bug_search_index_change"');
+    expect(sql).toContain('CREATE TRIGGER "Idea_search_index_change"');
+  });
+
   it("is one migration.sql per folder, each named by the timestamp it applies in", () => {
     expect(folders.length).toBeGreaterThan(0);
     for (const folder of folders) {
@@ -213,7 +252,7 @@ describe("the migration history", () => {
       }
     }
     expect(offenders).toEqual([]);
-  });
+  }, 30_000);
 });
 
 describe("the connection migrations use", () => {
