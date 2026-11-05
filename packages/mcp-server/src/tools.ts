@@ -137,9 +137,10 @@ export const TOOLS: readonly ToolDef[] = [
     method: "GET",
     route: "/ideas",
     projectScoped: true,
-    query: ["status", "convertible", "platform", "q", "limit", "cursor"],
+    query: ["track", "status", "convertible", "platform", "q", "limit", "cursor"],
     input: {
       projectId,
+      track: z.enum(["product", "marketing"]).optional().describe("Work track to list: product (default) or marketing."),
       platform: z.string().optional().describe("A platform slug from ziki_list_platforms (e.g. desktop), or `none` for ideas with no platform yet."),
       status: z.enum(["open", "converted", "rejected", "archived"]).optional().describe("Only ideas in this status. `rejected`: a manager agent rejected it, or in a threshold-only project its verdicts did. `archived`: a manager agent archived it as obsolete."),
       convertible: z.boolean().optional().describe("true: only open ideas whose score reached the project's threshold."),

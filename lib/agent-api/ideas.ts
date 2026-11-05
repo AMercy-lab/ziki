@@ -1,4 +1,4 @@
-import { PRODUCT_TRACK } from "@/lib/marketing/track";
+import { parseTrackFilter } from "@/lib/marketing/track";
 import { parseIdeaTrack } from "@/lib/marketing/idea-track";
 import { NextResponse, type NextRequest } from "next/server";
 import { reportSummarySchema } from "@/lib/validations/report-summary";
@@ -113,8 +113,10 @@ export function ideaJson(idea: IdeaRow, ideaThreshold: number) {
   };
 }
 
-/** `?status=`, `?convertible=`, `?platform=` (slug, id or "none"), `?q=` and the shared cursor, newest first. */
+/** `?track=`, `?status=`, `?convertible=`, `?platform=` (slug, id or "none"), `?q=` and the shared cursor, newest first. */
 export async function listAgentIdeas(scope: Scope, params: URLSearchParams) {
+  const track = parseTrackFilter(params.get("track"));
+  if (!track.ok) throw new IssueApiError(400, track.message, { error: "invalid_request", field: "track" });
   const rawStatus = params.get("status");
   if (rawStatus && !(IDEA_STATUSES as readonly string[]).includes(rawStatus)) {
     throw new IssueApiError(400, `status must be one of ${IDEA_STATUSES.join(", ")}.`);
@@ -138,7 +140,7 @@ export async function listAgentIdeas(scope: Scope, params: URLSearchParams) {
   const platform = requireKnownFilter("platform", rawPlatform, parsePlatformFilter(rawPlatform, platforms));
   const where: Prisma.IdeaWhereInput = {
     ...scope,
-    ...PRODUCT_TRACK,
+    track: track.track,
     isDeleted: false,
     ...(platform ? { categoryId: platform === PLATFORM_NONE ? null : platform } : {}),
     ...(rawStatus ? { status: rawStatus as IdeaStatus } : {}),
