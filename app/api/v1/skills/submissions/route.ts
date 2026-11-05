@@ -86,6 +86,9 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ submission }, { status: 201 });
 }
 
-const notAllowed = NextResponse.json({ error: "Method not allowed" }, { status: 405 });
-export const PUT = notAllowed;
-export const DELETE = notAllowed;
+export async function PUT() {
+  return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
+}
+export async function DELETE() {
+  return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
+}

@@ -56,8 +56,15 @@ export async function PATCH(
   return NextResponse.json({ submission: updated });
 }
 
-const notAllowed = NextResponse.json({ error: "Method not allowed" }, { status: 405 });
-export const GET = notAllowed;
-export const POST = notAllowed;
-export const PUT = notAllowed;
-export const DELETE = notAllowed;
+export async function GET() {
+  return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
+}
+export async function POST() {
+  return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
+}
+export async function PUT() {
+  return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
+}
+export async function DELETE() {
+  return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
+}

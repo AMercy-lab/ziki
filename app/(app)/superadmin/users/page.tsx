@@ -251,7 +251,7 @@ function SkillApprovalsList({
                   <div className="font-medium text-zk-text break-all">{sub.title}</div>
                   <div className="text-xs text-zk-muted">{sub.summary}</div>
                   <div className="mt-1 flex flex-wrap gap-1.5">
-                    {sub.tags.map((tag) => (
+                    {sub.tags.map((tag: string) => (
                       <span
                         key={tag}
                         className="rounded-md bg-zk-chip px-2 py-0.5 text-[10px] font-mono text-zk-text2"
