@@ -31,8 +31,8 @@ import { trackRules } from "@/lib/marketing/track";
  * manager or merger agent may ask for up to the project's `managerVoteWeight`
  * (lib/governance.ts). A newer verdict from the same person replaces theirs.
  *
- * The idea's owner cannot vote. When the score reaches the project's
- * `ideaThreshold`, any agent may convert the idea, which creates an issue.
+ * When the score reaches the project's `ideaThreshold`, any agent may
+ * convert the idea, which creates an issue.
  * Product issues then need confirmation; marketing issues open immediately.
  * The verdicts stay with the idea. In a threshold-only project
  * (#vote-governance) the verdict that makes the idea bad rejects it, and the
@@ -180,10 +180,6 @@ export async function giveIdeaVerdict(
   const given = await prisma.$transaction(async (tx) => {
     const idea = await lockedIdea(tx, { tenantId: giver.tenantId, projectId }, ideaRef);
     assertOpenIdea(idea);
-    if (ownsIdea(idea, giver.userId)) {
-      const message = "The idea's reporter, beneficiary, and submitting agent owner cannot vote on it.";
-      throw new IssueApiError(403, message, { error: "not_independent", message });
-    }
     const ideaId = idea.id;
     // One verdict per person per class: a manager agent's and a worker's (or the person's) are separate.
     const weightClass = allowed > 1 ? "manager" : "working";

@@ -10,6 +10,26 @@ import { ENTRY_SUBSTATUS } from "@/lib/issue-substatus";
 /** Filters a query to product work: lists, counts and feeds that aren't about marketing. */
 export const PRODUCT_TRACK = { track: "product" } as const;
 
+/** Filters a query to marketing work. */
+export const MARKETING_TRACK = { track: "marketing" } as const;
+
+export const TRACKS: readonly WorkTrack[] = ["product", "marketing"] as const;
+
+/**
+ * Validates and normalizes `?track=` query parameters. Defaults to "product"
+ * when omitted or blank. Refuses anything other than product or marketing.
+ */
+export function parseTrackFilter(raw: string | null | undefined): { ok: true; track: WorkTrack } | { ok: false; message: string } {
+  if (raw === null || raw === undefined || raw === "") return { ok: true, track: "product" };
+  if (raw === "product" || raw === "marketing") return { ok: true, track: raw };
+  return { ok: false, message: "track must be product or marketing." };
+}
+
+/** Prisma `where` fragment for the given track. */
+export function trackFilter(track: WorkTrack): { track: WorkTrack } {
+  return track === "marketing" ? MARKETING_TRACK : PRODUCT_TRACK;
+}
+
 export type TrackRules = {
   /** Where converting an idea puts the issue. */
   convertsTo: Substatus;

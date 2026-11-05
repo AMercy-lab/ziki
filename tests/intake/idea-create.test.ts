@@ -39,6 +39,7 @@ vi.mock("@anthropic-ai/sdk/helpers/zod", () => ({ zodOutputFormat: (schema: unkn
 import { createIdeaWithPolicy, type CreatePolicyInput } from "@/lib/agent-api/create-policy";
 import { listAgentIdeas, readAgentIdea } from "@/lib/agent-api/ideas";
 import { structureIdea } from "@/lib/idea-structuring";
+import { parseIdeaTrack } from "@/lib/marketing/idea-track";
 
 const NOW = new Date("2026-10-19T12:00:00Z");
 const agent = { agentId: "agent1", tenantId: "tenant_zedu" };
@@ -57,8 +58,7 @@ const input = (overrides: Partial<CreatePolicyInput> = {}): CreatePolicyInput =>
 const similarRow = { id: "b1", number: 12, title: "Login button does nothing in Safari", status: "open", voteCount: 3, score: 0.8 };
 const idea = {
   id: "i1", number: 12, title: "Export activity as CSV", summary: "People want a CSV.", description: "People want their data.",
-  rationale: null, track: "product" as const,
-  status: "open" as const, score: 3, typeId: null, categoryId: null, areaId: null, proofLinks: [], projectId: "p1",
+  track: "product" as const, rationale: null as string | null, status: "open" as const, score: 3, typeId: null, categoryId: null, areaId: null, proofLinks: [], projectId: "p1",
   reporterId: "ada", beneficiaryUserId: "ada", createdByAgentId: null, convertedAt: null, archiveReason: null,
   archiveEvidence: null, archiveDuplicateOf: null, archivedAt: null, archivedByAgentId: null,
   createdAt: new Date("2026-10-20T10:00:00Z"), updatedAt: new Date("2026-10-20T10:00:00Z"), area: null, issue: null,
@@ -103,6 +103,44 @@ describe("creating an idea", () => {
     const values = (db.$queryRaw.mock.calls[0] as unknown[]).slice(1);
     expect(values).toEqual(expect.arrayContaining(["tenant_zedu", "project_zedu"]));
     expect(await createIdeaWithPolicy(input({ acknowledgeSimilar: true }))).toMatchObject({ status: 201 });
+  });
+});
+
+describe("proposing a marketing task", () => {
+  it("is product work by default; a marketing idea needs a rationale and a product idea takes none", () => {
+    expect(parseIdeaTrack({})).toEqual({ ok: true, value: { track: "product", rationale: null } });
+    expect(parseIdeaTrack({ track: "marketing", rationale: "  People keep asking what changed.  " })).toEqual({
+      ok: true,
+      value: { track: "marketing", rationale: "People keep asking what changed." },
+    });
+    expect(parseIdeaTrack({ track: "marketing" })).toMatchObject({ ok: false, field: "rationale" });
+    expect(parseIdeaTrack({ track: "marketing", rationale: "x".repeat(2001) })).toMatchObject({ ok: false, field: "rationale" });
+    expect(parseIdeaTrack({ rationale: "Why not." })).toMatchObject({ ok: false, field: "rationale" });
+    expect(parseIdeaTrack({ track: "sales" })).toMatchObject({ ok: false, field: "track" });
+  });
+
+  it("takes only a type on its own track, and writes nothing otherwise", async () => {
+    db.issueType.findUnique.mockResolvedValue({ isActive: true, track: "product" });
+    expect(await createIdeaWithPolicy(input({ track: "marketing", typeId: "type_bug" }))).toMatchObject({ status: 422, error: "wrong_track" });
+    db.issueType.findUnique.mockResolvedValue({ isActive: true, track: "marketing" });
+    expect(await createIdeaWithPolicy(input({ typeId: "type_blog" }))).toMatchObject({ status: 422, error: "wrong_track" });
+    expect(insert).not.toHaveBeenCalled();
+    expect(await createIdeaWithPolicy(input({ track: "marketing", typeId: "type_blog" }))).toMatchObject({ status: 201 });
+    expect(insert).toHaveBeenCalledWith(db, { typeId: "type_blog" });
+  });
+
+  it("compares a marketing idea only with marketing work when looking for duplicates", async () => {
+    await createIdeaWithPolicy(input({ track: "marketing" }));
+    expect((db.$queryRaw.mock.calls[0] as unknown[]).slice(1)).toContain("marketing");
+  });
+
+  it("shows a marketing idea's rationale, and no rationale on a product idea", async () => {
+    db.idea.findUniqueOrThrow.mockResolvedValue({ ...idea, track: "marketing", rationale: "A post answers everyone at once.", attachments: [] });
+    expect(await readAgentIdea(scope, "12")).toMatchObject({ track: "marketing", rationale: "A post answers everyone at once." });
+    db.idea.findUniqueOrThrow.mockResolvedValue({ ...idea, attachments: [] });
+    const product = await readAgentIdea(scope, "12");
+    expect(product).toMatchObject({ track: "product" });
+    expect(product).not.toHaveProperty("rationale");
   });
 });
 

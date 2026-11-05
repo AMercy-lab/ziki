@@ -11,6 +11,7 @@ type VerdictRow = {
   pullRequestUrl: string | null;
   headSha?: string | null;
   createdAt: Date;
+  updatedAt: Date;
   agent: { id: string; ownerUserId: string };
 };
 
@@ -20,7 +21,7 @@ const state = vi.hoisted(() => ({
 }));
 
 const db = vi.hoisted(() => ({
-  bug: { findFirst: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
+  bug: { findFirst: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), findMany: vi.fn(), update: vi.fn() },
   bugActivity: { create: vi.fn() },
   comment: { create: vi.fn() },
   testVerdict: { findMany: vi.fn() },
@@ -33,7 +34,7 @@ const db = vi.hoisted(() => ({
   webhookSubscription: { findMany: vi.fn() },
   webhookDelivery: { createMany: vi.fn() },
   issueClaim: { updateMany: vi.fn() },
-  delivery: { findMany: vi.fn() },
+  delivery: { findMany: vi.fn(), findFirst: vi.fn() },
   projectWorkflow: { findUnique: vi.fn() },
   project: { findFirst: vi.fn() },
   agentMistake: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), findMany: vi.fn() },
@@ -47,7 +48,8 @@ vi.mock("@/lib/redesigns", () => ({ assertRedesignOpen: redesign.assertRedesignO
 const notify = vi.hoisted(() => ({ notifyMergeFailed: vi.fn() }));
 vi.mock("@/lib/agent-notifications", () => ({ notifyMergeFailed: notify.notifyMergeFailed }));
 
-import { acceptFix as acceptFixRaw } from "@/lib/agent-api/merge";
+import { acceptFix as acceptFixRaw, marketingAcceptAwards } from "@/lib/agent-api/merge";
+import { award } from "@/lib/points/award";
 import { resetWorkflowCache } from "@/lib/workflow";
 
 const PR = "https://github.com/Zedu-Endor/issue-tracker/pull/42";
@@ -141,6 +143,7 @@ function verdict(
     headSha,
     onBehalfOfUserId,
     createdAt: new Date(),
+    updatedAt: new Date(),
     agent: { id: agentId, ownerUserId: ownerId },
   });
 }
@@ -155,6 +158,9 @@ beforeEach(() => {
   db.bug.findUnique.mockResolvedValue(bugRow());
   // No delivery filed on the claim holder's behalf unless a test adds one.
   db.delivery.findMany.mockResolvedValue([]);
+  db.delivery.findFirst.mockResolvedValue(null);
+  db.bug.findUniqueOrThrow.mockResolvedValue({ reward: 5, reporterId: "ada" });
+  db.issueClaim.updateMany.mockResolvedValue({ count: 1 });
   db.bug.update.mockResolvedValue({});
   db.bugActivity.create.mockResolvedValue({});
   db.comment.create.mockResolvedValue({ id: "merge-comment-1" });
@@ -405,5 +411,165 @@ describe("accepting marketing work", () => {
     expect(entrySubstatus("marketing", "resolved")).toBe("published");
     expect(entrySubstatus("product", "resolved")).toBe("on_dev");
     expect(entrySubstatus("marketing", "open")).toBe("open");
+  });
+});
+
+describe("acceptFix: marketing work goes Live (#M-API-5)", () => {
+  function marketingBug(overrides: Record<string, unknown> = {}) {
+    return bugRow({
+      track: "marketing",
+      status: "done",
+      substatus: "accepted",
+      pullRequestUrl: null,
+      pullRequestHeadSha: null,
+      reporterId: "poster",
+      claims: [{
+        status: "active",
+        claimedAt: new Date("2026-10-20T10:00:00Z"),
+        releasedAt: null,
+        agentId: "solver-agent",
+        beneficiaryUserId: "ada",
+        dispatcherUserId: null,
+        agent: { ownerUserId: "ada", name: "solver-agent" },
+      }],
+      ...overrides,
+    });
+  }
+
+  function marketingReady() {
+    db.bug.findFirst.mockResolvedValue(marketingBug());
+    db.bug.findUniqueOrThrow.mockResolvedValue({ reward: 6, reporterId: "poster" });
+    verdict("r1", "rob", "rob", null, null);
+    verdict("r2", "sam", "sam", null, null);
+    verdict("r3", "tia", "tia", null, null);
+  }
+
+  it("moves Done · Accepted to Live · Published, skipping Merge and the PR gate", async () => {
+    marketingReady();
+
+    const result = await acceptFix(merger("m1", "mo", "manager"), "bug1");
+
+    expect(result).toMatchObject({ status: 200, accepted: true, published: true });
+    expect(db.bug.update).toHaveBeenCalledWith({
+      where: { id: "bug1" },
+      data: { status: "resolved", substatus: "published" },
+    });
+    // No pull request, confirmation, redesign or PR report gate is consulted.
+    expect(db.pullRequestReport.findFirst).not.toHaveBeenCalled();
+    expect(redesign.assertRedesignOpen).not.toHaveBeenCalled();
+    expect(db.issueConfirmation.findMany).not.toHaveBeenCalled();
+    expect(db.issueClaim.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ releaseReason: "accepted" }) }),
+    );
+  });
+
+  it("pays the worker, poster and reviewers directly, once each by source key", async () => {
+    marketingReady();
+
+    await acceptFix(merger("m1", "mo", "manager"), "bug1");
+
+    const awards = db.pointEntry.createMany.mock.calls.flatMap(
+      ([arg]) => arg.data as Array<Record<string, unknown>>,
+    );
+    expect(awards).toEqual(expect.arrayContaining([
+      expect.objectContaining({ userId: "ada", role: "solver", points: 6, sourceKey: "solver:bug1:ada" }),
+      expect.objectContaining({ userId: "poster", role: "reporter", sourceKey: "reporter:bug1:poster" }),
+      expect.objectContaining({ userId: "rob", role: "reviewer", sourceKey: "reviewer:bug1:rob" }),
+      expect.objectContaining({ userId: "sam", role: "reviewer", sourceKey: "reviewer:bug1:sam" }),
+      expect.objectContaining({ userId: "tia", role: "reviewer", sourceKey: "reviewer:bug1:tia" }),
+    ]));
+  });
+
+  it("records the accept as an audit row and an issue.accepted event", async () => {
+    marketingReady();
+
+    await acceptFix(merger("m1", "mo", "manager"), "bug1");
+
+    expect(db.agentAuditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "issue.accepted",
+        target: "bug:bug1",
+        payload: expect.objectContaining({
+          published: true,
+          track: "marketing",
+          status: "resolved",
+          substatus: "published",
+        }),
+      }),
+    });
+    expect(db.agentEvent.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        type: "issue.accepted",
+        payload: expect.objectContaining({
+          published: true,
+          track: "marketing",
+          status: "resolved",
+          substatus: "published",
+        }),
+      }),
+    }));
+  });
+
+  it("refuses marketing work its reviewers haven't approved", async () => {
+    db.bug.findFirst.mockResolvedValue(marketingBug({ status: "done", substatus: "requires_review" }));
+
+    expect(await acceptFix(merger("m1", "mo", "manager"), "bug1")).toMatchObject({
+      status: 409,
+      error: "not_ready",
+      missing: "verdicts",
+    });
+    expect(db.bug.update).not.toHaveBeenCalled();
+    expect(db.pointEntry.createMany).not.toHaveBeenCalled();
+  });
+
+  it("refuses a working agent: marketing acceptance is a manager's review", async () => {
+    marketingReady();
+
+    expect(await acceptFix(merger("w1", "wes", "working"), "bug1")).toMatchObject({
+      status: 403,
+      error: "insufficient_level",
+    });
+    expect(db.pointEntry.createMany).not.toHaveBeenCalled();
+  });
+
+  it("pays each award once when the same awards are written twice (#sourceKey)", async () => {
+    const rows: Array<Record<string, unknown>> = [];
+    const createMany = vi.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => {
+      let count = 0;
+      for (const row of data) {
+        if (rows.some((existing) => existing.sourceKey === row.sourceKey)) continue;
+        rows.push(row);
+        count += 1;
+      }
+      return { count };
+    });
+    const awards = marketingAcceptAwards({
+      bug: { id: "bug1", tenantId: "tenant_zedu", reporterId: "poster" },
+      claim: {
+        status: "active",
+        claimedAt: new Date("2026-10-20T10:00:00Z"),
+        releasedAt: null,
+        agentId: "solver-agent",
+        beneficiaryUserId: "ada",
+        dispatcherUserId: null,
+        agent: { ownerUserId: "ada", name: "solver-agent" },
+      },
+      solverUserId: "ada",
+      rewardedReviewerUserIds: ["rob", "sam"],
+      reward: 6,
+      reporterPoints: 1.5,
+      reviewerPoints: 3,
+      dispatcherPoints: 0.6,
+    });
+
+    for (const entry of awards) await award({ pointEntry: { createMany } } as never, entry);
+    for (const entry of awards) await award({ pointEntry: { createMany } } as never, entry);
+
+    expect(rows.map((row) => row.sourceKey)).toEqual([
+      "solver:bug1:ada",
+      "reporter:bug1:poster",
+      "reviewer:bug1:rob",
+      "reviewer:bug1:sam",
+    ]);
   });
 });

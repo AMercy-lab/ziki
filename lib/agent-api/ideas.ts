@@ -1,7 +1,9 @@
+import { parseTrackFilter } from "@/lib/marketing/track";
+import { parseIdeaTrack } from "@/lib/marketing/idea-track";
 import { NextResponse, type NextRequest } from "next/server";
 import { reportSummarySchema } from "@/lib/validations/report-summary";
 import { z } from "zod";
-import type { IdeaStatus, Prisma, WorkTrack } from "@prisma/client";
+import type { IdeaStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { AgentContext } from "@/lib/agents/require-agent";
 import { audit } from "@/lib/agents/audit";
@@ -52,6 +54,9 @@ export const createIdeaSchema = createBugSchema
     // #494: no beneficiaryUserId. The reporter is always the agent's owner.
     projectId: idSchema.optional(),
     typeId: z.unknown().optional(),
+    // Product (the default) or marketing, and why a marketing idea is worth doing (parseIdeaTrack).
+    track: z.unknown().optional(),
+    rationale: z.unknown().optional(),
     acknowledgeSimilar: z.unknown().optional(),
     attachmentIds: attachmentIdsSchema,
     // Up to three plain lines a person can read at a glance (#report-summary).
@@ -67,8 +72,8 @@ export const ideaSelect = {
   title: true,
   summary: true,
   description: true,
-  rationale: true,
   track: true,
+  rationale: true,
   status: true,
   score: true,
   typeId: true,
@@ -96,9 +101,11 @@ type IdeaRow = Prisma.IdeaGetPayload<{ select: typeof ideaSelect }>;
 
 /** The idea as the API shows it: the issue it became, and whether it can be converted now. */
 export function ideaJson(idea: IdeaRow, ideaThreshold: number) {
-  const { issue, ...rest } = withPlatform(idea);
+  const { issue, rationale, ...rest } = withPlatform(idea);
   return {
     ...rest,
+    // Only marketing ideas carry a rationale.
+    ...(idea.track === "marketing" ? { rationale } : {}),
     issueId: issue?.id ?? null,
     issueNumber: issue?.number ?? null,
     ideaThreshold,
@@ -108,10 +115,8 @@ export function ideaJson(idea: IdeaRow, ideaThreshold: number) {
 
 /** `?track=`, `?status=`, `?convertible=`, `?platform=` (slug, id or "none"), `?q=` and the shared cursor, newest first. */
 export async function listAgentIdeas(scope: Scope, params: URLSearchParams) {
-  const rawTrack = params.get("track") ?? "product";
-  if (rawTrack !== "product" && rawTrack !== "marketing") {
-    throw new IssueApiError(400, "track must be product or marketing.", { error: "invalid_request", field: "track" });
-  }
+  const track = parseTrackFilter(params.get("track"));
+  if (!track.ok) throw new IssueApiError(400, track.message, { error: "invalid_request", field: "track" });
   const rawStatus = params.get("status");
   if (rawStatus && !(IDEA_STATUSES as readonly string[]).includes(rawStatus)) {
     throw new IssueApiError(400, `status must be one of ${IDEA_STATUSES.join(", ")}.`);
@@ -135,7 +140,7 @@ export async function listAgentIdeas(scope: Scope, params: URLSearchParams) {
   const platform = requireKnownFilter("platform", rawPlatform, parsePlatformFilter(rawPlatform, platforms));
   const where: Prisma.IdeaWhereInput = {
     ...scope,
-    track: rawTrack as WorkTrack,
+    track: track.track,
     isDeleted: false,
     ...(platform ? { categoryId: platform === PLATFORM_NONE ? null : platform } : {}),
     ...(rawStatus ? { status: rawStatus as IdeaStatus } : {}),
@@ -295,6 +300,11 @@ export async function createAgentIdea(agent: AgentContext, request: NextRequest)
 
 async function createIdeaFromBody(agent: AgentContext, request: NextRequest, body: unknown, uploaded: string[], digests: string[]) {
   const input = createIdeaSchema.parse(body);
+  const fields = parseIdeaTrack(input);
+  if (!fields.ok) {
+    throw new IssueApiError(400, fields.message, { error: "invalid_request", message: fields.message, field: fields.field });
+  }
+  const { track, rationale } = fields.value;
   const scope = await issueProject(agent, request.nextUrl.searchParams, input.projectId);
   const beneficiaryUserId = agent.ownerId;
   const requestHash = hashCreateRequest({
@@ -307,6 +317,8 @@ async function createIdeaFromBody(agent: AgentContext, request: NextRequest, bod
     proofLinks: input.proofLinks,
     typeId: input.typeId ?? null,
     acknowledgeSimilar: input.acknowledgeSimilar ?? null,
+    // Product requests hash as they always did, so their keys keep replaying.
+    ...(track === "marketing" ? { track, rationale } : {}),
     // Files sent in this request hash by content, not by the ids they were just given (#722).
     ...(input.attachmentIds?.filter((id) => !uploaded.includes(id)).length
       ? { attachmentIds: [...new Set(input.attachmentIds.filter((id) => !uploaded.includes(id)))].sort() }
@@ -321,6 +333,7 @@ async function createIdeaFromBody(agent: AgentContext, request: NextRequest, bod
     requestHash,
     title: input.title,
     typeId: input.typeId,
+    track,
     acknowledgeSimilar: input.acknowledgeSimilar,
     insert: async (tx, policy) => {
       const member = await tx.membership.findUnique({
@@ -342,6 +355,8 @@ async function createIdeaFromBody(agent: AgentContext, request: NextRequest, bod
           title: input.title,
           summary: input.summary,
           description,
+          track,
+          rationale,
           categoryId,
           areaId,
           proofLinks: input.proofLinks,

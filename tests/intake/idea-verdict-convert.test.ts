@@ -123,13 +123,11 @@ describe("giveIdeaVerdict", () => {
     expect(result).toMatchObject({ replaced: true, pointsAwarded: 0 });
   });
 
-  it("refuses a verdict from the idea's reporter or beneficiary", async () => {
-    await expect(giveIdeaVerdict({ tenantId: "t1", userId: "ada" }, "p1", "i1", input)).rejects.toMatchObject({
-      status: 403,
-      body: { error: "not_independent" },
-    });
-    expect(db.ideaVerdict.upsert).not.toHaveBeenCalled();
-    expect(db.pointEntry.createMany).not.toHaveBeenCalled();
+  it("takes a verdict from the idea's own reporter, and pays it (#owner-agents)", async () => {
+    db.$queryRaw.mockResolvedValue([idea({ score: 0 })]);
+    const result = await giveIdeaVerdict({ tenantId: "t1", userId: "ada" }, "p1", "i1", input);
+    expect(result).toMatchObject({ replaced: false, pointsAwarded: 0.01 });
+    expect(db.ideaVerdict.upsert).toHaveBeenCalled();
   });
 
   it("refuses votes on marketing ideas already rejected or converted", async () => {
