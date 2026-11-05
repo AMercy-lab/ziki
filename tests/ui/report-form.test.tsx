@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 "use client";
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { unstable_rethrow } from "next/navigation";
@@ -11,6 +11,7 @@ import { CreateBugForm } from "@/components/create-issue-form";
 vi.mock("next/navigation", async (importOriginal) => ({
   ...(await importOriginal<typeof import("next/navigation")>()),
   unstable_rethrow: vi.fn(),
+  useRouter: () => ({ back: vi.fn() }),
 }));
 
 const issueTypes = vi.hoisted(() => ({ findMany: vi.fn(), count: vi.fn(), upsert: vi.fn() }));
@@ -303,4 +304,21 @@ describe("marketing task types and the report form", () => {
     await ensureDefaultIssueTypes("t1");
     expect(issueTypes.upsert).toHaveBeenCalled();
   });
+
+  it("proposes with the marketing types, asks for no points (D5) and says nothing was saved", async () => {
+    const { NewMarketingTaskForm, NOT_SAVED_NOTICE } = await import("@/components/marketing/tasks/new-marketing-task-form");
+    render(<NewMarketingTaskForm types={[{ id: "blog", name: "Blog post" }]} />);
+
+    expect(screen.getByRole("option", { name: "Blog post" })).toBeTruthy();
+    expect(screen.queryByLabelText(/points/i)).toBeNull();
+
+    fireEvent.submit(screen.getByRole("button", { name: "Propose task" }).closest("form")!);
+    expect(screen.getByRole("status").textContent).toBe(NOT_SAVED_NOTICE);
+  }, 15000);
+
+  it("can't be submitted when the workspace has no marketing types", async () => {
+    const { NewMarketingTaskForm } = await import("@/components/marketing/tasks/new-marketing-task-form");
+    render(<NewMarketingTaskForm types={[]} />);
+    expect((screen.getByRole("button", { name: "Propose task" }) as HTMLButtonElement).disabled).toBe(true);
+  }, 15000);
 });
