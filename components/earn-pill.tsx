@@ -9,8 +9,8 @@ import { EarnWithdraw } from "@/components/earn-withdraw";
 const money = (n: number) => `$${n.toFixed(2)}`;
 
 /**
- * The earner's money in the header (#earn-drafts, Mark's call of 5 Nov): one capsule with the balance
- * ("$5.00 / $30", a slim bar filling toward the threshold) and Withdraw beside it.
+ * The earner's money in the header (#earn-drafts, Mark's call of 5 Nov): one capsule with just the balance
+ * ("$5.00") and Withdraw beside it.
  * The balance opens a window in the middle of the page with the dollars and a link to Earnings, and
  * no Withdraw inside it. Withdraw opens its own window with the threshold; neither takes you to another page.
  */
@@ -18,8 +18,7 @@ export function EarnPill({ info }: { info: WithdrawInfo }) {
   const [open, setOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const share = Math.min(1, info.earned / info.threshold);
-
+  
   useEffect(() => {
     const dialog = dialogRef.current;
     if (open && dialog && !dialog.open) dialog.showModal();
@@ -40,15 +39,7 @@ export function EarnPill({ info }: { info: WithdrawInfo }) {
           onClick={() => setOpen(true)}
           className="inline-flex h-8 items-center gap-2 rounded-full pl-1.5 pr-2.5 hover:bg-zk-chip focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue"
         >
-          <span className="flex flex-col gap-1">
-            <span className="flex items-baseline gap-1 whitespace-nowrap leading-none">
-              <span className="text-[14px] font-bold tabular-nums">{money(info.earned)}</span>
-              <span className="text-xs font-medium text-zk-muted">/ ${info.threshold}</span>
-            </span>
-            <span aria-hidden="true" className="block h-1 w-[72px] overflow-hidden rounded-full bg-zk-seg">
-              <span className={`block h-full rounded-full ${info.ready ? "bg-zk-ok-fg" : "bg-electric-blue-strong"}`} style={{ width: `${Math.max(4, share * 100)}%` }} />
-            </span>
-          </span>
+          <span className="text-[14px] font-bold tabular-nums">{money(info.earned)}</span>
         </button>
         <EarnWithdraw
           info={info}
