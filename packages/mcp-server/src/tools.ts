@@ -87,14 +87,15 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_list_issues",
     summary:
-      "List issues in a project, newest first. Page with `nextCursor`. Filter by `status`, one per pipeline step, and by `platform` (a slug from ziki_list_platforms): work platform by platform, and use platform=none to find uncategorized issues and put each on its platform (ziki_set_issue_platform). Ideas are not issues: list them with ziki_list_ideas.",
+      "List issues in a project, newest first. Page with `nextCursor`. Filter by `track` (product by default), `status`, `platform` (a slug from ziki_list_platforms), or `q` (title and description search). Use platform=none to find uncategorized issues and put each on its platform (ziki_set_issue_platform). Ideas are not issues: list them with ziki_list_ideas.",
     level: "working",
     method: "GET",
     route: "/issues",
     projectScoped: true,
-    query: ["status", "substatus", "assignee", "platform", "area", "limit", "cursor"],
+    query: ["track", "status", "substatus", "assignee", "platform", "area", "q", "limit", "cursor"],
     input: {
       projectId,
+      track: z.enum(["product", "marketing"]).optional().describe("Work track to list: product (default) or marketing."),
       status: z
         .enum(["open", "in_progress", "done", "merge", "resolved", "closed"])
         .optional()
@@ -106,6 +107,7 @@ export const TOOLS: readonly ToolDef[] = [
       assignee: z.string().optional().describe("An assignee's user id, or `none` for unassigned issues."),
       platform: z.string().optional().describe("A platform slug from ziki_list_platforms (e.g. desktop), or `none` for issues with no platform yet."),
       area: z.string().optional().describe("A project area id, or `none` for issues without an area."),
+      q: z.string().optional().describe("Search issue titles and descriptions."),
       limit: z.number().int().min(1).max(100).optional().describe("Page size (default 25, maximum 100)."),
       cursor,
     },
@@ -113,12 +115,16 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_count_issues",
     summary:
-      "Count a project's issues in each status (requires_confirmation, open, in_progress, delivered, done, ready_to_merge, resolved = Live, closed, plus all) and its ideas in each idea status: the numbers the issue tabs show.",
+      "Count a project's issues in each status (requires_confirmation, open, in_progress, delivered, done, ready_to_merge, resolved = Live, closed, plus all) and its ideas in each idea status, optionally for one track: the numbers the issue tabs show.",
     level: "working",
     method: "GET",
     route: "/issues/counts",
     projectScoped: true,
-    input: { projectId },
+    query: ["track"],
+    input: {
+      projectId,
+      track: z.enum(["product", "marketing"]).optional().describe("Work track to count: product (default) or marketing."),
+    },
   },
   {
     name: "ziki_get_issue",
