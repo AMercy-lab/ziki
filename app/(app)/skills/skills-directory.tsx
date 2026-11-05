@@ -184,17 +184,16 @@ export function SkillsDirectory({ skills, agents, userId }: SkillsDirectoryProps
           </p>
         </div>
 
-        {/* Quick Stats Pill */}
-        <div className="flex items-center gap-2 rounded-2xl border border-zk-border bg-zk-surface p-3 shadow-sm">
-          <div className="border-r border-zk-divider px-4 text-center">
-            <div className="text-xl font-extrabold text-zk-text">{skills.length}</div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-zk-muted">Available</div>
-          </div>
-          <div className="px-4 text-center">
-            <div className="text-xl font-extrabold text-zk-ok-fg">{totalEquippedCount}</div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-zk-muted">Equipped</div>
-          </div>
-        </div>
+        {/* Action Button: Link directly to the Contributor Submission Portal */}
+        <Link
+          href="/earn/skills"
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-xs transition hover:bg-blue-700 active:scale-[0.98]"
+        >
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+          </svg>
+          <span>Add Skill</span>
+        </Link>
       </div>
 
       {/* Filter and Search Bar */}
@@ -207,7 +206,7 @@ export function SkillsDirectory({ skills, agents, userId }: SkillsDirectoryProps
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 font-bold transition ${
+                className={`flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 font-bold transition ${
                   active
                     ? "bg-blue-600 text-white shadow-sm"
                     : "border border-zk-border bg-zk-surface text-zk-text2 hover:bg-zk-chip"
@@ -241,7 +240,7 @@ export function SkillsDirectory({ skills, agents, userId }: SkillsDirectoryProps
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search tools & skills..."
-            className="w-full rounded-xl border border-zk-border bg-zk-surface py-2 pl-9 pr-8 text-xs font-medium text-zk-text placeholder-zk-muted focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/20"
+            className="w-full rounded-full border border-zk-border bg-zk-surface py-2 pl-9 pr-8 text-xs font-medium text-zk-text placeholder-zk-muted focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/20"
           />
           {searchQuery && (
             <button
@@ -265,7 +264,7 @@ export function SkillsDirectory({ skills, agents, userId }: SkillsDirectoryProps
               setSelectedCategory("all");
               setSearchQuery("");
             }}
-            className="mt-4 rounded-xl bg-zk-chip px-4 py-2 text-xs font-bold text-zk-text hover:bg-zk-border transition"
+            className="mt-4 rounded-full bg-zk-chip px-5 py-2 text-xs font-bold text-zk-text hover:bg-zk-border transition"
           >
             Reset Filters
           </button>
@@ -295,7 +294,7 @@ export function SkillsDirectory({ skills, agents, userId }: SkillsDirectoryProps
                       <SkillIcon icon={skill.icon} />
                     </div>
 
-                    <span className="rounded-lg border border-zk-border bg-zk-chip px-2 py-0.5 text-[11px] font-bold text-zk-text2">
+                    <span className="rounded-full border border-zk-border bg-zk-chip px-2.5 py-0.5 text-[11px] font-bold text-zk-text2">
                       {skill.badge}
                     </span>
                   </div>
@@ -320,7 +319,7 @@ export function SkillsDirectory({ skills, agents, userId }: SkillsDirectoryProps
                     {skill.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="rounded-md bg-zk-chip px-2 py-0.5 font-mono text-[10px] text-zk-muted"
+                        className="rounded-full bg-zk-chip px-2.5 py-0.5 font-mono text-[10px] text-zk-muted"
                       >
                         #{tag}
                       </span>
@@ -338,7 +337,7 @@ export function SkillsDirectory({ skills, agents, userId }: SkillsDirectoryProps
                     <select
                       value={currentAgentId}
                       onChange={(e) => handleCardAgentChange(skill.id, e.target.value)}
-                      className="flex-1 rounded-xl border border-zk-border bg-zk-chip px-2.5 py-1.5 text-xs font-semibold text-zk-text focus:border-blue-600 focus:outline-none"
+                      className="flex-1 rounded-full border border-zk-border bg-zk-chip px-3 py-1.5 text-xs font-semibold text-zk-text focus:border-blue-600 focus:outline-none"
                     >
                       {agents.length === 0 ? (
                         <option value="default-agent">For: Default Agent</option>
@@ -354,7 +353,7 @@ export function SkillsDirectory({ skills, agents, userId }: SkillsDirectoryProps
                     <button
                       type="button"
                       onClick={() => toggleEquip(skill)}
-                      className={`flex shrink-0 items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition shadow-sm ${
+                      className={`flex shrink-0 items-center gap-1 rounded-full px-3.5 py-1.5 text-xs font-bold transition shadow-sm ${
                         isEquipped
                           ? "bg-zk-ok-bg text-zk-ok-fg hover:brightness-95 border border-zk-ok-fg/30"
                           : "bg-blue-600 text-white hover:brightness-110"
@@ -377,7 +376,7 @@ export function SkillsDirectory({ skills, agents, userId }: SkillsDirectoryProps
                   <button
                     type="button"
                     onClick={() => copyPrompt(skill)}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-zk-border bg-zk-surface py-2 text-xs font-semibold text-zk-text hover:bg-zk-chip transition shadow-2xs"
+                    className="flex w-full items-center justify-center gap-2 rounded-full border border-zk-border bg-zk-surface py-2 text-xs font-semibold text-zk-text hover:bg-zk-chip transition shadow-2xs"
                   >
                     <svg className="h-3.5 w-3.5 text-zk-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
