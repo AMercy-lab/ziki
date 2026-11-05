@@ -7,68 +7,54 @@ import { Avatar } from "@/components/avatar";
 export interface SkillApprovalItem {
   id: string;
   title: string;
-  category: string;
-  categoryLabel: string;
-  summary: string;
-  tags: string[];
+  slug?: string;
+  categoryLabel?: string;
+  summary?: string;
+  tags?: string[];
   status: "pending" | "approved" | "rejected";
   authorName: string;
-  authorEmail: string;
+  authorEmail?: string;
   authorImage?: string | null;
   reviewedByName?: string;
   rejectionReason?: string | null;
-  submittedAt: string;
-  reviewedAt?: string | null;
 }
 
 const INITIAL_ACTIVE: SkillApprovalItem[] = [
   {
     id: "sub-seed-1",
     title: "Next.js App Router Performance Guardian",
-    category: "frontend",
+    slug: "nextjs-guardian",
     categoryLabel: "Frontend & Fullstack",
-    summary: "Audits Next.js App Router codebases for waterfall data fetching, bundle bloat, and optimizes Server vs Client components.",
-    tags: ["next.js", "performance", "react", "waterfalls"],
     status: "pending",
     authorName: "Sarah Jenkins",
     authorEmail: "sarah.j@emerjent.org",
-    submittedAt: "2 hours ago",
   },
   {
     id: "sub-seed-2",
     title: "PostgreSQL Database Migration Auditor",
-    category: "devops",
+    slug: "database-migration",
     categoryLabel: "DevOps & Infrastructure",
-    summary: "Validates Prisma and Neon migration scripts for non-blocking column additions, index health, and zero-downtime safety.",
-    tags: ["postgresql", "prisma", "neon", "migrations"],
     status: "pending",
     authorName: "Alex Rivera",
     authorEmail: "alex.r@emerjent.org",
-    submittedAt: "5 hours ago",
   },
   {
     id: "sub-seed-3",
     title: "WCAG 2.1 AA Accessibility Linter",
-    category: "testing",
+    slug: "a11y-linter",
     categoryLabel: "Testing & QA",
-    summary: "Automated verification for semantic landmark roles, focus management, color contrast, and keyboard navigation.",
-    tags: ["a11y", "wcag", "aria", "testing"],
     status: "pending",
     authorName: "Maya Lin",
     authorEmail: "maya.l@emerjent.org",
-    submittedAt: "Yesterday",
   },
   {
     id: "sub-seed-4",
     title: "Flutter Declarative State Engine",
-    category: "mobile",
+    slug: "flutter-state",
     categoryLabel: "Mobile Development",
-    summary: "Architects Flutter application state using immutable Riverpod providers with strict clean architecture boundaries.",
-    tags: ["flutter", "dart", "riverpod", "architecture"],
     status: "pending",
     authorName: "David Kim",
     authorEmail: "david.k@emerjent.org",
-    submittedAt: "2 days ago",
   },
 ];
 
@@ -76,59 +62,35 @@ const INITIAL_HISTORY: SkillApprovalItem[] = [
   {
     id: "sub-seed-5",
     title: "Zero-Bloat Git Hygiene Enforcer",
-    category: "devops",
-    categoryLabel: "DevOps & Infrastructure",
-    summary: "Enforces clean branch rebaselining, conventional semantic commit messages, and automated merge conflict prevention.",
-    tags: ["git", "ci-cd", "hygiene", "branching"],
+    slug: "git-hygiene",
     status: "approved",
     authorName: "Bolu",
-    authorEmail: "bolu@ziki.dev",
     reviewedByName: "Super Admin",
-    submittedAt: "Nov 3, 2026",
-    reviewedAt: "Nov 4, 2026",
   },
   {
     id: "sub-seed-6",
     title: "Playwright E2E Integration Suite",
-    category: "testing",
-    categoryLabel: "Testing & QA",
-    summary: "Generates resilient end-to-end integration workflows using Playwright test runners with visual regression checkpoints.",
-    tags: ["playwright", "e2e", "qa", "browser"],
+    slug: "playwright-suite",
     status: "approved",
     authorName: "Goodness Mbakara",
-    authorEmail: "goodness@emerjent.org",
     reviewedByName: "Super Admin",
-    submittedAt: "Nov 2, 2026",
-    reviewedAt: "Nov 3, 2026",
   },
   {
     id: "sub-seed-7",
     title: "Automated Memory Leak Detector",
-    category: "testing",
-    categoryLabel: "Testing & QA",
-    summary: "Analyzes Chrome DevTools heap snapshots to pinpoint orphaned event listeners and unbounded memory retention.",
-    tags: ["memory", "devtools", "profiling"],
+    slug: "memory-leak",
     status: "rejected",
     authorName: "Kenji Sato",
-    authorEmail: "kenji.s@emerjent.org",
     reviewedByName: "Super Admin",
-    rejectionReason: "Requires automated unit test assertions and reproducer scripts before approving.",
-    submittedAt: "Nov 1, 2026",
-    reviewedAt: "Nov 2, 2026",
+    rejectionReason: "Requires automated unit tests before approval",
   },
   {
     id: "sub-seed-8",
     title: "Vercel Fluid Compute Optimizer",
-    category: "devops",
-    categoryLabel: "DevOps & Infrastructure",
-    summary: "Optimizes serverless and edge compute memory allocation, function duration budgets, and regional routing.",
-    tags: ["vercel", "serverless", "edge", "latency"],
+    slug: "vercel-optimizer",
     status: "approved",
     authorName: "Debby Angel",
-    authorEmail: "debby@emerjent.org",
     reviewedByName: "Super Admin",
-    submittedAt: "Oct 30, 2026",
-    reviewedAt: "Oct 31, 2026",
   },
 ];
 
@@ -137,7 +99,6 @@ interface SkillApprovalsManagerProps {
 }
 
 export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApprovalsManagerProps) {
-  // Combine initial DB records with rich visualization seeds
   const [activeItems, setActiveItems] = useState<SkillApprovalItem[]>(() => {
     const dbPending = initialSubmissions.filter((s) => s.status === "pending");
     return dbPending.length > 0 ? [...dbPending, ...INITIAL_ACTIVE] : INITIAL_ACTIVE;
@@ -160,7 +121,6 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
       ...item,
       status: "approved",
       reviewedByName: "Super Admin",
-      reviewedAt: "Just now",
     };
 
     setActiveItems((prev) => prev.filter((i) => i.id !== item.id));
@@ -169,15 +129,14 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
   }
 
   function handleReject(item: SkillApprovalItem) {
-    const reason = prompt("Enter a brief reason for requesting changes:", "Please provide verification test instructions.");
-    if (reason === null) return; // user cancelled
+    const reason = prompt("Enter brief reason for requesting changes:", "Requires unit test suite before sign-off.");
+    if (reason === null) return;
 
     const updated: SkillApprovalItem = {
       ...item,
       status: "rejected",
       reviewedByName: "Super Admin",
-      rejectionReason: reason || "Requested changes from contributor.",
-      reviewedAt: "Just now",
+      rejectionReason: reason || "Changes requested.",
     };
 
     setActiveItems((prev) => prev.filter((i) => i.id !== item.id));
@@ -186,21 +145,21 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
   }
 
   return (
-    <div className="space-y-10">
-      {/* Toast */}
+    <div className="w-full space-y-8">
+      {/* Toast Notification */}
       {toastMessage && (
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl border border-zk-border bg-zk-surface px-5 py-3.5 text-sm font-semibold text-zk-text shadow-2xl transition-all"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 rounded-2xl border border-zk-border bg-zk-surface px-5 py-3 text-sm font-semibold text-zk-text shadow-2xl transition-all"
         >
-          <span className="flex size-2 rounded-full bg-emerald-500" />
+          <span className="size-2 rounded-full bg-emerald-500" />
           {toastMessage}
         </div>
       )}
 
       {/* Top Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-zk-border pb-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-zk-border pb-5">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold text-zk-text sm:text-2xl">Skill Approvals</h1>
@@ -210,16 +169,16 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
               </span>
             )}
           </div>
-          <p className="mt-1 max-w-2xl text-sm text-zk-text2">
-            Review, verify, and quality sign-off incoming agent skills submitted by the community before publishing them to the public skills library.
+          <p className="mt-1 text-sm text-zk-text2">
+            Review and quality sign-off incoming agent skills submitted by contributors.
           </p>
         </div>
 
-        {/* Single Top-Level Button */}
+        {/* Single Button */}
         <div>
           <Link
             href="/skills"
-            className="inline-flex items-center gap-2 rounded-xl border border-zk-border bg-zk-surface px-4 py-2.5 text-xs font-semibold text-zk-text hover:bg-zk-tint transition shadow-sm"
+            className="inline-flex items-center gap-2 rounded-xl border border-zk-border bg-zk-surface px-4 py-2 text-xs font-semibold text-zk-text hover:bg-zk-tint transition shadow-sm"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
@@ -231,77 +190,54 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
         </div>
       </div>
 
-      {/* SECTION 1: ACTIVE ENTRIES (WAITING FOR APPROVAL) */}
-      <section className="space-y-4">
+      {/* SECTION 1: ACTIVE ENTRIES */}
+      <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-zk-text flex items-center gap-2">
-              Active Entries
-              <span className="text-xs font-normal text-zk-muted">({activeItems.length})</span>
-            </h2>
-            <p className="text-xs text-zk-muted">
-              Incoming skill submissions requiring maintainer verification.
-            </p>
-          </div>
+          <h2 className="text-sm font-semibold text-zk-text flex items-center gap-2">
+            Active Entries
+            <span className="text-xs font-normal text-zk-muted">({activeItems.length})</span>
+          </h2>
         </div>
 
         {activeItems.length === 0 ? (
-          <div className="rounded-[20px] border border-zk-border bg-zk-surface/50 p-10 text-center">
+          <div className="rounded-[18px] border border-zk-border bg-zk-surface/50 p-8 text-center">
             <p className="text-sm font-medium text-zk-text">Waiting for when a user submits skills, it comes here.</p>
-            <p className="mt-1 text-xs text-zk-muted">
-              No pending skill specifications in the review queue right now.
-            </p>
+            <p className="mt-1 text-xs text-zk-muted">No pending skill submissions in the review queue right now.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-[20px] border border-zk-border bg-zk-surface shadow-sm">
-            <table className="min-w-full divide-y divide-zk-border text-sm">
-              <thead className="bg-zk-tint text-left text-xs font-semibold uppercase tracking-wide text-zk-muted">
+          <div className="rounded-[18px] border border-zk-border bg-zk-surface shadow-sm overflow-hidden">
+            <table className="w-full text-left text-sm divide-y divide-zk-border">
+              <thead className="bg-zk-tint text-xs font-semibold uppercase tracking-wide text-zk-muted">
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-3">Skill Specification</th>
-                  <th className="whitespace-nowrap px-4 py-3">Submitted By</th>
-                  <th className="whitespace-nowrap px-4 py-3">Category</th>
-                  <th className="whitespace-nowrap px-4 py-3">Status</th>
-                  <th className="whitespace-nowrap px-4 py-3">Review Decision</th>
-                  <th className="whitespace-nowrap px-4 py-3">Submitted</th>
+                  <th className="px-4 py-3">Skill Name</th>
+                  <th className="px-4 py-3">Submitted By</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Decision</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zk-divider">
                 {activeItems.map((item) => (
                   <tr key={item.id} className="hover:bg-zk-tint/60 transition-colors">
-                    {/* Specification */}
-                    <td className="px-4 py-3 max-w-[340px]">
-                      <div className="font-semibold text-zk-text break-words">{item.title}</div>
-                      <div className="text-xs text-zk-muted line-clamp-2 mt-0.5">{item.summary}</div>
-                      {item.tags.length > 0 && (
-                        <div className="mt-1.5 flex flex-wrap gap-1">
-                          {item.tags.map((tag) => (
-                            <span key={tag} className="rounded-md bg-zk-chip px-2 py-0.5 text-[10px] font-mono text-zk-text2">
-                              #{tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                    {/* Skill Name */}
+                    <td className="px-4 py-3">
+                      <Link
+                        href="/skills"
+                        className="font-medium text-zk-text hover:text-zk-accent transition hover:underline"
+                        title="Click to view in library"
+                      >
+                        {item.title}
+                      </Link>
                     </td>
 
-                    {/* Author */}
+                    {/* Submitted By */}
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
                         <Avatar name={item.authorName} image={item.authorImage} size="sm" />
-                        <div className="min-w-0">
-                          <div className="font-medium text-zk-text text-xs">{item.authorName}</div>
-                          <div className="text-[11px] text-zk-muted">{item.authorEmail}</div>
-                        </div>
+                        <span className="text-xs font-medium text-zk-text">{item.authorName}</span>
                       </div>
                     </td>
 
-                    {/* Category */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="rounded-lg bg-zk-chip px-2.5 py-1 text-xs font-medium text-zk-text">
-                        {item.categoryLabel}
-                      </span>
-                    </td>
-
-                    {/* Status Badge */}
+                    {/* Status */}
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-xs font-semibold text-blue-600 border border-blue-500/20">
                         <span className="size-1.5 rounded-full bg-blue-500 animate-pulse" />
@@ -309,9 +245,9 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
                       </span>
                     </td>
 
-                    {/* Actions */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
+                    {/* Decision */}
+                    <td className="px-4 py-3 whitespace-nowrap text-right">
+                      <div className="inline-flex items-center gap-2 justify-end">
                         <button
                           type="button"
                           onClick={() => handleApprove(item)}
@@ -326,12 +262,13 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
                         >
                           Reject
                         </button>
+                        <Link
+                          href="/skills"
+                          className="rounded-lg border border-zk-border bg-zk-surface px-2.5 py-1.5 text-xs font-semibold text-zk-text2 hover:text-zk-text hover:bg-zk-tint transition"
+                        >
+                          View
+                        </Link>
                       </div>
-                    </td>
-
-                    {/* Date */}
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-zk-text2">
-                      {item.submittedAt}
                     </td>
                   </tr>
                 ))}
@@ -342,44 +279,44 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
       </section>
 
       {/* SECTION 2: DECISION HISTORY */}
-      <section className="space-y-4 pt-4 border-t border-zk-border">
-        <div>
-          <h2 className="text-base font-semibold text-zk-text flex items-center gap-2">
+      <section className="space-y-3 pt-3 border-t border-zk-border">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-zk-text flex items-center gap-2">
             Decision History
             <span className="text-xs font-normal text-zk-muted">({historyItems.length})</span>
           </h2>
-          <p className="text-xs text-zk-muted">
-            Previously reviewed skill submissions and their maintainer outcomes.
-          </p>
         </div>
 
         {historyItems.length === 0 ? (
-          <div className="rounded-[20px] border border-zk-border bg-zk-surface/50 p-8 text-center text-sm text-zk-muted">
+          <div className="rounded-[18px] border border-zk-border bg-zk-surface/50 p-6 text-center text-xs text-zk-muted">
             No reviewed skill history yet.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-[20px] border border-zk-border bg-zk-surface shadow-sm">
-            <table className="min-w-full divide-y divide-zk-border text-sm">
-              <thead className="bg-zk-tint text-left text-xs font-semibold uppercase tracking-wide text-zk-muted">
+          <div className="rounded-[18px] border border-zk-border bg-zk-surface shadow-sm overflow-hidden">
+            <table className="w-full text-left text-sm divide-y divide-zk-border">
+              <thead className="bg-zk-tint text-xs font-semibold uppercase tracking-wide text-zk-muted">
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-3">Skill Specification</th>
-                  <th className="whitespace-nowrap px-4 py-3">Submitted By</th>
-                  <th className="whitespace-nowrap px-4 py-3">Category</th>
-                  <th className="whitespace-nowrap px-4 py-3">Outcome</th>
-                  <th className="whitespace-nowrap px-4 py-3">Maintainer Notes</th>
-                  <th className="whitespace-nowrap px-4 py-3">Decided</th>
+                  <th className="px-4 py-3">Skill Name</th>
+                  <th className="px-4 py-3">Submitted By</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Outcome / Note</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zk-divider">
                 {historyItems.map((item) => (
-                  <tr key={item.id} className="hover:bg-zk-tint/60 transition-colors opacity-95">
-                    {/* Specification */}
-                    <td className="px-4 py-3 max-w-[320px]">
-                      <div className="font-semibold text-zk-text break-words">{item.title}</div>
-                      <div className="text-xs text-zk-muted line-clamp-2 mt-0.5">{item.summary}</div>
+                  <tr key={item.id} className="hover:bg-zk-tint/60 transition-colors">
+                    {/* Skill Name */}
+                    <td className="px-4 py-3">
+                      <Link
+                        href="/skills"
+                        className="font-medium text-zk-text hover:text-zk-accent transition hover:underline"
+                        title="Click to view in library"
+                      >
+                        {item.title}
+                      </Link>
                     </td>
 
-                    {/* Author */}
+                    {/* Submitted By */}
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Avatar name={item.authorName} image={item.authorImage} size="sm" />
@@ -387,12 +324,7 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
                       </div>
                     </td>
 
-                    {/* Category */}
-                    <td className="px-4 py-3 whitespace-nowrap text-xs text-zk-text2">
-                      {item.categoryLabel}
-                    </td>
-
-                    {/* Outcome Badge */}
+                    {/* Status */}
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border ${
@@ -410,22 +342,17 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
                       </span>
                     </td>
 
-                    {/* Notes */}
-                    <td className="px-4 py-3 max-w-[280px]">
+                    {/* Outcome Note */}
+                    <td className="px-4 py-3 whitespace-nowrap text-right">
                       {item.status === "approved" ? (
                         <span className="text-xs text-emerald-600 font-medium">
-                          ✓ Verified & published to library
+                          ✓ Published to library
                         </span>
                       ) : (
-                        <span className="text-xs text-amber-700 bg-amber-500/10 border border-amber-500/20 rounded-lg px-2 py-1 block">
-                          {item.rejectionReason}
+                        <span className="text-xs text-amber-600 font-medium">
+                          {item.rejectionReason || "Changes requested"}
                         </span>
                       )}
-                    </td>
-
-                    {/* Decided Date */}
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-zk-muted">
-                      {item.reviewedAt || item.submittedAt}
                     </td>
                   </tr>
                 ))}
