@@ -1,10 +1,10 @@
-# Idea Box (M-UI-5)
+# Library (M-UI-5)
 
-Open `/<project>/marketing/idea-box` directly. The Marketing landing page and shared navigation remain owned by M-LAUNCH-1. The existing app shell is reused; the reference design's sidebar is not duplicated. The Marketing breadcrumb and empty-state action use the existing landing page until the Tasks board ships. Task links use the shared `/<project>/<number>` issue route (D6).
+Open `/<project>/marketing/library` directly. The Marketing landing page and shared navigation remain owned by M-LAUNCH-1. The existing app shell is reused; the reference design's sidebar is not duplicated. The Marketing breadcrumb and empty-state action use the existing landing page until the Tasks board ships. Task links use the shared `/<project>/<number>` issue route (D6).
 
 The page checks `requireProject` before reading data. Reads are restricted to that tenant and project, non-deleted marketing tasks, `status: resolved`, and `substatus: published`. It uses the latest delivery and the accepting manager review's timestamp. Missing dates are left unknown. No lifecycle or payment writes happen here.
 
-Deliverables currently come from `Delivery.deliverableUrls`. Only uploaded files explicitly named by their authenticated attachment route are resolved against that task's attachment metadata. Other task attachments, delivery screenshots and earlier deliveries are not promoted to approved work. M-API-3's planned `attachmentIds` association is not present in the foundation schema: integrate that explicit association when it ships rather than guessing which task files are deliverables. Aphoe's M-API-5 publication change can feed this page once merged; it need not be copied into this UI branch.
+Deliverables currently come from `Delivery.deliverableUrls`. Only uploaded files explicitly named by their authenticated attachment route are resolved against that task's attachment metadata. Other task attachments, delivery screenshots and earlier deliveries are not promoted to approved work. M-API-3 links a delivery's `attachmentIds` to the issue but doesn't record them on the delivery, so a delivery with only files shows no source here yet: that needs an explicit association rather than guessing which task files are deliverables.
 
 Selection, file, search, content filter, sort and mobile detail state are encoded in query parameters. Native browser history integrates with Next.js; desktop selection stays in the collection, while mobile selection opens `?view=detail` with a Back control. Refresh uses an access-checked server action and retains previous results when a refresh fails.
 

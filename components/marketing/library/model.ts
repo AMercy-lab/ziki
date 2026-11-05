@@ -2,7 +2,7 @@ import { BASE_PATH } from "@/lib/base-path";
 
 export const CONTENT_TYPES = ["All", "Graphics", "Videos", "Articles", "PDFs", "Docs", "Links"] as const;
 export type ContentType = (typeof CONTENT_TYPES)[number];
-export type IdeaBoxFile = {
+export type LibraryFile = {
   id: string;
   url: string;
   name: string;
@@ -12,16 +12,16 @@ export type IdeaBoxFile = {
   downloadable: boolean;
   local: boolean;
 };
-export type IdeaBoxItem = {
+export type LibraryItem = {
   id: string;
   number: number;
   title: string;
   summary: string;
   agent: string;
   publishedAt: string | null;
-  files: IdeaBoxFile[];
+  files: LibraryFile[];
 };
-export type IdeaBoxResult = { ok: true; items: IdeaBoxItem[] } | { ok: false };
+export type LibraryResult = { ok: true; items: LibraryItem[] } | { ok: false };
 export type FileMetadata = { id: string; filename: string; contentType: string; size: number };
 
 /** Never turn an arbitrary stored URL into an executable or credential-bearing link. */
@@ -49,7 +49,7 @@ function kindOf(path: string, contentType: string | null): Exclude<ContentType, 
 }
 
 /** Only URLs actually named by the delivery appear here; task evidence isn't a deliverable. */
-export function deliveryFiles(urls: string[], attachments: FileMetadata[] = []): IdeaBoxFile[] {
+export function deliveryFiles(urls: string[], attachments: FileMetadata[] = []): LibraryFile[] {
   return [...new Set(urls)].flatMap((raw, index) => {
     // Local uploaded files may be named by their authenticated serving route.
     const localMatch = /^(?:\/bug-tracker)?\/api\/(?:v1\/)?attachments\/([a-z0-9-]+)$/i.exec(raw);
@@ -70,7 +70,7 @@ export function deliveryFiles(urls: string[], attachments: FileMetadata[] = []):
   });
 }
 
-export function filterIdeaBox(items: IdeaBoxItem[], search: string, type: ContentType, oldest: boolean): IdeaBoxItem[] {
+export function filterLibrary(items: LibraryItem[], search: string, type: ContentType, oldest: boolean): LibraryItem[] {
   const query = search.trim().toLocaleLowerCase();
   return items.filter((item) => {
     const matchesType = type === "All" || item.files.some((file) => file.kind === type);

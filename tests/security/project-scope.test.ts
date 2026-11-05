@@ -17,8 +17,8 @@ vi.mock("@/lib/auth-helpers", () => ({ requireUser: section.requireUser }));
 
 import MarketingHomePage from "@/app/(app)/[project]/marketing/page";
 import MarketingPage from "@/app/(app)/marketing/page";
-import IdeaBoxPage from "@/app/(app)/[project]/marketing/idea-box/page";
-import { readIdeaBox } from "@/app/(app)/[project]/marketing/idea-box/data";
+import LibraryPage from "@/app/(app)/[project]/marketing/library/page";
+import { readLibrary } from "@/app/(app)/[project]/marketing/library/data";
 import { AgentProjectError } from "@/lib/agents/require-agent";
 import { marketingTabHref } from "@/lib/header-nav";
 import { issueProject } from "@/lib/agent-api/issues";
@@ -65,11 +65,11 @@ describe("issueProject project scope (#742)", () => {
   });
 });
 
-describe("Idea Box project isolation", () => {
+describe("Library project isolation", () => {
   it("refuses access before reading published deliverables", async () => {
     section.requireProject.mockRejectedValue(new Error("NOT_FOUND"));
     publishedTasks.mockClear();
-    await expect(IdeaBoxPage({ params: Promise.resolve({ project: "private" }) })).rejects.toThrow("NOT_FOUND");
+    await expect(LibraryPage({ params: Promise.resolve({ project: "private" }) })).rejects.toThrow("NOT_FOUND");
     expect(publishedTasks).not.toHaveBeenCalled();
   });
 
@@ -94,7 +94,7 @@ describe("Idea Box project isolation", () => {
     publishedTasks.mockImplementation(async ({ where, select }) => records
       .filter((row) => Object.entries(where).every(([key, value]) => row[key as keyof typeof row] === value))
       .map((row) => ({ ...row, deliveries: select.deliveries.orderBy[0].updatedAt === "desc" ? [...row.deliveries].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()).slice(0, select.deliveries.take) : row.deliveries })));
-    const result = await readIdeaBox({ tenantId: "tenant_zedu", project: { id: "project_web" } } as Parameters<typeof readIdeaBox>[0]);
+    const result = await readLibrary({ tenantId: "tenant_zedu", project: { id: "project_web" } } as Parameters<typeof readLibrary>[0]);
     expect(result).toEqual([expect.objectContaining({
       id: "approved", agent: "Studio", publishedAt: "2026-11-04T00:00:00.000Z",
       files: [expect.objectContaining({ url: "https://example.com/final.png" })],

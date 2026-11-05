@@ -1,10 +1,10 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { ProjectContext } from "@/lib/project-route";
-import { deliveryFiles, type IdeaBoxItem } from "@/components/marketing/idea-box/model";
+import { deliveryFiles, type LibraryItem } from "@/components/marketing/library/model";
 
 /** The caller must resolve access with requireProject; every read remains tenant/project scoped. */
-export async function readIdeaBox({ project, tenantId }: ProjectContext): Promise<IdeaBoxItem[]> {
+export async function readLibrary({ project, tenantId }: ProjectContext): Promise<LibraryItem[]> {
   const tasks = await prisma.bug.findMany({
     where: { projectId: project.id, tenantId, isDeleted: false, track: "marketing", status: "resolved", substatus: "published" },
     orderBy: [{ number: "desc" }, { id: "asc" }],
