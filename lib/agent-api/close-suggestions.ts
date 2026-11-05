@@ -265,7 +265,7 @@ async function closeInTransaction(
     await linkDuplicate(tx, { tenantId: actor.tenantId, bugId: bug.id, targetId: input.duplicateOfId, actorId: actor.userId }).catch(duplicateRefused);
   }
   const claims = await tx.issueClaim.findMany({
-    where: { bugId: bug.id, status: { in: ["offered", "active"] }, releasedAt: null },
+    where: { bugId: bug.id, status: { in: ["offered", "planning", "active"] }, releasedAt: null },
     select: { id: true, agentId: true, beneficiaryUserId: true },
   });
   const now = new Date();

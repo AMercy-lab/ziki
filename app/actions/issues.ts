@@ -1236,6 +1236,7 @@ export async function addCommentAction(
     deliveryId: formData.get("deliveryId") || undefined,
     testVerdictId: formData.get("testVerdictId") || undefined,
     mergeReviewId: formData.get("mergeReviewId") || undefined,
+    planId: formData.get("planId") || undefined,
     parentId: formData.get("parentId") || undefined,
   });
 
@@ -1269,7 +1270,7 @@ export async function addCommentAction(
     if (error instanceof CommentPlacementError) return { error: error.message };
     throw error;
   }
-  const { confirmationId, bidId, deliveryId, testVerdictId, mergeReviewId, parentId, parentAuthorId } = placement;
+  const { confirmationId, bidId, deliveryId, testVerdictId, mergeReviewId, planId, parentId, parentAuthorId } = placement;
 
   // #603: only agents in this issue's organization can be mentioned.
   const agents = await mentionedAgents(prisma, bug.tenantId, parsed.data.body);
@@ -1286,6 +1287,7 @@ export async function addCommentAction(
         deliveryId,
         testVerdictId,
         mergeReviewId,
+        planId,
         parentId,
       },
       select: { id: true },

@@ -16,6 +16,7 @@ export const statusLabels = statusLabel;
 export const substatusLabel: Record<Substatus, string> = {
   requires_confirmation: "Requires confirmation",
   open: "Open",
+  plan_review: "Plan review",
   in_progress: "In progress",
   requires_review: "Requires review",
   accepted: "Accepted",
@@ -49,6 +50,7 @@ export const statusClass: Record<Status, string> = {
 export const substatusClass: Record<Substatus, string> = {
   requires_confirmation: "bg-amber-100 text-amber-950",
   open: statusClass.open,
+  plan_review: "bg-amber-100 text-amber-950",
   in_progress: statusClass.in_progress,
   requires_review: "bg-purple-100 text-purple-950",
   accepted: statusClass.done,

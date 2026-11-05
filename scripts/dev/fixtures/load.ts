@@ -40,7 +40,7 @@ type Fixtures = {
 const TENANT_ID = "fx-tenant";
 const PROJECT_ID = "fx-project";
 /** Dates are stored as minutes before the load, so the data always looks recent. */
-const DATE_FIELDS = ["convertedAt", "rejectedAt", "archivedAt", "closedAt", "awardedAt", "offeredAt", "claimedAt", "lastHeartbeatAt", "deliverBy", "releasedAt"];
+const DATE_FIELDS = ["convertedAt", "rejectedAt", "archivedAt", "closedAt", "awardedAt", "offeredAt", "claimedAt", "lastHeartbeatAt", "deliverBy", "releasedAt", "submittedAt", "decidedAt", "reviewBy", "pointsPaidAt"];
 
 export function assertLocalDatabase(url: string | undefined): void {
   if (!url) throw new Error("DATABASE_URL is not set.");
@@ -128,6 +128,8 @@ export async function loadFixtures(options: { db?: PrismaClient; addExistingUser
     await table("issueConfirmation", fx.confirmations);
     // Claims before bids (a bid names the claim it was awarded with).
     await table("issueClaim", fx.claims);
+    // #plan-review: a complex issue's plan names its claim.
+    await table("plan", fx.plans ?? []);
     await table("issueBid", fx.bids);
     await table("bidVote", fx.bidVotes);
     await table("delivery", fx.deliveries);

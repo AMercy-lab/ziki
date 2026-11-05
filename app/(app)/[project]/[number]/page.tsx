@@ -42,6 +42,9 @@ import { IssueStageProvider } from "@/components/issue-stage-context";
 import { IssueComments } from "@/components/comment-thread";
 import { CommentComposer } from "@/components/comment-composer";
 import { AwardBox } from "@/components/award-box";
+import { PlanReviewCard, type PlanCardView } from "@/components/plan-review-card";
+import { currentPlan, planDeadline, type PlanView } from "@/lib/agent-api/plan";
+import { difficultyLabel } from "@/lib/difficulty";
 import { AwardStep, IdeaStep, IssueTimeline, TimelineStep, type AwardStepView } from "@/components/issue-timeline";
 import { currentHold, shownAssignee, type IssueHold } from "@/lib/issue-holders";
 import { isOpenBid } from "@/lib/open-bids";
@@ -455,6 +458,20 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     }),
   ]);
   const awardClaim: AwardStepView | null = claimHistory[0] ?? null;
+  // #plan-review: a complex issue's plan, while under review and after (what the delivery is judged against).
+  const planReviewing = bug.substatus === "plan_review" && !bug.isDeleted;
+  const planRecord: PlanView | null = pastConfirmation ? await loadOptional<PlanView | null>("plan", null, () => currentPlan(bug.id)) : null;
+  const planCard: PlanCardView | null = planRecord && (planReviewing ? planRecord.live : planRecord.decision === "approved")
+    ? {
+      id: planRecord.id, agentName: planRecord.agentName, ownerName: planRecord.ownerName, summary: planRecord.summary, description: planRecord.description,
+      reading: planRecord.reading, assumptions: planRecord.assumptions, uncertainties: planRecord.uncertainties,
+      steps: planRecord.steps.map(({ id, text, by }) => ({ id, text, by })), estimateMinutes: planRecord.estimateMinutes, risk: planRecord.risk, confidence: planRecord.confidence,
+      round: planRecord.round, sendBacksLeft: planRecord.sendBacksLeft, submittedAt: planRecord.submittedAt, decision: planRecord.decision, decidedAt: planRecord.decidedAt,
+      decisionNote: planRecord.decisionNote, reviewBy: planRecord.reviewBy,
+      replies: planRecord.replies.map((reply) => ({ id: reply.id, label: reply.label, body: reply.body, authorName: reply.authorName, agentName: reply.agentName, createdAt: reply.createdAt })),
+    }
+    : null;
+  const planOwnerId = planReviewing ? (planRecord?.live ? planRecord.ownerId : null) : null;
 
   const [users, voterSummary, activities, activityCount, comments, latestStatusChange, attachments, lastRevision, agentDecisions, escalations] =
     await Promise.all([
@@ -932,6 +949,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     confirmations: confirmationsData?.confirmations ?? 0,
     confirmationsNeeded: confirmationsData?.confirmationsNeeded ?? 0,
     holder: hold ? { agentName: hold.agentName, personName: hold.personName, status: hold.status, offeredAt: hold.offeredAt } : null,
+    plan: planReviewing ? { submitted: Boolean(planCard), decision: planCard?.decision ?? null, round: planCard?.round ?? 0, reviewBy: planCard?.reviewBy ?? null } : null,
     openBids: bidList.filter(isOpenBid).length,
     goodToMerge: judgementCount?.good ?? testVerdictList.filter((verdict) => verdict.goodToMerge).length,
     verdictsNeeded: judgementCount?.needed ?? verdictsNeeded,
@@ -1269,7 +1287,22 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
           {deliveredBanner ? <DeliveredBanner {...deliveredBanner} /> : null}
 
               {/* Who has the issue, while it is the latest thing (In progress); the timeline below keeps the award after that. */}
-              {hold?.status === "active" && bug.status === "in_progress" ? <AwardBox hold={hold} /> : null}
+              {(hold?.status === "active" || hold?.status === "planning") && bug.status === "in_progress" ? <AwardBox hold={hold} /> : null}
+
+              {/* #plan-review: the plan is the latest thing while the issue is at In progress · Plan review. */}
+              {planReviewing && hold?.status === "planning" ? (
+                <section className="rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-[22px]">
+                  <PlanReviewCard
+                    bugId={bug.id}
+                    plan={planCard}
+                    isOwner={planOwnerId === user.id}
+                    live
+                    deadline={planDeadline({ offeredAt: hold.offeredAt, createdAt: hold.offeredAt ?? new Date() }, planCard ? { reviewBy: new Date(planCard.reviewBy) } : null, workflow.planReviewSeconds)}
+                    canReply={!bug.isDeleted}
+                    difficultyLabel={difficultyLabel[bug.difficulty]}
+                  />
+                </section>
+              ) : null}
 
               {conversationHasContent ? (
                 <section
@@ -1293,6 +1326,12 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                     {timelineDeliveries.length > 0 ? (
                       <TimelineStep>
                         <DeliveriesPanel at={firstAt(timelineDeliveries)} bugId={bug.id} deliveries={timelineDeliveries} canReply={!bug.isDeleted && delivering} />
+                      </TimelineStep>
+                    ) : null}
+                    {/* #plan-review: the approved plan stays on the issue, above the award, as what the delivery is judged against. */}
+                    {!planReviewing && planCard?.decision === "approved" ? (
+                      <TimelineStep>
+                        <PlanReviewCard bugId={bug.id} plan={planCard} isOwner={false} live={false} deadline={null} canReply={!bug.isDeleted} difficultyLabel={difficultyLabel[bug.difficulty]} />
                       </TimelineStep>
                     ) : null}
                     {awardClaim ? (
@@ -1405,6 +1444,10 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                 <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
                 {stateLabel(bug.substatus)}
               </Badge>
+              {/* #plan-review: the one new label, the issue's difficulty; complex issues go through plan review. */}
+              <span className={`${issueChipBaseClass} ${bug.difficulty === "complex" ? "bg-zk-warn-bg text-zk-warn-fg" : "bg-zk-chip text-zk-text2"}`} data-testid="difficulty-chip" title="Set when the idea was converted; fixed once the issue has a bid.">
+                {difficultyLabel[bug.difficulty]}
+              </span>
               {bug.isBoosted && !bug.isDeleted ? (
                 <span className={`${issueChipBaseClass} border border-zk-warn-bd bg-zk-warn-bg text-zk-warn-fg`}>Boosted</span>
               ) : null}

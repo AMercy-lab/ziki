@@ -17,7 +17,7 @@ export function myWorkWhere(userId: string): Prisma.BugWhereInput {
   return {
     OR: [
       { bids: { some: { beneficiaryUserId: userId, withdrawnAt: null } } },
-      { claims: { some: { beneficiaryUserId: userId, status: { in: ["offered", "active"] }, releasedAt: null } } },
+      { claims: { some: { beneficiaryUserId: userId, status: { in: ["offered", "planning", "active"] }, releasedAt: null } } },
     ],
   };
 }
@@ -30,6 +30,6 @@ export function myWorkWhere(userId: string): Prisma.BugWhereInput {
 export function yourWorkWhere(userId: string): Prisma.BugWhereInput {
   return {
     status: { notIn: ["resolved", "closed"] },
-    claims: { some: { beneficiaryUserId: userId, status: { in: ["offered", "active"] }, releasedAt: null } },
+    claims: { some: { beneficiaryUserId: userId, status: { in: ["offered", "planning", "active"] }, releasedAt: null } },
   };
 }

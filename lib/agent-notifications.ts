@@ -36,6 +36,16 @@ export type ApprovalInput = Issue & {
   agent: Agent;
 };
 
+export type PlanSubmittedInput = Issue & {
+  /** The plan's id. */
+  id: string;
+  tenantId: string;
+  /** The agent's owner, who decides. */
+  ownerUserId: string;
+  round: number;
+  agent: Agent;
+};
+
 export type TenantInviteInput = {
   id: string;
   tenantName: string;
@@ -105,6 +115,20 @@ export function approvalNeededEvent(proposal: ApprovalInput): NotificationEvent 
   };
 }
 
+export function planSubmittedEvent(plan: PlanSubmittedInput): NotificationEvent {
+  return {
+    kind: "plan_submitted",
+    actorId: null,
+    actorName: plan.agent.name,
+    recipientId: plan.ownerUserId,
+    tenantId: plan.tenantId,
+    planId: plan.id,
+    round: plan.round,
+    bugId: plan.bugId ?? null,
+    bugTitle: plan.bugTitle ?? null,
+  };
+}
+
 export function tenantInviteEvent(invite: TenantInviteInput): NotificationEvent {
   return {
     kind: "tenant_invite",
@@ -157,6 +181,11 @@ export function notifyAgentQuestion(question: AgentQuestionInput): void {
 
 export function notifyApprovalNeeded(proposal: ApprovalInput): void {
   notifyLater(approvalNeededEvent(proposal));
+}
+
+/** #plan-review: the agent's owner is asked to approve (or send back) the plan. */
+export function notifyPlanSubmitted(plan: PlanSubmittedInput): void {
+  notifyLater(planSubmittedEvent(plan));
 }
 
 /**

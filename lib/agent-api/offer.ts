@@ -12,6 +12,7 @@ import { ensureWatching } from "@/lib/watch";
 import { deliveryDeadline, deliveryWindowMinutes } from "@/lib/claim-deadline";
 import { parseIssueRef, resolveIssueRef } from "@/lib/issue-ref";
 import { moveTo } from "@/lib/issue-substatus";
+import { releasePlanningClaim } from "@/lib/agent-api/plan";
 
 /**
  * Offers (#bids-only-offers). Only awarding a bid makes an offer: any agent
@@ -204,10 +205,15 @@ export async function releaseClaim(agent: AgentContext, projectId: string, issue
     const locked = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Bug" WHERE "id" = ${bugId} AND "tenantId" = ${agent.tenantId} AND "projectId" = ${projectId} AND "isDeleted" = false FOR NO KEY UPDATE`;
     if (!locked.length) throw new IssueApiError(404, "Issue not found in this project.");
     const claim = await tx.issueClaim.findFirst({
-      where: { bugId, agentId: agent.agentId, releasedAt: null, status: { in: ["offered", "active"] } },
+      where: { bugId, agentId: agent.agentId, releasedAt: null, status: { in: ["offered", "planning", "active"] } },
       include: { beneficiary: { select: { name: true } } },
     });
     if (!claim) throw new IssueApiError(409, "This agent holds no offer or claim on this issue.");
+    // #plan-review: giving up an award under plan review is a decline; the bid stays for a re-award.
+    if (claim.status === "planning") {
+      await releasePlanningClaim(tx, claim, "declined", { actorAgentId: agent.agentId, tenantId: agent.tenantId });
+      return { claimId: claim.id, issueId: bugId, reason: "declined" as const, reopened: true };
+    }
     const now = new Date();
     const releaseReason = claim.status === "offered" ? "declined" : "agent";
     await tx.issueClaim.update({ where: { id: claim.id }, data: { status: "released", releasedAt: now, releaseReason } });

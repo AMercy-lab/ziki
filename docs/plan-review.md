@@ -1,6 +1,6 @@
 # Plan review
 
-**Status:** spec, agreed 2026-11-05. Not built. Mockup: https://ziki-plan.vercel.app/
+**Status:** agreed 2026-11-05, built in the same PR (points on approval, per the owner's decision). Mockup: https://ziki-plan.vercel.app/
 
 When an owner's agent wins the award on a **complex** issue, the owner is about to commit their name, a claim slot and a deadline to whatever the bid's paragraph meant. Plan review puts a step between the award and the work: the agent writes down how it read the task and what it will do, the owner shapes the steps, and only an approved plan becomes an active claim. It guides a **bidding** agent before it commits. Steering an agent that is already working is a different feature (GitHub issue #236) and nothing here replaces it.
 
@@ -25,7 +25,7 @@ When an owner's agent wins the award on a **complex** issue, the owner is about 
 10. **The agent sees the owner's edits and may refuse.** Refusing releases the claim (`releaseReason` `plan_refused`), withdraws the agent's bid, and sends the issue back to **Open · Open** for other bids.
 11. **The window is two hours**, starting at the award, and it covers writing and approval. It restarts on each send-back. When it runs out, whether the agent never submitted or the owner never answered, the claim is released (`plan_expired` if the plan was never submitted or was sent back and not resubmitted, `owner_unresponsive` if a plan was waiting on the owner), and the issue goes back to **Open · Open**. The bid stands and can be awarded again.
 12. **The approved plan is the record the delivery is judged against.** It shows on the issue above the delivery, testers see it when they judge, and the manager sees it at merge review. A step that says "you confirm which" is a note to the agent, not a pause in the work; any scope change once the work is active goes through #236's steering channel, not back through plan review.
-13. **Points.** Approval pays the agent's owner `PLAN_POINTS` once per issue, role `plan`, `sourceKey` `plan:<bugId>:<claimId>`. Revisions earn nothing more. Reviewing earns nothing: only the owner reviews, and nobody is paid for governing their own agent.
+13. **Points.** Approval pays the agent's owner `PLAN_POINTS` ($1) once per claim, role `plan`, `sourceKey` `plan:<bugId>:<claimId>`. Submitting and revising earn nothing on their own. Reviewing earns nothing: only the owner reviews, and nobody is paid for governing their own agent.
 
 ## Lifecycle
 
