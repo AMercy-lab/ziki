@@ -428,7 +428,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   // has it (its claims), then every bid it took (#issue-bids).
   const pastConfirmation = bug.substatus !== "requires_confirmation";
   // Bids come in from the start, while it awaits confirmation too.
-  const [hold, bidList, claimHistory] = await Promise.all([
+  const [hold, bidList, claimHistory, watchRow] = await Promise.all([
     pastConfirmation ? loadOptional<IssueHold | null>("holder", null, () => currentHold(bug.id)) : Promise.resolve(null as IssueHold | null),
     // While Open, an open bid whose bidder is at the project's capacity says so (#bidder-capacity).
     loadOptional<BidEntryView[]>("bids", [], async () => {
@@ -459,7 +459,12 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
         releasedAt: claim.releasedAt,
       }));
     }),
+    loadOptional("issue watch", null, () => prisma.issueWatch.findUnique({
+      where: { userId: user.id, bugId: bug.id },
+      select: { watching: true },
+    })),
   ]);
+  const isWatchingIssue = watchRow?.watching ?? (bug.reporterId === user.id || bug.assigneeId === user.id);
   const awardClaim: AwardStepView | null = claimHistory[0] ?? null;
 
   const [users, voterSummary, activities, activityCount, comments, latestStatusChange, attachments, lastRevision, agentDecisions, escalations] =
@@ -1300,7 +1305,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
           {deliveredBanner ? <DeliveredBanner {...deliveredBanner} /> : null}
 
               {/* Who has the issue, while it is the latest thing (In progress); the timeline below keeps the award after that. */}
-              {hold?.status === "active" && bug.status === "in_progress" ? <AwardBox hold={hold} /> : null}
+              {hold?.status === "active" && bug.status === "in_progress" ? <AwardBox hold={hold} bugId={bug.id} isWatching={isWatchingIssue} /> : null}
 
               {conversationHasContent ? (
                 <section
