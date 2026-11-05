@@ -11,7 +11,8 @@ export function GET(request: NextRequest) {
   const next = request.nextUrl.searchParams.get("next");
   const to = request.nextUrl.clone();
   to.pathname = next && next.startsWith("/") && !next.startsWith("//") ? next : "/earn/withdraw";
-  to.search = "";
+  // A paid task passes ?celebrate=1 so its page can make a moment of it.
+  to.search = request.nextUrl.searchParams.get("celebrate") === "1" ? "?celebrate=1" : "";
   const response = NextResponse.redirect(to);
   if (state && state !== "new" && EARN_STAGES.includes(state)) {
     response.cookies.set(EARN_PREVIEW_COOKIE, state, { path: "/", sameSite: "lax", httpOnly: true });

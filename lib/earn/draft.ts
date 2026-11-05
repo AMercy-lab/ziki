@@ -80,9 +80,9 @@ export function stageAfterPaying(stage: EarnStage): EarnStage {
   return paid >= EARN_TASKS.length ? "progress" : (`task${paid}` as EarnStage);
 }
 
-/** A Ziki task's own page, in the earner's project: /<project>/tasks/<n>. */
+/** A Ziki task's own page, under Marketing: /earn/marketing/<n>. Not an issue page. */
 export function zikiTaskPath(n: number): string {
-  return `/${EARN_PROJECT_SLUG}/tasks/${n}`;
+  return `/earn/marketing/${n}`;
 }
 
 /** Where earners do their Ziki tasks: their own page, not the builders' issue list. */

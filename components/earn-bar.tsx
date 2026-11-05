@@ -1,56 +1,75 @@
 import { formatZ } from "@/lib/points/rules";
-import { CONVERSION_BONUS, WITHDRAW_THRESHOLD, type EarnBalance } from "@/lib/earn/draft";
+import { CONVERSION_BONUS, EARN_TASKS, SIGNUP_BONUS, WITHDRAW_THRESHOLD, type EarnBalance } from "@/lib/earn/draft";
 
 /**
- * One bar to $30 (#earn-drafts): what you've earned in green, what's still
- * locked in amber beside it, ending at the $30 mark. Under it, both amounts
- * in words.
+ * The road to the first withdrawal (#earn-drafts), laid out like the earnings
+ * bar Mark likes: a segmented bar, a marker at the end, a legend with colour
+ * dots. Three colours: what you've earned (green), what your tasks can still
+ * add (blue), and what arrives when someone you reached starts a project
+ * (amber). A small notch marks where each task pays out, so the bar reads as a
+ * road and not a meter, and a glowing dot sits at your head of it.
  */
 export function EarnBar({ balance }: { balance: Pick<EarnBalance, "earned" | "tasksLeft"> }) {
-  // Before anything is earned: the empty bar and "$0 earned", with no breakdown of what each part pays yet.
-  if (balance.earned === 0) {
-    return (
-      <div>
-        <div role="img" aria-label={`Nothing earned yet. Withdraw opens at ${formatZ(WITHDRAW_THRESHOLD)}.`} className="h-2.5 rounded-full bg-zk-seg" />
-        <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-zk-text2">
-          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-zk-ok-fg" />
-          <span className="font-bold text-zk-text">{formatZ(0)}</span> earned
-        </p>
-      </div>
-    );
-  }
-  const left = Math.max(0, WITHDRAW_THRESHOLD - balance.earned);
+  const total = WITHDRAW_THRESHOLD;
+  const earned = Math.min(balance.earned, total);
+  const left = Math.max(0, total - balance.earned);
   const fromTasks = Math.min(balance.tasksLeft, left);
   const fromPerson = left - fromTasks;
-  // Three parts on one bar: earned (green), still to earn from tasks (blue), and the part a person starting pays (amber).
+  const ready = left === 0;
+  const pct = (value: number) => `${(value / total) * 100}%`;
+
+  // Where each payout lands on the bar: the sign-up gift, then each task in turn (5, 8, 10, 14, 19).
+  const stops: number[] = [];
+  EARN_TASKS.reduce((sum, task) => {
+    stops.push(sum);
+    return sum + task.pay;
+  }, SIGNUP_BONUS);
+  const notches = stops.filter((value) => value < total);
+
   const parts = [
-    { key: "earned", value: Math.min(balance.earned, WITHDRAW_THRESHOLD), bar: "bg-zk-ok-fg", dot: "bg-zk-ok-fg", text: "font-bold text-zk-text", label: "earned" },
-    { key: "tasks", value: fromTasks, bar: "border border-electric-blue/30 bg-zk-tint", dot: "border border-electric-blue/40 bg-zk-tint", text: "font-bold text-zk-accent", label: "from your tasks" },
-    { key: "person", value: fromPerson, bar: "border border-zk-warn-bd bg-zk-warn-bg", dot: "border border-zk-warn-bd bg-zk-warn-bg", text: "font-bold text-zk-warn-fg", label: "when someone you reached starts a project" },
+    { key: "earned", value: earned, bar: "bg-zk-ok-fg", dot: "bg-zk-ok-fg", text: "font-bold text-zk-text", label: "earned", show: balance.earned >= 0 },
+    { key: "tasks", value: fromTasks, bar: "bg-zk-accent/35", dot: "bg-zk-accent/40", text: "font-bold text-zk-accent", label: "from your tasks", show: fromTasks > 0 },
+    { key: "person", value: fromPerson, bar: "bg-amber-300", dot: "bg-amber-300", text: "font-bold text-zk-warn-fg", label: "when someone you reached starts a project", show: fromPerson > 0 },
   ];
-  const shown = parts.filter((part) => part.value > 0);
+
   return (
     <div>
-      <div
-        role="img"
-        aria-label={
-          left > 0
-            ? `${formatZ(balance.earned)} earned. ${fromTasks ? `${formatZ(fromTasks)} to come from your tasks. ` : ""}${formatZ(fromPerson)} when someone you reached starts a project. Withdraw opens at ${formatZ(WITHDRAW_THRESHOLD)}.`
-            : `${formatZ(balance.earned)} earned. Withdraw is open.`
-        }
-        className="flex h-2.5 gap-[3px]"
-      >
-        {shown.map((part, i) => (
-          <div
-            key={part.key}
-            className={`h-full ${part.bar} ${i === 0 ? "rounded-l-full" : ""} ${i === shown.length - 1 ? "rounded-r-full" : ""}`}
-            style={{ flex: `${part.value} 1 0%` }}
-          />
-        ))}
+      <div className="relative pt-6">
+        {/* The marker at the end: where withdrawing opens. */}
+        <span className={`absolute right-0 top-0 text-[11px] font-bold ${ready ? "text-zk-ok-fg" : "text-zk-muted"}`}>{ready ? "Withdraw is open" : `Withdraw opens at ${formatZ(total)}`}</span>
+        <span aria-hidden="true" className={`absolute right-0 top-4 z-10 h-6 w-0.5 rounded-full ${ready ? "bg-zk-ok-fg" : "bg-zk-text"}`} />
+        <div
+          role="img"
+          aria-label={
+            ready
+              ? `${formatZ(balance.earned)} earned. Withdraw is open.`
+              : `${formatZ(balance.earned)} earned. ${fromTasks ? `${formatZ(fromTasks)} to come from your tasks. ` : ""}${formatZ(fromPerson)} when someone you reached starts a project. Withdraw opens at ${formatZ(total)}.`
+          }
+          className="relative flex h-3.5 overflow-hidden rounded-full bg-zk-seg"
+        >
+          {parts.map((part) =>
+            part.show && part.value > 0 ? (
+              <div key={part.key} className="h-full" style={{ width: pct(part.value) }}>
+                <div className={`earn-grow h-full w-full ${part.bar}`} />
+              </div>
+            ) : null,
+          )}
+          {/* Where each payout lands. */}
+          {notches.map((value) => (
+            <span key={value} aria-hidden="true" className="absolute top-0 h-full w-[2px] bg-zk-surface/80" style={{ left: pct(value) }} />
+          ))}
+        </div>
+        {/* You are here. */}
+        {earned > 0 && !ready ? (
+          <span aria-hidden="true" className="absolute top-[18px] z-10 flex h-[22px] w-[22px] -translate-x-1/2 items-center justify-center" style={{ left: pct(earned) }}>
+            <span className="absolute h-full w-full rounded-full bg-zk-ok-fg/30 motion-safe:animate-ping" />
+            <span className="relative h-3.5 w-3.5 rounded-full border-[3px] border-zk-surface bg-zk-ok-fg shadow-[0_1px_4px_rgba(11,23,51,0.35)]" />
+          </span>
+        ) : null}
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zk-text2">
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zk-text2">
         {parts.map((part) =>
-          part.key === "earned" || part.value > 0 ? (
+          part.show ? (
             <span key={part.key} className="inline-flex items-center gap-1.5">
               <span aria-hidden="true" className={`h-2 w-2 rounded-full ${part.dot}`} />
               <span className={part.text}>{formatZ(part.key === "earned" ? balance.earned : part.key === "person" ? CONVERSION_BONUS : part.value)}</span> {part.label}
