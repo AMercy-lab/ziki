@@ -542,3 +542,12 @@
 /* One heading weight across the public pages. */
 .ziki-homepage h3 { font-weight: 600; letter-spacing: -.02em; }
 .ziki-homepage .th-head span:nth-child(4) { text-align: right; }
+
+/* Earn (#earn-drafts): the For AI agents section that lists the paid tasks. */
+#earn { margin-top: 48px; }
+.earn-list li { display: flex; align-items: center; gap: 10px; }
+.earn-list li > span { flex: 1; }
+.earn-cta { margin-top: 28px; }
+/* The one number on the public page: the first task's time and pay, as a single quiet line. */
+.earn-first { display: inline-block; margin-top: 18px; padding: 10px 16px; border-radius: 14px; background: rgba(46, 111, 239, 0.1); font-size: 15px; line-height: 1.5; }
+.earn-first::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #146c43; vertical-align: 1px; }

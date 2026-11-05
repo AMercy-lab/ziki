@@ -21,6 +21,9 @@ import { AgentsDock, type DockAgent } from "@/components/agents-dock";
 import { AGENTS_DOCK_HEIGHT } from "@/lib/agents-dock";
 import { appVersionLabel } from "@/lib/deployed-version";
 import { agentActivity, agentEarnings } from "@/lib/points/agent-earnings";
+import { sampleBalance } from "@/lib/earn/state";
+import { withdrawInfo } from "@/lib/earn/draft";
+import { isEarner } from "@/lib/earn/earner";
 
 export default async function AppLayout({
   children,
@@ -103,6 +106,12 @@ export default async function AppLayout({
     }
   }
 
+  // Earn (#earn-drafts): an earner's money for the header.
+  const earner = await isEarner(user.id).catch(() => false);
+  const earnSample = earner ? await sampleBalance() : null;
+  // The earner's agent bar shows what she has earned, the same amount as the header ($5 from signing up).
+  if (earnSample) dockAgents = dockAgents.map((agent) => ({ ...agent, earnedPoints: earnSample.earned }));
+
   // #287: one primary-key read; a failure leaves shortcuts on, the default.
   let shortcutsEnabled = true;
   try {
@@ -134,6 +143,8 @@ export default async function AppLayout({
           defaultProjectSlug={defaultProjectSlug}
           reportFormUrl={REPORT_FORM_URL}
           organizationAdmin={tenantId !== null && isOrganizationAdmin(membershipRole, user.role)}
+          earned={earnSample ? earnSample.earned : null}
+          withdraw={earnSample ? withdrawInfo(earnSample.stage) : null}
         />
         <main
           id={MAIN_CONTENT_ID}

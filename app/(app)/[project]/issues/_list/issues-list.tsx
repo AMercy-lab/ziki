@@ -100,6 +100,10 @@ import { openIssueConfirmations, parseIssueStageView, type IssueStage } from "@/
 import { issueHref } from "@/lib/issue-ref";
 import { PROJECT_ALL_PARAM, showsAllProjects } from "@/lib/issue-list-filters";
 import { ideaVoteTotals, NO_VOTES } from "@/lib/idea-vote-totals";
+import { EARN_PROJECT_SLUG, EARN_TASKS, ZIKI_TASKS_PATH, tasksPaid } from "@/lib/earn/draft";
+import { isEarner } from "@/lib/earn/earner";
+import { sampleStage, startedTask } from "@/lib/earn/state";
+import { ZikiTasksTable } from "@/components/ziki-tasks-table";
 
 /* Distinct browser-tab title; the root layout appends "· Ziki". */
 export const metadata = { title: "Issues" };
@@ -194,7 +198,10 @@ export async function IssuesList({
   ideas,
   returnTo,
   searchParams,
+  zikiTasks = false,
 }: {
+  /** Earn (#earn-drafts): `/<slug>/issues/ziki-tasks` lists the Ziki tasks in place of the issues. */
+  zikiTasks?: boolean;
   slug: string;
   /** The list the path names: a status, `ideas` or `rejected_ideas` (#project-urls). */
   status: string;
@@ -218,7 +225,8 @@ export async function IssuesList({
   if (tenantId && userId && membershipRole && isOrganizationAdmin(membershipRole, effectiveRole)) {
     try {
       const dismissed = parseDismissed((await cookies()).get(GETTING_STARTED_COOKIE)?.value);
-      if (!dismissed.includes(tenantId)) {
+      // Earn (#earn-drafts): someone who came to earn never sees the new-workspace checklist.
+      if (!dismissed.includes(tenantId) && slug !== EARN_PROJECT_SLUG) {
         const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
         if (tenant) {
           const checklist = await gettingStartedFor(prisma, tenantId, slug);
@@ -777,7 +785,9 @@ export async function IssuesList({
   // same scope the list shows, including ?project=all, so an empty filter
   // across a busy workspace is "no issues match", not "no issues yet".
   let isFirstRun = false;
-  if (totalCount === 0 && !isDeletedView) {
+  // Earn: the earner's workspace keeps the normal toolbar (Add Idea at the far left, filter and
+  // search at the right) even while it has no issues, since the Ziki tasks fill the list.
+  if (totalCount === 0 && !isDeletedView && slug !== EARN_PROJECT_SLUG) {
     try {
       isFirstRun = (await prisma.bug.count({
         where: {
@@ -944,7 +954,15 @@ export async function IssuesList({
     </>
   );
 
-  const listContent = (
+  // Earn (#earn-drafts, Mark's review): Ziki tasks live in the main list, as a green step
+  // above Open, only for someone earning and only while tasks are left.
+  const earnStage = slug === EARN_PROJECT_SLUG && (await isEarner(user.id).catch(() => false)) ? await sampleStage() : null;
+  const zikiTasksLeft = earnStage ? EARN_TASKS.length - tasksPaid(earnStage) : 0;
+  const showZikiTasks = earnStage !== null && (zikiTasksLeft > 0 || zikiTasks);
+  // The In Progress tab opens on the Ziki tasks (its link points there); Open and the rest stay normal.
+  const onZikiTasks = zikiTasks;
+
+  const listContent = onZikiTasks && earnStage ? <ZikiTasksTable stage={earnStage} started={await startedTask()} /> : (
     <div className="space-y-4">
 
         {/* #project-links: the site/code panel renders here (from ProjectLinks in the top right) while it is open. */}
@@ -1236,8 +1254,10 @@ export async function IssuesList({
           stages={STAGE_GROUPS.map((group, index) => ({
             label: group.label,
             // Error is part of Merge, so the stage total counts it once.
-            count: group.statuses.reduce((sum, value) => sum + (value === ERROR_STATUS || value === POSSIBLY_DELIVERED ? 0 : statusCount(value)), 0),
-            href: statusLink(group.statuses[0]),
+            // Earn: the Ziki tasks still to do count as work in progress.
+            count: group.statuses.reduce((sum, value) => sum + (value === ERROR_STATUS || value === POSSIBLY_DELIVERED ? 0 : statusCount(value)), 0) + (showZikiTasks && group.label === "In Progress" ? zikiTasksLeft : 0),
+            // Earn: while Ziki tasks remain, In Progress opens straight onto them.
+            href: showZikiTasks && group.label === "In Progress" ? ZIKI_TASKS_PATH : statusLink(group.statuses[0]),
             selected: index === stageIndex,
           }))}
         />
@@ -1269,12 +1289,17 @@ export async function IssuesList({
         {/* The Ideas stage has no sidebar: its Filter menu switches to Rejected ideas (#ideas-filter). */}
         {stageIndex >= 0 && !isIdeasView ? (
           <StageSidebar
-            steps={STAGE_GROUPS[stageIndex].statuses.map((value) => ({
-              label: value === IDEAS_STATUS ? "New ideas" : value === REJECTED_IDEAS_STATUS ? "Rejected ideas" : statusFilterLabel(value),
-              count: statusCount(value),
-              href: statusLink(value),
-              selected: value === currentStatus,
-            }))}
+            steps={[
+              ...(showZikiTasks && STAGE_GROUPS[stageIndex].label === "In Progress"
+                ? [{ label: "Ziki tasks", count: zikiTasksLeft, href: ZIKI_TASKS_PATH, selected: onZikiTasks, tone: "earn" as const }]
+                : []),
+              ...STAGE_GROUPS[stageIndex].statuses.map((value) => ({
+                label: value === IDEAS_STATUS ? "New ideas" : value === REJECTED_IDEAS_STATUS ? "Rejected ideas" : statusFilterLabel(value),
+                count: statusCount(value),
+                href: statusLink(value),
+                selected: !onZikiTasks && value === currentStatus,
+              })),
+            ]}
           />
         ) : null}
         <div className="min-w-0 flex-1">

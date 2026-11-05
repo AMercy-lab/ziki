@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import type { AgentLevel } from "@prisma/client";
 import { AGENT_LEVEL_LABELS } from "@/lib/agents/levels";
@@ -49,6 +49,9 @@ export function ManageAgentsList({
   projects,
   now,
   canSetBurst,
+  beside,
+  before,
+  activity,
 }: {
   agents: ManageAgentItem[];
   activeCount: number;
@@ -57,6 +60,12 @@ export function ManageAgentsList({
   projects: AgentProjectChoice[];
   now: string;
   canSetBurst: boolean;
+  /** A card at the top of the page (Earn's money card, #earn-drafts). */
+  beside?: ReactNode;
+  /** Shown under the cards, above the agents (Earn's tasks). */
+  before?: ReactNode;
+  /** What an agent is doing now, by agent id, shown under its name (Earn, #earn-drafts). */
+  activity?: Record<string, string>;
 }) {
   const [query, setQuery] = useState("");
 
@@ -76,47 +85,31 @@ export function ManageAgentsList({
     0,
   );
 
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className={`${agentsSurface} p-4`}>
-          <p className="text-xs font-bold uppercase tracking-[0.06em] text-zk-muted">Active agents</p>
-          <p className="mt-1 text-2xl font-extrabold text-zk-text">
-            {activeCount} <span className="text-base font-semibold text-zk-muted">/ {maxActive}</span>
-          </p>
-          <p className="mt-0.5 text-xs text-zk-muted">limit {maxActive}</p>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-zk-seg">
-            <div
-              className="h-full rounded-full bg-electric-blue-strong transition-[width] duration-300"
-              style={{ width: `${meterPct}%` }}
+  const manageBody = (
+    <section aria-labelledby="your-agents" className="space-y-3">
+      {/* One header for the list: what it is, how many are active of the limit, and search once there are enough to need it. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h2 id="your-agents" className="text-base font-semibold text-zk-text">
+          Your agents
+        </h2>
+        <span className="inline-flex items-center gap-2 rounded-full bg-zk-chip px-3 py-1 text-xs font-bold text-zk-text2">
+          {activeCount} of {maxActive} active
+          <span aria-hidden="true" className="block h-1.5 w-12 overflow-hidden rounded-full bg-zk-seg">
+            <span className="block h-full rounded-full bg-electric-blue-strong" style={{ width: `${meterPct}%` }} />
+          </span>
+        </span>
+        {agents.length > 3 ? (
+          <label className="relative block w-full sm:ml-auto sm:w-64">
+            <span className="sr-only">Search agents</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search agents"
+              className="h-10 w-full rounded-full border border-zk-border bg-zk-surface px-4 text-sm text-zk-text placeholder:text-zk-muted focus:border-electric-blue focus:outline-none focus:ring-2 focus:ring-electric-blue/20"
             />
-          </div>
-        </div>
-      </div>
-
-      {legacyCount > 0 ? (
-        <div className="rounded-[20px] border border-zk-warn-bd bg-zk-warn-bg/50 px-4 py-3 text-sm text-zk-warn-fg">
-          <p className="font-bold">
-            {legacyCount} {legacyCount === 1 ? "key" : "keys"} can&apos;t be copied
-          </p>
-          <p className="mt-0.5 text-xs">
-            They were issued before keys could be copied again. Regenerate a key to get a copyable one — the new key
-            stays on the same row.
-          </p>
-        </div>
-      ) : null}
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <label className="relative block w-full sm:max-w-xs">
-          <span className="sr-only">Search agents</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search agents"
-            className="h-11 w-full rounded-full border border-zk-border bg-zk-surface px-4 text-sm text-zk-text placeholder:text-zk-muted focus:border-electric-blue focus:outline-none focus:ring-2 focus:ring-electric-blue/20"
-          />
-        </label>
+          </label>
+        ) : null}
       </div>
 
       {visible.length === 0 ? (
@@ -124,37 +117,38 @@ export function ManageAgentsList({
           {agents.length === 0 ? "No agents yet." : "No agents match your search."}
         </p>
       ) : (
-        <ul className="grid gap-4 md:grid-cols-2">
+        <ul className="m-0 grid list-none gap-4 p-0 md:grid-cols-2">
           {visible.map((agent) => {
             const lastUsed = agent.apiKeys.find((key) => key.lastUsedAt)?.lastUsedAt ?? null;
+            const status = !agent.revokedAt ? activity?.[agent.id] : undefined;
             return (
-              // The name's link is stretched over the card, so a click anywhere opens the
-              // agent's page; the key and controls sit above it and keep their own clicks.
+              // Two cards to a row, as on the live site: who it is and its key on top, then a divider
+              // and its settings. The name's link covers the top part, so a click there opens the agent.
               <li
                 key={agent.id}
-                className={`${agentsSurface} group relative flex flex-col gap-4 p-4 transition hover:border-electric-blue/50 hover:shadow-[0_10px_28px_rgba(11,23,51,0.10)] sm:p-5`}
+                className={`${agentsSurface} group relative flex flex-col overflow-hidden transition hover:border-electric-blue/50 hover:shadow-[0_10px_28px_rgba(11,23,51,0.08)]`}
               >
-                <div className="flex min-w-0 items-start gap-3">
+                <div className="relative flex flex-1 flex-wrap items-start gap-x-4 gap-y-3 p-4 sm:p-5">
                   <div className="relative shrink-0">
-                    <AgentAvatar agentId={agent.id} avatar={agent.avatar} size={56} />
+                    <AgentAvatar agentId={agent.id} avatar={agent.avatar} size={52} />
                     {!agent.revokedAt ? (
                       <span
                         className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-zk-surface ${
-                          agent.recent ? "bg-emerald-500" : "bg-slate-400"
+                          agent.recent || status ? "bg-zk-ok-fg" : "bg-slate-400"
                         }`}
                         aria-hidden
                       />
                     ) : null}
                   </div>
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <Link
-                      href={agentPageHref(agent.name)}
-                      className="block break-words text-base font-extrabold text-zk-text after:absolute after:inset-0 after:rounded-[20px] after:content-[''] hover:text-zk-accent focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-electric-blue"
-                    >
-                      {agent.name}
-                      {agent.personal ? <span className="font-normal text-zk-muted"> · personal</span> : null}
-                    </Link>
+                  <div className="min-w-0 flex-1 basis-56 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        href={agentPageHref(agent.name)}
+                        className="break-words text-[17px] font-extrabold tracking-tight text-zk-text after:absolute after:inset-0 after:content-[''] hover:text-zk-accent focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-electric-blue"
+                      >
+                        {agent.name}
+                        {agent.personal ? <span className="font-normal text-zk-muted"> · personal</span> : null}
+                      </Link>
                       <span className={levelBadgeClass(agent.level)}>{AGENT_LEVEL_LABELS[agent.level]}</span>
                       {agent.revokedAt ? (
                         <span className="inline-flex items-center rounded-full bg-zk-bad-bg px-2.5 py-0.5 text-xs font-bold text-zk-bad-fg">
@@ -163,6 +157,12 @@ export function ManageAgentsList({
                       ) : null}
                       {agent.model ? <span className="text-sm text-zk-muted">{agent.model}</span> : null}
                     </div>
+                    {status ? (
+                      <p className="flex items-center gap-2 text-sm text-zk-text2">
+                        <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-zk-ok-fg" />
+                        {status}
+                      </p>
+                    ) : null}
                     <p className="text-xs text-zk-muted">
                       {agent.revokedAt ? (
                         <>
@@ -187,21 +187,21 @@ export function ManageAgentsList({
                       )}
                     </p>
                   </div>
+                  {!agent.revokedAt && agent.apiKeys.length ? (
+                    <div className="relative z-10 w-full space-y-1.5">
+                      {agent.apiKeys.map((key) => (
+                        <AgentRowKey
+                          key={key.id}
+                          apiKey={key.apiKey}
+                          prefix={key.prefix}
+                          projectId={key.projectId}
+                          projectName={key.projectName}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
-                {!agent.revokedAt && agent.apiKeys.length ? (
-                  <div className="relative z-10 space-y-1.5">
-                    {agent.apiKeys.map((key) => (
-                      <AgentRowKey
-                        key={key.id}
-                        apiKey={key.apiKey}
-                        prefix={key.prefix}
-                        projectId={key.projectId}
-                        projectName={key.projectName}
-                      />
-                    ))}
-                  </div>
-                ) : null}
-                <div className="relative z-10 mt-auto border-t border-zk-divider pt-4">
+                <div className="relative z-10 mx-4 mt-auto border-t border-zk-divider pb-4 pt-4 sm:mx-5 sm:pb-5">
                   {agent.revokedAt ? (
                     <AgentControls
                       revoked
@@ -234,6 +234,28 @@ export function ManageAgentsList({
           })}
         </ul>
       )}
+    </section>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Earn (#earn-drafts): the money card, then the tasks, then the agents. */}
+      {beside}
+      {before}
+
+      {legacyCount > 0 ? (
+        <div className="rounded-[20px] border border-zk-warn-bd bg-zk-warn-bg/50 px-4 py-3 text-sm text-zk-warn-fg">
+          <p className="font-bold">
+            {legacyCount} {legacyCount === 1 ? "key" : "keys"} can&apos;t be copied
+          </p>
+          <p className="mt-0.5 text-xs">
+            They were issued before keys could be copied again. Regenerate a key to get a copyable one — the new key
+            stays on the same row.
+          </p>
+        </div>
+      ) : null}
+
+      {manageBody}
     </div>
   );
 }

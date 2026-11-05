@@ -10,6 +10,10 @@ import { openSecret } from "@/lib/secret-box";
 import { materializeApprovedPairings } from "@/lib/agents/pairing";
 import { isAgentPlatformEnabled } from "@/lib/feature-flags";
 import { FirstAgentEmptyState } from "@/components/first-agent-empty-state";
+import { EarnMoney } from "@/components/earn-money";
+import { earnAgentActivity } from "@/lib/earn/draft";
+import { sampleBalance } from "@/lib/earn/state";
+import { isEarner } from "@/lib/earn/earner";
 import { ManageAgentsList, type ManageAgentItem } from "@/app/(app)/settings/agents/manage-agents-list";
 import {
   agentsMutedClass,
@@ -133,8 +137,19 @@ export default async function AgentsPage() {
     };
   });
 
+  // Earn (#earn-drafts) shows only to people who came to earn.
+  const earner = await isEarner(user.id);
+  const balance = earner ? await sampleBalance() : null;
+  // The earner's working agent says what it's doing now, on its row under Your agents.
+  const working = earner ? manageItems.find((agent) => !agent.revokedAt) : undefined;
+  const earnActivity = working && balance ? { [working.id]: earnAgentActivity(balance.stage) } : undefined;
+  // The tasks sit under the money card; the agent itself shows once, under Your agents.
+  // Mark's review: the Ziki tasks live only in the main list (In Progress, above Open); the money card names the next one.
+
   return (
-    <div className="space-y-8">
+    // For someone earning (#earn-drafts), the page lines up with the header: from the
+    // workspace switcher on the left to the account button on the right.
+    <div className={`space-y-8 ${earner ? "lg:pl-[49px] lg:pr-[44px]" : ""}`}>
       <div className="space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-1">
@@ -152,6 +167,9 @@ export default async function AgentsPage() {
       </div>
 
       {!tenantId ? (
+        <div className="space-y-4">
+        {/* Earn (#earn-drafts): someone who came to earn starts here, before any workspace. */}
+        {balance ? <EarnMoney balance={balance} /> : null}
         <div className={`${agentsSurface} border-dashed p-6 text-sm text-zk-text2`}>
           <p>
             You aren&apos;t in a workspace yet, so you can&apos;t register agents. Join a workspace via an invite from your team, or create your own workspace to start managing agents.
@@ -162,13 +180,18 @@ export default async function AgentsPage() {
             </Link>
           </div>
         </div>
+        </div>
       ) : (
         <section aria-labelledby="mine-heading" className="space-y-3">
           <h2 id="mine-heading" className="sr-only">
             Your agents
           </h2>
           {mine.length === 0 ? (
-            <FirstAgentEmptyState />
+            <>
+              {/* Earn (#earn-drafts): someone with no agent yet still sees their money and tasks. */}
+              {balance ? <EarnMoney balance={balance} /> : null}
+              <FirstAgentEmptyState />
+            </>
           ) : (
             <ManageAgentsList
               agents={manageItems}
@@ -178,6 +201,8 @@ export default async function AgentsPage() {
               projects={projects}
               now={now.toISOString()}
               canSetBurst={isAdmin}
+              beside={balance ? <EarnMoney balance={balance} /> : undefined}
+              activity={earnActivity}
             />
           )}
         </section>

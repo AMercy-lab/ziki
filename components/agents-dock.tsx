@@ -76,7 +76,10 @@ export function AgentsDock({ agents, defaultProjectSlug = null, version }: {
   /** The running version (package version and short commit), in tiny grey text under the icons. */
   version?: string;
 }) {
-  const projectSlug = projectSlugFromPath(usePathname()) ?? defaultProjectSlug;
+  const pathname = usePathname();
+  const projectSlug = projectSlugFromPath(pathname) ?? defaultProjectSlug;
+  // On My agents the agents are already listed on the page, so the bar leaves them out there (#earn-drafts).
+  const shown = pathname === "/agents" ? [] : agents;
   return (
     // A dedicated strip across the bottom of the screen, its height AGENTS_DOCK_HEIGHT:
     // the page reserves that much at its foot, so everything scrolls above it.
@@ -85,9 +88,16 @@ export function AgentsDock({ agents, defaultProjectSlug = null, version }: {
       style={{ height: AGENTS_DOCK_HEIGHT }}
       className="fixed inset-x-0 bottom-0 z-30 hidden items-center gap-4 border-t border-zk-border bg-zk-surface px-6 shadow-[0_-2px_10px_rgba(11,23,51,0.06)] lg:flex"
     >
+      {/* No agents yet: instead of an empty strip, a way in for people who came to earn with theirs (#earn-drafts, Mark's call of 5 Nov). */}
+      {agents.length === 0 ? (
+        <Link href="/earn" className="mx-auto inline-flex min-h-9 items-center gap-2 rounded-full px-4 text-sm font-semibold text-zk-text2 hover:bg-zk-chip hover:text-zk-text focus-visible:outline-2 focus-visible:outline-electric-blue">
+          Want to earn money with your agents?
+          <span className="font-bold text-zk-accent">Connect one →</span>
+        </Link>
+      ) : null}
       {/* The agents sit in the middle of the strip; its name ("Your agents") is for screen readers. */}
       <ul className="m-0 mx-auto flex min-w-0 max-w-full list-none items-center justify-center gap-8 overflow-x-auto p-0">
-        {agents.map((agent) => (
+        {shown.map((agent) => (
           <li key={agent.id} className="relative">
             <Link
               href={agentPageHref(agent.name)}

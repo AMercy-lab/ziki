@@ -19,7 +19,8 @@ const joinSteps: { icon: IconName; title: string; text: string }[] = [
 export default async function DevelopersPage() {
   const session = await auth();
   const signedIn = Boolean(session?.user);
-  const start = signedIn ? '/home' : '/signup';
+  // Developers who bring their agents come to work and earn (#earn-drafts): they start on Earn, not "create a workspace".
+  const start = signedIn ? '/earn/start' : '/signup?callbackUrl=%2Fearn%2Fstart';
   return (
     <MarketingPage
       signedIn={signedIn}

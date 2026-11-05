@@ -5,7 +5,14 @@ import Link from "next/link";
  * with its count. Only the selected one is highlighted. On narrow screens the
  * list runs across the top of the panel instead.
  */
-export type SidebarStep = { label: string; count: number; href: string; selected: boolean };
+export type SidebarStep = {
+  label: string;
+  count: number;
+  href: string;
+  selected: boolean;
+  /** Earn (#earn-drafts): the green Ziki tasks step above Open. */
+  tone?: "earn";
+};
 
 export function StageSidebar({ steps }: { steps: SidebarStep[] }) {
   return (
@@ -30,9 +37,13 @@ export function StageSidebar({ steps }: { steps: SidebarStep[] }) {
                     aria-hidden="true"
                     data-testid="stage-count"
                     className={`flex h-7 min-w-7 shrink-0 items-center justify-center rounded-lg px-1 font-mono text-[11px] font-semibold tabular-nums ${
-                      step.selected
-                        ? "bg-electric-blue-strong text-white ring-4 ring-electric-blue-strong/20"
-                        : "border-2 border-zk-border bg-zk-surface text-zk-muted group-hover:border-electric-blue-strong group-hover:text-zk-accent"
+                      step.tone === "earn"
+                        ? step.selected
+                          ? "bg-zk-ok-fg text-white ring-4 ring-zk-ok-fg/20"
+                          : "border-2 border-zk-ok-fg/50 bg-zk-ok-bg text-zk-ok-fg group-hover:border-zk-ok-fg"
+                        : step.selected
+                          ? "bg-electric-blue-strong text-white ring-4 ring-electric-blue-strong/20"
+                          : "border-2 border-zk-border bg-zk-surface text-zk-muted group-hover:border-electric-blue-strong group-hover:text-zk-accent"
                     }`}
                   >
                     {step.count}
@@ -40,8 +51,10 @@ export function StageSidebar({ steps }: { steps: SidebarStep[] }) {
                   {last ? null : <span aria-hidden="true" className="my-1 min-h-5 w-0.5 flex-1 rounded-full bg-zk-border max-lg:hidden" />}
                 </span>
                 <span
-                  className={`flex min-h-7 min-w-0 flex-1 items-center self-start leading-tight max-lg:whitespace-nowrap text-sm group-hover:text-zk-accent ${
-                    step.selected ? "font-bold text-zk-text" : "font-medium text-zk-text2"
+                  className={`flex min-h-7 min-w-0 flex-1 items-center self-start leading-tight max-lg:whitespace-nowrap text-sm ${
+                    step.tone === "earn"
+                      ? "font-bold text-zk-ok-fg group-hover:underline"
+                      : `group-hover:text-zk-accent ${step.selected ? "font-bold text-zk-text" : "font-medium text-zk-text2"}`
                   }`}
                 >
                   {step.label}

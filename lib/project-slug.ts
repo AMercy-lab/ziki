@@ -24,6 +24,7 @@ export const RESERVED_PROJECT_SLUGS: ReadonlySet<string> = new Set([
   "superadmin",
   "agents",
   "docs",
+  "earn",
   "escalations",
   "inbox",
   "feed",

@@ -21,6 +21,8 @@ import { LocalTime } from "@/components/local-time";
 import { BASE_PATH } from "@/lib/base-path";
 import { PAGE_CONTAINER_CLASS } from "@/components/page-container";
 import { ZikiMark } from "@/components/ziki-mark";
+import { EarnWithdraw } from "@/components/earn-withdraw";
+import type { WithdrawInfo } from "@/lib/earn/draft";
 
 const linkFocus =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue focus-visible:ring-offset-2";
@@ -269,7 +271,13 @@ export function AppHeader({
   reportFormUrl,
   organizationAdmin = false,
   defaultProjectSlug = null,
+  earned = null,
+  withdraw = null,
 }: {
+  /** Earn (#earn-drafts): what the Withdraw window shows; null for everyone else. */
+  withdraw?: WithdrawInfo | null;
+  /** Earn (#earn-drafts): an earner's dollars, shown with Withdraw in the header; null for everyone else. */
+  earned?: number | null;
   /** The first project in the current workspace, for pages whose URL names none yet. */
   defaultProjectSlug?: string | null;
   userName?: string | null;
@@ -325,6 +333,33 @@ export function AppHeader({
             From lg up it keeps shrink-0 so the account controls are never
             squeezed. */}
         <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 max-sm:gap-1 lg:shrink-0">
+          {earned !== null ? (
+            // Earn (#earn-drafts): the balance and Withdraw, in reach from every page (the canvas design).
+            // The amount opens your earnings on My agents; Withdraw opens Withdraw. The button is
+            // blue; on the Withdraw page itself it turns white, since you're already there.
+            <div className="inline-flex h-10 items-center gap-1 rounded-full border border-zk-border bg-zk-surface py-1 pl-1 pr-1 text-zk-text">
+              <Link
+                href="/agents#earn-money"
+                aria-label={`$${earned.toFixed(2)} earned. See your earnings.`}
+                className={`inline-flex h-8 items-center rounded-full px-2.5 text-[14px] font-bold tabular-nums hover:bg-zk-chip ${linkFocus}`}
+              >
+                ${earned.toFixed(2)}
+              </Link>
+              {/* Never locked (Mark's review): below $30 it opens a window with the threshold; at $30 the Withdraw page. */}
+              {withdraw ? (
+                <EarnWithdraw
+                  info={withdraw}
+                  className={`inline-flex h-8 items-center rounded-full px-3 text-[13px] font-semibold ${linkFocus} ${
+                    pathname?.startsWith("/earn/withdraw")
+                      ? "bg-zk-surface text-zk-text ring-1 ring-zk-border"
+                      : "bg-electric-blue-strong text-white hover:bg-[#2552af]"
+                  }`}
+                >
+                  Withdraw
+                </EarnWithdraw>
+              ) : null}
+            </div>
+          ) : null}
 
           <div ref={accountRef} className="relative">
             <button
