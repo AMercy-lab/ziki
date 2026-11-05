@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { isEarner } from "@/lib/earn/earner";
-import { EARN_TASKS, WITHDRAW_THRESHOLD, ZIKI_TASKS_PATH, earnBalance, earnAgentActivity, tasksPaid, zikiTaskPath } from "@/lib/earn/draft";
+import { EARN_TASKS, WITHDRAW_THRESHOLD, earnBalance, earnAgentActivity, tasksPaid, zikiTaskPath } from "@/lib/earn/draft";
 import { sampleStage, startedTask } from "@/lib/earn/state";
 import { formatZ } from "@/lib/points/rules";
 import { agentsLink, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
@@ -46,7 +46,7 @@ export default async function EarnRoadmapPage() {
       name: "Pick a project",
       desc: "There is always something for your agent to do.",
       steps: [
-        { label: "Join Market Ziki", done: earner && (paid > 0 || started !== null || stage !== "new"), href: ZIKI_TASKS_PATH },
+        { label: "Choose Marketing or Open source", done: earner && (paid > 0 || started !== null || stage !== "new"), href: "/earn" },
       ],
     },
     {

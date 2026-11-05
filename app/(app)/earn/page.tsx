@@ -1,10 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { isEarner } from "@/lib/earn/earner";
 import { EarnWaiting } from "@/components/earn-waiting";
-import { SIGNUP_BONUS, WITHDRAW_THRESHOLD, ZIKI_TASKS_PATH, earnAgentActivity } from "@/lib/earn/draft";
-import { sampleStage } from "@/lib/earn/state";
+import { SIGNUP_BONUS, WITHDRAW_THRESHOLD, earnAgentActivity } from "@/lib/earn/draft";
+import { sampleStage, startedTask } from "@/lib/earn/state";
 import { formatZ } from "@/lib/points/rules";
 import { agentsChipClass, agentsLink, agentsPrimaryBtn, agentsSecondaryBtn, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
 
@@ -26,6 +27,9 @@ export default async function EarnPage() {
     ? await prisma.agent.findFirst({ where: { ownerUserId: user.id, revokedAt: null }, orderBy: { createdAt: "asc" }, select: { name: true } }).catch(() => null)
     : null;
   const stage = await sampleStage();
+  // Mark's four pages: this one is only for someone who has just arrived. Once an earner has started
+  // (a task begun or paid), they have a different job: seeing how their agent is doing, on Earnings.
+  if (earner && (stage !== "new" || (await startedTask()) !== null)) redirect("/earn/earnings");
 
   return (
     <div className="mx-auto max-w-4xl space-y-10">
@@ -68,41 +72,38 @@ export default async function EarnPage() {
 
       <section aria-labelledby="projects-heading" className="space-y-4">
         <div className="space-y-1">
-          <h2 id="projects-heading" className="text-2xl font-extrabold tracking-tight text-zk-text">Pick something for it to do</h2>
+          <h2 id="projects-heading" className="text-2xl font-extrabold tracking-tight text-zk-text">What should it work on?</h2>
           <p className="max-w-xl text-sm text-zk-text2">
-            {earner ? "Take one now, or let your agent wait above and we’ll tell you when a project needs it." : "Your agent can’t earn until it has something to do. Connect it, then choose a project, or let it wait here until one needs it."}
+            {earner ? "Pick one. Each has its own page with the tasks your agent can do, and you can switch any time." : "Connect your agent first, then pick one. Each has its own page with the tasks your agent can do."}
           </p>
         </div>
 
-        <div className={`${agentsSurface} divide-y divide-zk-border overflow-hidden`}>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4">
-            <div className="min-w-0 flex-1 basis-64">
-              <p className="flex items-center gap-2">
-                <span className="text-base font-extrabold text-zk-text">Market Ziki</span>
-                <span className={agentsChipClass}>Run by Ziki</span>
-              </p>
-              <p className="mt-0.5 text-sm text-zk-text2">
-                Help people find Ziki: pick who needs it, reach them, post about it. Always open, anyone can join.
-              </p>
-            </div>
-            <p className="basis-56 text-sm text-zk-muted">Paid when it ships. Starter pay is held until someone you reached starts a project.</p>
-            {earner ? (
-              <Link href={ZIKI_TASKS_PATH} className={agentsPrimaryBtn}>Open tasks</Link>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {[
+            { href: "/earn/marketing", title: "Marketing", tag: "Run by Ziki", text: "Help people find Ziki: pick who needs it, reach them, post about it. Always open, anyone can join.", note: "Paid when it ships. Starter pay is held until someone you reached starts a project." },
+            { href: "/earn/open-source", title: "Open source", tag: "Public projects", text: "Fix issues on public projects we support. Everything is visible to everyone.", note: "Paid for each accepted fix." },
+          ].map((choice) => {
+            const body = (
+              <>
+                <span className="flex items-center gap-2">
+                  <span className="text-xl font-extrabold tracking-tight text-zk-text">{choice.title}</span>
+                  <span className={agentsChipClass}>{choice.tag}</span>
+                </span>
+                <span className="mt-1.5 block text-sm leading-relaxed text-zk-text2">{choice.text}</span>
+                <span className="mt-3 block text-xs text-zk-muted">{choice.note}</span>
+                <span className={`mt-4 inline-flex min-h-11 items-center rounded-full px-5 text-sm font-bold ${earner ? "bg-electric-blue-strong text-white" : "bg-zk-seg text-zk-muted"}`}>
+                  {earner ? `Open ${choice.title}` : "Connect your agent first"}
+                </span>
+              </>
+            );
+            return earner ? (
+              <Link key={choice.title} href={choice.href} className={`${agentsSurface} block p-5 transition hover:border-electric-blue/50 hover:shadow-[0_10px_28px_rgba(11,23,51,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue`}>
+                {body}
+              </Link>
             ) : (
-              <span aria-disabled="true" className="inline-flex min-h-11 items-center rounded-full bg-zk-seg px-5 text-sm font-bold text-zk-muted">Connect your agent first</span>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4">
-            <div className="min-w-0 flex-1 basis-64">
-              <p className="flex items-center gap-2">
-                <span className="text-base font-extrabold text-zk-text">Open-source projects</span>
-                <span className={agentsChipClass}>Soon</span>
-              </p>
-              <p className="mt-0.5 text-sm text-zk-text2">Fix issues on public projects we support. Everything is visible to everyone.</p>
-            </div>
-            <p className="basis-56 text-sm text-zk-muted">Paid for each accepted fix.</p>
-            <span aria-disabled="true" className="inline-flex min-h-11 items-center rounded-full bg-zk-seg px-5 text-sm font-bold text-zk-muted">Not open yet</span>
-          </div>
+              <div key={choice.title} className={`${agentsSurface} p-5`}>{body}</div>
+            );
+          })}
         </div>
 
         <p className="max-w-2xl text-sm text-zk-muted">

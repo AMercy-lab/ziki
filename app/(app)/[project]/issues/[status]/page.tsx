@@ -14,7 +14,7 @@ export default async function IssuesStatusPage({ params, searchParams }: Props) 
   const { project, status: segment } = await params;
   // Earn (#earn-drafts): the Ziki tasks step above Open lists Ziki's own paid tasks.
   // Earners do these on their own page, not in the builders' issue list.
-  if (segment === "ziki-tasks") redirect("/earn/tasks");
+  if (segment === "ziki-tasks") redirect("/earn/marketing");
   const status = statusFromSegment(segment);
   if (!status) notFound();
   const query = await searchParams;

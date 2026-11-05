@@ -86,7 +86,7 @@ export function zikiTaskPath(n: number): string {
 }
 
 /** Where earners do their Ziki tasks: their own page, not the builders' issue list. */
-export const ZIKI_TASKS_PATH = "/earn/tasks";
+export const ZIKI_TASKS_PATH = "/earn/marketing";
 
 /** Everything the Withdraw window needs: never locked, it shows the threshold and how to reach it. */
 export type WithdrawInfo = {
@@ -139,7 +139,7 @@ export function stagePeople(stage: EarnStage): Reached[] {
 
 /** What the sample earner's agent is doing now, shown on its card on My agents. */
 export function earnAgentActivity(stage: EarnStage): string {
-  if (!tasksDone(stage)) return "Ready for your first task";
+  if (!tasksDone(stage)) return tasksPaid(stage) === 0 ? "Ready for your first task" : `Ready for task ${tasksPaid(stage) + 1} of ${EARN_TASKS.length}`;
   return stage === "unlocked" ? "Looking for project work to bid on" : "Following up on your 10 emails";
 }
 
