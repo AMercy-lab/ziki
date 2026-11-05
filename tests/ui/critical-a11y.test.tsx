@@ -105,7 +105,6 @@ describe("component accessibility (axe)", () => {
     const { container } = render(
       <CreateBugForm projectSlug="acme"
         users={users}
-        categories={[{ id: "c1", name: "macOS" }]}
         types={[{ id: "t1", name: "Bug" }]}
         isAdmin
       />,
@@ -117,7 +116,6 @@ describe("component accessibility (axe)", () => {
     const { container } = render(
       <CreateBugForm projectSlug="acme"
         users={users}
-        categories={[{ id: "c1", name: "macOS" }]}
         types={[{ id: "t1", name: "Bug" }]}
         isAdmin={false}
         currentUserId="u1"

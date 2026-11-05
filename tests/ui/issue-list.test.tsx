@@ -41,11 +41,6 @@ vi.mock("@/lib/project-route", () => ({
 vi.mock("@/lib/tenant-access", () => ({ currentTenantAccess: vi.fn(async () => ({ membershipRole: "member" })) }));
 vi.mock("@/lib/lookups", () => ({
   getIssueTypes: vi.fn(async () => []),
-  getPlatforms: vi.fn(async () => [
-    { id: "cat-web", name: "Web", isActive: true },
-    { id: "cat-mobile", name: "Mobile", isActive: true },
-    { id: "cat-old", name: "Desktop", isActive: false },
-  ]),
 }));
 vi.mock("@/lib/tenant-context", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/tenant-context")>()),
@@ -112,7 +107,6 @@ const BUG = {
   type: null,
   reporter: { name: "Rita Reporter", role: "user", image: null },
   assignee: { name: "Bob Builder", role: "user", image: null },
-  category: { id: "cat-web", name: "Web" },
   area: null,
   project: { slug: "acme" },
   votes: [],
@@ -131,7 +125,6 @@ const IDEA = {
   archivedAt: null,
   verdicts: [],
   reporter: { name: "Rita Reporter" },
-  category: { name: "Web" },
   _count: { verdicts: 3 },
 };
 
@@ -195,14 +188,14 @@ describe("issue list layout", () => {
   });
 
   it("keeps search and scope when switching status, and resets paging and intake", async () => {
-    const html = await renderList({ q: "login", platform: "cat-web", mine: "assigned", stage: "reported", page: "2", status: "open" });
+    const html = await renderList({ q: "login", mine: "assigned", stage: "reported", page: "2", status: "open" });
     const list = statusList(html);
     // #project-urls: the status is the path, the rest stays in the query.
-    expect(list).toContain('href="/acme/issues/in-progress?q=login&amp;platform=cat-web&amp;mine=assigned"');
+    expect(list).toContain('href="/acme/issues/in-progress?q=login&amp;mine=assigned"');
     expect(list).not.toContain("page=");
     expect(list).not.toContain("stage=");
     const statusCount = groupBy.mock.calls.find(([args]) => args?.by?.[0] === "status");
-    expect(statusCount?.[0].where).toMatchObject({ tenantId: "tenant-acme", projectId: "project-acme", categoryId: "cat-web" });
+    expect(statusCount?.[0].where).toMatchObject({ tenantId: "tenant-acme", projectId: "project-acme" });
     expect(statusCount?.[0].where).not.toHaveProperty("status");
   });
 
@@ -243,12 +236,70 @@ describe("issue list layout", () => {
           { status: "closed", _count: { _all: 3 } },
         ]) as never);
     const html = await renderList({ status: "open" });
-    // Ideas: new ideas + rejected ideas. In Progress: Open, In progress, Closed. Delivered: Done, Merge, Live.
-    // Possibly delivered is a list inside Open, so In Progress's total doesn't count it again.
-    expect(counted(stages(html))).toEqual({ Ideas: 8, "In Progress": 18, Delivered: 15 });
+    // Your Work: the issues assigned to you. Ideas: new ideas + rejected ideas. In Progress: Open, In progress,
+    // Closed. Delivered: Done, Merge. Live: its own stage. Possibly delivered is a list inside Open, so In
+    // Progress's total doesn't count it again.
+    expect(counted(stages(html))).toEqual({ "Your Work": 1, Ideas: 8, "In Progress": 18, Delivered: 8, Live: 7 });
     expect(counted(statusList(html))).toEqual({ Open: 13, "In progress": 2, Closed: 3, "Possibly delivered": 1 });
   });
 
+  it("shows Your Work only while something is assigned to you, and Live only once something went live", async () => {
+    groupBy.mockImplementation((async (args: { by: string[] }) =>
+      args.by[0] !== "status" ? [] : [{ status: "open", _count: { _all: 4 } }, { status: "done", _count: { _all: 2 } }]) as never);
+    count.mockResolvedValue(0);
+    const html = await renderList({ status: "open" });
+    expect(Object.keys(counted(stages(html)))).toEqual(["Ideas", "In Progress", "Delivered"]);
+  });
+
+});
+
+/** The agents dock's settings (#agents-dock): saved per browser, and the dock still works when they can't be. */
+describe("agents dock settings", () => {
+  function fakeStorage(saved: string | null, blocked = false) {
+    const store = new Map(saved === null ? [] : [["ziki-agents-dock", saved]]);
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => { if (blocked) throw new Error("blocked"); return store.get(key) ?? null; },
+      setItem: (key: string, value: string) => { if (blocked) throw new Error("blocked"); store.set(key, value); },
+    });
+    return store;
+  }
+  /** A fresh copy of the module, as after a page load: it keeps what it read in memory. */
+  async function load() {
+    vi.resetModules();
+    return import("@/components/agents-dock-prefs");
+  }
+
+  it("starts with the face and the bar closing when the cursor leaves", async () => {
+    fakeStorage(null);
+    const { readPrefs, lookFor } = await load();
+    expect(readPrefs().closeOnLeave).toBe(true);
+    expect(lookFor(readPrefs(), "agent-1")).toBe("face");
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the checkbox's choice across a page load, and ignores anything it can't read", async () => {
+    const store = fakeStorage(null);
+    (await load()).writePrefs({ closeOnLeave: false });
+    expect(JSON.parse(store.get("ziki-agents-dock")!).closeOnLeave).toBe(false);
+    expect((await load()).readPrefs().closeOnLeave).toBe(false);
+    fakeStorage(JSON.stringify({ closeOnLeave: "no", pinned: 1, looks: { a: "nonsense", b: "pixel" } }));
+    const junk = (await load()).readPrefs();
+    expect(junk).toMatchObject({ closeOnLeave: true, pinned: true, looks: { b: "pixel" } });
+    expect(junk.looks.a).toBeUndefined();
+    fakeStorage("not json");
+    expect((await load()).readPrefs().closeOnLeave).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("still works when the browser blocks storage: the choice holds until the page reloads", async () => {
+    fakeStorage(null, true);
+    const { readPrefs, writePrefs } = await load();
+    expect(readPrefs().closeOnLeave).toBe(true);
+    writePrefs({ closeOnLeave: false });
+    expect(readPrefs().closeOnLeave).toBe(false);
+    expect((await load()).readPrefs().closeOnLeave).toBe(true);
+    vi.unstubAllGlobals();
+  });
 });
 
 /** Your call (#your-call): how urgent an issue the agents split on is, and why. */

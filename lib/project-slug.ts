@@ -22,8 +22,10 @@ export const RESERVED_PROJECT_SLUGS: ReadonlySet<string> = new Set([
   // app/(app)/
   "activity",
   "superadmin",
+  "agent",
   "agents",
   "docs",
+  "earn",
   "escalations",
   "inbox",
   "feed",
@@ -64,6 +66,7 @@ export const RESERVED_PROJECT_SLUGS: ReadonlySet<string> = new Set([
   "opengraph-image",
   "robots",
   "sitemap",
+  "sitemaps",
   "twitter-image",
   // Redirects in next.config.ts and middleware.ts
   "bug-tracker",

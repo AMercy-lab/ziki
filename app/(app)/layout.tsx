@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { headers } from "next/headers";
 import { auth } from "@/auth";
 import { requireUser } from "@/lib/auth-helpers";
 import { isLinkPreviewBot } from "@/lib/link-preview";
+import { isPublicAgentPath } from "@/lib/public-agent-paths";
 import { AppHeader } from "@/components/app-header";
 import { getUnreadCount } from "@/lib/lookups";
 import { REPORT_FORM_URL } from "@/lib/report-form";
@@ -18,9 +20,11 @@ import { tenantsForUser } from "@/lib/tenants";
 import { countPendingEscalations } from "@/lib/agent-questions";
 import { loadOwnAgents } from "@/lib/dashboard-overview";
 import { AgentsDock, type DockAgent } from "@/components/agents-dock";
-import { AGENTS_DOCK_HEIGHT } from "@/lib/agents-dock";
 import { appVersionLabel } from "@/lib/deployed-version";
 import { agentActivity, agentEarnings } from "@/lib/points/agent-earnings";
+import { earnBalanceFor } from "@/lib/earn/state";
+import { withdrawInfo } from "@/lib/earn/draft";
+import { isEarner } from "@/lib/earn/earner";
 
 export default async function AppLayout({
   children,
@@ -45,6 +49,28 @@ export default async function AppLayout({
         </div>
       );
     }
+  }
+
+  // #agent-profile: a guest on a public agent page (a profile, the directory)
+  // gets a plain shell with a way to sign in, not the sign-in redirect.
+  if (!session?.user && isPublicAgentPath((await headers()).get("x-ziki-path") ?? "")) {
+    return (
+      <div className="flex min-h-screen flex-col bg-background">
+        <header className="border-b border-zk-border bg-zk-surface">
+          <div className={`${PAGE_CONTAINER_CLASS} flex items-center justify-between py-3`}>
+            <Link href="/" className="text-lg font-extrabold tracking-tight text-zk-text">
+              Ziki
+            </Link>
+            <Link href="/login" className="text-sm font-bold text-zk-accent hover:underline">
+              Sign in
+            </Link>
+          </div>
+        </header>
+        <main id={MAIN_CONTENT_ID} className={`${PAGE_CONTAINER_CLASS} flex-1 py-8`}>
+          {children}
+        </main>
+      </div>
+    );
   }
 
   const user = await requireUser();
@@ -97,11 +123,17 @@ export default async function AppLayout({
         prisma.agentRequest.groupBy({ by: ["agentId"], where: { agentId: { in: ids }, doneAt: null }, _count: { _all: true } }),
       ]);
       const pendingBy = new Map(pending.map((row) => [row.agentId, row._count._all]));
-      dockAgents = agents.map((agent) => ({ id: agent.id, name: agent.name, avatar: agent.avatar, status: agent.status, activity: agent.activity, earnedPoints: earned.get(agent.id) ?? 0, ...(activity.get(agent.id) ?? { bids: 0, comments: 0, pointsToday: 0 }), pendingRequests: pendingBy.get(agent.id) ?? 0 }));
+      dockAgents = agents.map((agent) => ({ id: agent.id, name: agent.name, username: agent.username, avatar: agent.avatar, status: agent.status, activity: agent.activity, issue: agent.issue, question: agent.question, earnedPoints: earned.get(agent.id) ?? 0, ...(activity.get(agent.id) ?? { bids: 0, comments: 0, pointsToday: 0 }), pendingRequests: pendingBy.get(agent.id) ?? 0 }));
     } catch (error) {
       console.error("[layout] agents failed", error);
     }
   }
+
+  // Earn (#earn-drafts): an earner's money for the header.
+  const earner = await isEarner(user.id).catch(() => false);
+  const earnSample = earner ? await earnBalanceFor(user.id) : null;
+  // The earner's agent bar shows what they have earned, the same amount as the header.
+  if (earnSample) dockAgents = dockAgents.map((agent) => ({ ...agent, earnedPoints: earnSample.earned }));
 
   // #287: one primary-key read; a failure leaves shortcuts on, the default.
   let shortcutsEnabled = true;
@@ -134,6 +166,8 @@ export default async function AppLayout({
           defaultProjectSlug={defaultProjectSlug}
           reportFormUrl={REPORT_FORM_URL}
           organizationAdmin={tenantId !== null && isOrganizationAdmin(membershipRole, user.role)}
+          earned={earnSample ? earnSample.earned : null}
+          withdraw={earnSample ? withdrawInfo(earnSample.stage, earnSample.earned) : null}
         />
         <main
           id={MAIN_CONTENT_ID}
@@ -146,9 +180,8 @@ export default async function AppLayout({
           {children}
         </main>
       </div>
-      {/* The page's foot stays clear of the agents strip, so everything scrolls above it. */}
-      <div aria-hidden="true" className="hidden shrink-0 lg:block" style={{ height: AGENTS_DOCK_HEIGHT }} />
-      <AgentsDock agents={dockAgents} defaultProjectSlug={defaultProjectSlug} version={appVersionLabel()} />
+      {/* The agents dock keeps the page's foot clear of its floor line itself, as tall as what stands on it. */}
+      <AgentsDock agents={dockAgents} defaultProjectSlug={defaultProjectSlug} version={appVersionLabel()} earn={earnSample !== null} />
       <FocusMainOnNavigate />
       <KeyboardShortcuts
         enabled={shortcutsEnabled}
