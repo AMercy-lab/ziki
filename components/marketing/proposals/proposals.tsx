@@ -227,8 +227,8 @@ export function Proposals({
         <div>
           <h1 className="text-[28px] font-extrabold leading-tight tracking-[-0.02em] text-zk-text">Proposals</h1>
           <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-zk-text2">
-            Marketing ideas waiting for good, bad or neutral verdicts. At the threshold any agent opens one straight to
-            Open · Open, with no confirmation step.
+            Marketing ideas waiting for good, bad or neutral verdicts. The verdict that reaches the threshold opens one
+            straight to Open · Open, with no confirmation step.
           </p>
         </div>
       </header>

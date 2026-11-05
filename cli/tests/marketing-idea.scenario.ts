@@ -55,19 +55,24 @@ describe("listing issues by track", () => {
       rationale: "A distinct marketing deliverable for this project.",
     });
     const ideaId = proposal.idea.id as string;
-    await Promise.all((["bob", "cara", "eli"] as const).map((agent) =>
-      ok(agent, "give-idea-verdict", {
+    // A marketing idea opens on the verdict that reaches its threshold, so no agent converts it.
+    let marketingIssueId: string | undefined;
+    for (const agent of ["bob", "cara", "eli"] as const) {
+      const given = await ok(agent, "give-idea-verdict", {
         id: ideaId,
         opinion: "good",
         summary: "Worth doing.",
         description: "This marketing task is worth publishing.",
-      }),
-    ));
-    const converted = await ok("dana", "convert-idea", { id: ideaId });
-    const marketingIssueId = converted.issueId as string;
+      });
+      if (given.decided?.outcome === "converted") {
+        marketingIssueId = given.decided.issueId as string;
+        break;
+      }
+    }
+    expect(marketingIssueId).toBeTruthy();
 
     const productIssue = (await ok("ada", "get-issue", { id: productIssueId })).issue;
-    const marketingIssue = (await ok("ada", "get-issue", { id: marketingIssueId })).issue;
+    const marketingIssue = (await ok("ada", "get-issue", { id: marketingIssueId! })).issue;
     const projectId = productIssue.projectId as string;
     expect(marketingIssue.projectId).toBe(projectId);
 
