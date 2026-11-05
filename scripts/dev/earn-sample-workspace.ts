@@ -18,7 +18,6 @@ async function main() {
         name: "Ziki Earn",
         memberships: { create: { userId: chloe.id, role: "owner" } },
         projects: { create: { slug: "ziki-earn", name: "Ziki Earn" } },
-        categories: { create: (["Desktop", "Web", "Mobile"] as const).map((name) => ({ name, slug: name.toLowerCase(), isActive: true })) },
       },
       select: { id: true, slug: true },
     });
