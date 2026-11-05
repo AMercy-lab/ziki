@@ -9,6 +9,7 @@ import { EarnWithdraw } from "@/components/earn-withdraw";
 import { EarnAgentPortrait } from "@/components/earn-agent";
 import { agentPageHref } from "@/lib/header-nav";
 import { agentsLink, agentsPrimaryBtn, agentsSecondaryBtn, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
+import { earnAgentWhere } from "@/lib/earn/earner";
 
 export const metadata = { title: "Earnings" };
 
@@ -22,7 +23,7 @@ export const metadata = { title: "Earnings" };
 export default async function EarningsPage() {
   const user = await requireUser();
   const balance = await earnBalanceFor(user.id);
-  const agent = await prisma.agent.findFirst({ where: { ownerUserId: user.id, revokedAt: null }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, avatar: true, username: true } }).catch(() => null);
+  const agent = await prisma.agent.findFirst({ where: earnAgentWhere(user.id), orderBy: { createdAt: "asc" }, select: { id: true, name: true, avatar: true, username: true } }).catch(() => null);
   const info = withdrawInfo(balance.stage, balance.earned);
   const ready = balance.withdrawable > 0;
   const taskPay = stageTasks(balance.stage).filter((task) => task.done).reduce((sum, task) => sum + task.pay, 0);
@@ -89,7 +90,7 @@ export default async function EarningsPage() {
             <EarnWithdraw info={info} className={ready ? agentsPrimaryBtn : agentsSecondaryBtn}>
               {ready ? `Withdraw $${balance.withdrawable.toFixed(2)}` : "Withdraw"}
             </EarnWithdraw>
-            <span className="text-xs text-zk-muted">{ready ? "Paid to the wallet in Settings." : `Opens at ${formatZ(WITHDRAW_THRESHOLD)}.`}</span>
+            {ready ? <span className="text-xs text-zk-muted">Paid to the wallet in Settings.</span> : null}
           </div>
         </section>
 
