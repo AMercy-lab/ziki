@@ -94,6 +94,16 @@ describe("Library approved deliverables", () => {
     expect(screen.queryByRole("button", { name: /Download/ })).not.toBeInTheDocument();
   });
 
+  it("keeps everything typed in search while the URL catches up", async () => {
+    const user = userEvent.setup();
+    render(<Library slug="demo" projectName="Demo" initial={{ ok: true, items }} />);
+    const search = screen.getByRole("searchbox", { name: "Search approved work" });
+    await user.type(search, "workflow");
+    expect(search).toHaveValue("workflow");
+    expect(new URLSearchParams(window.location.search).get("q")).toBe("workflow");
+    expect(screen.queryByRole("button", { name: /Launch campaign.*Task #42/ })).not.toBeInTheDocument();
+  });
+
   it("retries only a failed preview and keeps task access available", async () => {
     const user = userEvent.setup();
     render(<Library slug="demo" projectName="Demo" initial={{ ok: true, items }} />);
