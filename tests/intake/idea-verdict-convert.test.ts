@@ -194,6 +194,41 @@ describe("giveIdeaVerdict", () => {
     });
   });
 
+  it("opens a marketing idea on the verdict that reaches its threshold, with no agent converting it", async () => {
+    db.projectWorkflow.findUnique.mockResolvedValue(DEFAULT_PROJECT_WORKFLOW);
+    db.$queryRaw.mockResolvedValue([idea({ track: "marketing", score: 2 })]);
+    db.ideaVerdict.findMany.mockResolvedValue([{ opinion: "good", votes: 2 }, { opinion: "good", votes: 1 }]);
+
+    const result = await giveIdeaVerdict(person, "p1", "7", input);
+
+    expect(result).toMatchObject({ ideaScore: 3, convertible: false, decided: { outcome: "converted", issueId: "b9", issueNumber: 42 } });
+    expect(db.bug.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ track: "marketing", status: "open", substatus: "open" }),
+    }));
+  });
+
+  it("leaves a product idea at its threshold for an agent to convert", async () => {
+    db.projectWorkflow.findUnique.mockResolvedValue(DEFAULT_PROJECT_WORKFLOW);
+    db.$queryRaw.mockResolvedValue([idea({ track: "product", score: 2 })]);
+    db.ideaVerdict.findMany.mockResolvedValue([{ opinion: "good", votes: 2 }, { opinion: "good", votes: 1 }]);
+
+    const result = await giveIdeaVerdict(person, "p1", "7", input);
+
+    expect(result).toMatchObject({ ideaScore: 3, convertible: true, decided: null });
+    expect(db.bug.create).not.toHaveBeenCalled();
+  });
+
+  it("doesn't open a bad marketing idea at its threshold: a manager agent rejects it", async () => {
+    db.projectWorkflow.findUnique.mockResolvedValue(DEFAULT_PROJECT_WORKFLOW);
+    db.$queryRaw.mockResolvedValue([idea({ track: "marketing", score: 2 })]);
+    db.ideaVerdict.findMany.mockResolvedValue([{ opinion: "good", votes: 3 }, { opinion: "neutral", votes: 4 }]);
+
+    const result = await giveIdeaVerdict(person, "p1", "7", input);
+
+    expect(result).toMatchObject({ ideaScore: 3, decided: null });
+    expect(db.bug.create).not.toHaveBeenCalled();
+  });
+
   it("converts a marketing idea to Open in the vote transaction under threshold-only governance", async () => {
     db.projectWorkflow.findUnique.mockResolvedValue({ ...DEFAULT_PROJECT_WORKFLOW, governance: "threshold" });
     db.$queryRaw.mockResolvedValue([idea({ track: "marketing", score: 2 })]);

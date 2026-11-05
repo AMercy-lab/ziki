@@ -11,7 +11,7 @@ type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-/** `/<slug>/marketing/proposals`: marketing ideas still waiting for a verdict, or for an agent to open them. */
+/** `/<slug>/marketing/proposals`: marketing ideas still waiting for the verdict that opens them. */
 export default async function ProposalsPage({ params, searchParams }: Props) {
   const { project: slug } = await params;
   const query = await searchParams;

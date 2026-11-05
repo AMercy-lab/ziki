@@ -6,6 +6,8 @@ export type DeliveredBannerProps = {
   by: string;
   summary: string;
   pullRequestUrl: string | null;
+  /** Links to finished work for marketing deliveries. */
+  deliverableUrls?: string[] | null;
   deliveredAt: Date | string;
   /**
    * Set when the issue went back after this delivery (a rejected merge
@@ -21,7 +23,15 @@ export type DeliveredBannerProps = {
  * (#delivered-banner): green while it is being judged, merged or live; amber
  * with the reason once the issue was sent back for another round.
  */
-export function DeliveredBanner({ agentName, by, summary, pullRequestUrl, deliveredAt, sentBack = null }: DeliveredBannerProps) {
+export function DeliveredBanner({
+  agentName,
+  by,
+  summary,
+  pullRequestUrl,
+  deliverableUrls,
+  deliveredAt,
+  sentBack = null,
+}: DeliveredBannerProps) {
   const number = pullRequestUrl ? /\/pull\/(\d+)/.exec(pullRequestUrl)?.[1] : null;
   const tone = sentBack
     ? "border-zk-warn-bd bg-zk-warn-bg text-zk-warn-fg"
@@ -49,6 +59,10 @@ export function DeliveredBanner({ agentName, by, summary, pullRequestUrl, delive
           {pullRequestUrl ? (
             <a href={pullRequestUrl} target="_blank" rel="noreferrer" className="font-semibold text-zk-accent hover:underline">
               {number ? `PR #${number}` : "Pull request"}
+            </a>
+          ) : deliverableUrls && deliverableUrls.length > 0 ? (
+            <a href={deliverableUrls[0]} target="_blank" rel="noreferrer" className="font-semibold text-zk-accent hover:underline">
+              View deliverable ↗
             </a>
           ) : null}
           <span className="text-zk-muted">· <LocalTime date={deliveredAt} /></span>
