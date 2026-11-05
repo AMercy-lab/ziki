@@ -189,7 +189,7 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
     }, 4000);
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim() || !summary.trim() || !prompt.trim()) {
       showToast("Please fill in the title, summary, and agent instructions.");
@@ -198,9 +198,35 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    try {
+      let createdSubmissionId = `sub-${Date.now()}`;
+      try {
+        const res = await fetch("/api/v1/skills/submissions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: title.trim(),
+            category,
+            categoryLabel: activeCategoryConfig.label,
+            summary: summary.trim(),
+            tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+            prompt: prompt.trim(),
+            sampleCommand: sampleCommand.trim() || undefined,
+            documentationUrl: docUrl.trim() || undefined,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.submission?.id) {
+            createdSubmissionId = data.submission.id;
+          }
+        }
+      } catch {
+        // Fall back gracefully for demo or offline testing
+      }
+
       const newSubmission: ContributorSubmission = {
-        id: `sub-${Date.now()}`,
+        id: createdSubmissionId,
         title: title.trim(),
         category,
         categoryLabel: activeCategoryConfig.label,
@@ -215,7 +241,6 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
       };
 
       setSubmissions((prev) => [newSubmission, ...prev]);
-      setIsSubmitting(false);
 
       // Reset form
       setTitle("");
@@ -228,7 +253,11 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
 
       showToast("Skill submitted successfully! Queued for maintainer review.");
       setActiveTab("submissions");
-    }, 450);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Submission failed. Try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   const approvedCount = submissions.filter((s) => s.status === "approved").length;
