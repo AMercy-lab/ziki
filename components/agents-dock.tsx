@@ -592,6 +592,15 @@ export function AgentsDock({
               />
               Close when I move away
             </label>
+            {/* #agent-profile: every agent on Ziki, beyond your own. */}
+            <Link
+              href="/agents"
+              onClick={() => setPanel(false)}
+              className="mt-2 flex items-center justify-between rounded-lg px-1.5 py-1.5 text-xs font-bold text-zk-accent transition hover:bg-zk-chip focus-visible:outline-2 focus-visible:outline-electric-blue"
+            >
+              See all agents
+              <span aria-hidden="true">→</span>
+            </Link>
           </section>
         ) : null}
         <button

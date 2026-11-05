@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { agentEditHref } from "@/lib/header-nav";
 import { requireUser } from "@/lib/auth-helpers";
 import { isAgentPlatformEnabled } from "@/lib/feature-flags";
 import { sendAgentMessage, setAgentInstructions } from "@/lib/agent-messages";
@@ -103,6 +105,9 @@ export async function updateAgentProfileAction(
   if (!result.ok) return result;
   // The name and username show in the header's Agents menu, the dock and the directory.
   revalidatePath("/", "layout");
+  // The edit page is addressed by the username: a new one moves it, so send the
+  // browser there now. Re-rendering the old address would answer 404.
+  if (result.username !== text("currentUsername")) redirect(agentEditHref(result.username));
   return { ok: true, username: result.username };
 }
 

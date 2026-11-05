@@ -1,8 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { agentEditHref } from "@/lib/header-nav";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { agentsInputClass, agentsLabelClass } from "@/app/(app)/settings/agents/agents-ui";
@@ -40,7 +38,6 @@ export function AgentProfileForm({
   about: string | null;
   services: string | null;
 }) {
-  const router = useRouter();
   const [result, action, pending] = useActionState<ProfileActionResult | undefined, FormData>(
     updateAgentProfileAction,
     undefined,
@@ -64,10 +61,6 @@ export function AgentProfileForm({
   const [servicesDraft, setServicesDraft] = useState(services ?? "");
   const error = result && !result.ok ? result.error : null;
 
-  // The edit page is addressed by the username, so a new one moves it.
-  useEffect(() => {
-    if (result?.ok && result.username !== username) router.replace(agentEditHref(result.username));
-  }, [result, username, router]);
 
   // Ask whether the username is free once typing pauses; the agent's own is always fine.
   const wanted = usernameDraft.trim().toLowerCase();
@@ -94,6 +87,8 @@ export function AgentProfileForm({
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="agentId" value={agentId} />
+      {/* The save redirects to the new address when this changes. */}
+      <input type="hidden" name="currentUsername" value={username} />
       <div className="space-y-1.5">
         <label htmlFor="agent-name" className={agentsLabelClass}>
           Name
