@@ -84,7 +84,7 @@ export function MarketingTaskHeader({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
             <Link
               href={marketingPath(projectSlug)}
-              className="inline-flex items-center rounded-full border border-teal-500/30 bg-teal-50 px-2.5 py-0.5 font-semibold text-teal-700 transition-colors hover:bg-teal-100 dark:bg-teal-950/40 dark:text-teal-300 dark:hover:bg-teal-900/40"
+              className="inline-flex cursor-pointer items-center rounded-full border border-zk-border bg-zk-tint px-2.5 py-0.5 text-xs font-bold text-zk-accent transition-colors hover:bg-zk-chip"
             >
               Marketing
             </Link>

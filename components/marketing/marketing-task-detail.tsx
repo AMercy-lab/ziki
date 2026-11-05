@@ -154,7 +154,7 @@ export function MarketingTaskDetail({
             <AwardBox hold={hold} />
           ) : null}
 
-          {/* Tabbed Pipeline: Deliverables, Reviews, Bids, Discussion */}
+          {/* Tabbed Pipeline: Bids & Award, Discussion, Peer Reviews, Deliverables */}
           <div className="flex flex-col gap-3">
             <div className="flex overflow-x-auto pb-1">
               <div
@@ -165,61 +165,11 @@ export function MarketingTaskDetail({
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={activeTab === "deliverables"}
-                  aria-controls="panel-deliverables"
-                  id="tab-deliverables"
-                  onClick={() => setActiveTab("deliverables")}
-                  className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 font-semibold transition-all ${
-                    activeTab === "deliverables"
-                      ? "bg-zk-surface text-zk-text shadow-sm"
-                      : "text-zk-muted hover:text-zk-text"
-                  }`}
-                >
-                  <span>Deliverables</span>
-                  <span
-                    className={`rounded-full px-1.5 py-0.5 font-mono text-[11px] ${
-                      activeTab === "deliverables"
-                        ? "bg-teal-500/15 font-bold text-teal-700 dark:text-teal-300"
-                        : "bg-zk-chip text-zk-muted"
-                    }`}
-                  >
-                    {deliveries.length}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "reviews"}
-                  aria-controls="panel-reviews"
-                  id="tab-reviews"
-                  onClick={() => setActiveTab("reviews")}
-                  className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 font-semibold transition-all ${
-                    activeTab === "reviews"
-                      ? "bg-zk-surface text-zk-text shadow-sm"
-                      : "text-zk-muted hover:text-zk-text"
-                  }`}
-                >
-                  <span>Peer Reviews</span>
-                  <span
-                    className={`rounded-full px-1.5 py-0.5 font-mono text-[11px] ${
-                      activeTab === "reviews"
-                        ? "bg-teal-500/15 font-bold text-teal-700 dark:text-teal-300"
-                        : "bg-zk-chip text-zk-muted"
-                    }`}
-                  >
-                    {reviews.length}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  role="tab"
                   aria-selected={activeTab === "bids"}
                   aria-controls="panel-bids"
                   id="tab-bids"
                   onClick={() => setActiveTab("bids")}
-                  className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 font-semibold transition-all ${
+                  className={`inline-flex cursor-pointer items-center gap-2 rounded-full px-3.5 py-1.5 font-semibold transition-all ${
                     activeTab === "bids"
                       ? "bg-zk-surface text-zk-text shadow-sm"
                       : "text-zk-muted hover:text-zk-text"
@@ -229,7 +179,7 @@ export function MarketingTaskDetail({
                   <span
                     className={`rounded-full px-1.5 py-0.5 font-mono text-[11px] ${
                       activeTab === "bids"
-                        ? "bg-teal-500/15 font-bold text-teal-700 dark:text-teal-300"
+                        ? "bg-zk-tint font-bold text-zk-accent"
                         : "bg-zk-chip text-zk-muted"
                     }`}
                   >
@@ -244,7 +194,7 @@ export function MarketingTaskDetail({
                   aria-controls="panel-discussion"
                   id="tab-discussion"
                   onClick={() => setActiveTab("discussion")}
-                  className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 font-semibold transition-all ${
+                  className={`inline-flex cursor-pointer items-center gap-2 rounded-full px-3.5 py-1.5 font-semibold transition-all ${
                     activeTab === "discussion"
                       ? "bg-zk-surface text-zk-text shadow-sm"
                       : "text-zk-muted hover:text-zk-text"
@@ -254,11 +204,61 @@ export function MarketingTaskDetail({
                   <span
                     className={`rounded-full px-1.5 py-0.5 font-mono text-[11px] ${
                       activeTab === "discussion"
-                        ? "bg-teal-500/15 font-bold text-teal-700 dark:text-teal-300"
+                        ? "bg-zk-tint font-bold text-zk-accent"
                         : "bg-zk-chip text-zk-muted"
                     }`}
                   >
                     {commentsCount}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "reviews"}
+                  aria-controls="panel-reviews"
+                  id="tab-reviews"
+                  onClick={() => setActiveTab("reviews")}
+                  className={`inline-flex cursor-pointer items-center gap-2 rounded-full px-3.5 py-1.5 font-semibold transition-all ${
+                    activeTab === "reviews"
+                      ? "bg-zk-surface text-zk-text shadow-sm"
+                      : "text-zk-muted hover:text-zk-text"
+                  }`}
+                >
+                  <span>Peer Reviews</span>
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 font-mono text-[11px] ${
+                      activeTab === "reviews"
+                        ? "bg-zk-tint font-bold text-zk-accent"
+                        : "bg-zk-chip text-zk-muted"
+                    }`}
+                  >
+                    {reviews.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "deliverables"}
+                  aria-controls="panel-deliverables"
+                  id="tab-deliverables"
+                  onClick={() => setActiveTab("deliverables")}
+                  className={`inline-flex cursor-pointer items-center gap-2 rounded-full px-3.5 py-1.5 font-semibold transition-all ${
+                    activeTab === "deliverables"
+                      ? "bg-zk-surface text-zk-text shadow-sm"
+                      : "text-zk-muted hover:text-zk-text"
+                  }`}
+                >
+                  <span>Deliverables</span>
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 font-mono text-[11px] ${
+                      activeTab === "deliverables"
+                        ? "bg-zk-tint font-bold text-zk-accent"
+                        : "bg-zk-chip text-zk-muted"
+                    }`}
+                  >
+                    {deliveries.length}
                   </span>
                 </button>
               </div>
@@ -266,38 +266,6 @@ export function MarketingTaskDetail({
 
             {/* Tab Panels Container */}
             <div className="rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-6">
-              {/* Deliverables Panel */}
-              <div
-                role="tabpanel"
-                id="panel-deliverables"
-                aria-labelledby="tab-deliverables"
-                hidden={activeTab !== "deliverables"}
-              >
-                <MarketingDeliverablesPanel
-                  bugId={bug.id}
-                  deliveries={deliveries}
-                  isInProgress={isInProgress}
-                  workerName={workerName}
-                  canReply={canReply}
-                />
-              </div>
-
-              {/* Peer Reviews Panel */}
-              <div
-                role="tabpanel"
-                id="panel-reviews"
-                aria-labelledby="tab-reviews"
-                hidden={activeTab !== "reviews"}
-              >
-                <MarketingReviewsPanel
-                  bugId={bug.id}
-                  reviews={reviews}
-                  revisionCount={bug.revisionCount}
-                  maxRevisions={revisionLimit}
-                  canReply={canReply}
-                />
-              </div>
-
               {/* Bids & Award Panel */}
               <div
                 role="tabpanel"
@@ -337,6 +305,38 @@ export function MarketingTaskDetail({
                     No comments yet.
                   </div>
                 )}
+              </div>
+
+              {/* Peer Reviews Panel */}
+              <div
+                role="tabpanel"
+                id="panel-reviews"
+                aria-labelledby="tab-reviews"
+                hidden={activeTab !== "reviews"}
+              >
+                <MarketingReviewsPanel
+                  bugId={bug.id}
+                  reviews={reviews}
+                  revisionCount={bug.revisionCount}
+                  maxRevisions={revisionLimit}
+                  canReply={canReply}
+                />
+              </div>
+
+              {/* Deliverables Panel */}
+              <div
+                role="tabpanel"
+                id="panel-deliverables"
+                aria-labelledby="tab-deliverables"
+                hidden={activeTab !== "deliverables"}
+              >
+                <MarketingDeliverablesPanel
+                  bugId={bug.id}
+                  deliveries={deliveries}
+                  isInProgress={isInProgress}
+                  workerName={workerName}
+                  canReply={canReply}
+                />
               </div>
             </div>
           </div>
