@@ -5,7 +5,7 @@ import Link from "next/link";
 import { isEarnPath } from "@/lib/earn/paths";
 import { usePathname, useRouter } from "next/navigation";
 import { agentPageHref } from "@/lib/header-nav";
-import { CookieSettingsLink } from "@/components/consent-banner";
+import { VersionCredits } from "@/components/credits-dialog";
 import { projectPath } from "@/lib/project-paths";
 import { isReservedProjectSlug } from "@/lib/project-slug";
 import { AGENTS_DOCK_HEIGHT } from "@/lib/agents-dock";
@@ -694,11 +694,9 @@ function DockLinks({ projectSlug, version, quiet = false }: { projectSlug: strin
           </svg>
         </Link>
       ) : null}
-      <CookieSettingsLink className="text-[9px] leading-none text-zk-muted hover:text-zk-text hover:underline" />
+      {/* The version opens the credits, which hold the cookie settings too. */}
       {version ? (
-        <span className="mr-1 select-all font-mono text-[9px] leading-none text-zk-muted" title="The version running">
-          {version}
-        </span>
+        <VersionCredits version={version} className="mr-1 font-mono text-[9px] leading-none text-zk-muted hover:text-zk-text hover:underline" />
       ) : null}
     </div>
   );

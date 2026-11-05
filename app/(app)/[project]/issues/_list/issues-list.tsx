@@ -22,6 +22,7 @@ import { ToolbarFilterMenu, type ToolbarFilterGroup, type ToolbarFilterOption } 
 import { IdeasMoreFilters } from "@/components/ideas-more-filters";
 import { IDEA_AUTHOR_PARAM, parseIdeaAuthorFilter } from "@/lib/idea-filters";
 import { MY_WORK_PARAM, myWorkWhere, parseMyWorkFilter, yourWorkWhere } from "@/lib/my-work-filter";
+import { WORK_TAG_TONE, whatsNext } from "@/lib/whats-next";
 import { IDEA_SORT_COOKIE, ISSUE_SORT_COOKIE, getIdeaOrderBy, parseIdeaSort } from "@/lib/list-sort";
 import { SortHeader } from "@/components/sort-header";
 import { PROJECT_LINKS_SLOT_ID, ProjectLinks } from "@/components/project-links";
@@ -527,7 +528,7 @@ export async function IssuesList({
         // The claim working on it, or an offer waiting to be accepted.
         claims: {
           where: { status: { in: ["active", "offered"] }, releasedAt: null },
-          select: { status: true, claimedAt: true, createdAt: true, beneficiary: { select: { name: true } } },
+          select: { status: true, claimedAt: true, createdAt: true, deliverBy: true, beneficiaryUserId: true, beneficiary: { select: { name: true } } },
           orderBy: { createdAt: "desc" },
           take: 2,
         },
@@ -557,6 +558,15 @@ export async function IssuesList({
     return issuesQueryError(listed.reference);
   }
   const bugs = listed.bugs;
+  // Your Work: which rows are there because of your bid, for each row's tag.
+  const myBidIds = isYourWorkView && userId && bugs.length
+    ? new Set(
+        (await loadOrEmpty("your bids", () => prisma.issueBid.findMany({
+          where: { beneficiaryUserId: userId, withdrawnAt: null, bugId: { in: bugs.map((b) => b.id) } },
+          select: { bugId: true },
+        }), [])).map((bid) => bid.bugId),
+      )
+    : new Set<string>();
 
   // #idea-table: the Ideas tab's New ideas and Drafted read open ideas from
   // their own table, in the same tenant, project and search scope as the
@@ -629,7 +639,7 @@ export async function IssuesList({
           "your work",
           () =>
             prisma.bug.count({
-              where: { ...bugInTenant(tenantId), ...(projectId && !allProjects ? { projectId } : {}), isDeleted: false, ...duplicatesWhere(showDuplicates), ...yourWorkWhere(userId) },
+              where: { ...bugInTenant(tenantId), ...(projectId && !allProjects ? { projectId } : {}), isDeleted: false, ...duplicatesWhere(showDuplicates), AND: [yourWorkWhere(userId)] },
             }),
           0,
         )
@@ -888,7 +898,12 @@ export async function IssuesList({
 
   const headerContent = (
     <>
-      {gettingStarted ? <GettingStarted {...gettingStarted} /> : null}
+      {/* Your Work is about your own assignments, not setting up the workspace; and on a phone it would cover the list. */}
+      {gettingStarted && !isYourWorkView ? (
+        <div className="max-sm:hidden">
+          <GettingStarted {...gettingStarted} />
+        </div>
+      ) : null}
       {activeProject?.goal ? (
         <section aria-labelledby="project-goal-heading" className="rounded-[20px] border border-zk-border bg-zk-surface px-5 py-4">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -1062,14 +1077,25 @@ export async function IssuesList({
                   <span className="issues-vote w-[76px] shrink-0">
                     <SortHeader label="Reward" current={currentSort} first="reward" second="reward_low" cookie={ISSUE_SORT_COOKIE} />
                   </span>
+                  {/* Your Work: who it's for, between the reward and the issue. */}
+                  {isYourWorkView ? <span className="hidden w-10 shrink-0 lg:block" aria-hidden="true" /> : null}
                   <span className="min-w-0 flex-1">
                     <SortHeader label="Issue" current={currentSort} first="title" second="title_desc" firstDescending={false} cookie={ISSUE_SORT_COOKIE} />
                   </span>
-                  <span className="issues-status-cell justify-center">Bids</span>
-                  <span className="issues-vote-end">
-                    <SortHeader label="Importance" current={currentSort} first="importance" second="least_important" cookie={ISSUE_SORT_COOKIE} />
-                  </span>
-                  <span className="w-10" aria-hidden="true" />
+                  {isYourWorkView ? (
+                    // Your Work: who it's for sits beside the issue, then what happens next. No bids or importance.
+                    <>
+                      <span className="hidden w-[260px] shrink-0 md:block">What&apos;s next?</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="issues-status-cell justify-center">Bids</span>
+                      <span className="issues-vote-end">
+                        <SortHeader label="Importance" current={currentSort} first="importance" second="least_important" cookie={ISSUE_SORT_COOKIE} />
+                      </span>
+                      <span className="w-10" aria-hidden="true" />
+                    </>
+                  )}
                 </div>
                 <ul>
                   {bugs.map((bug, index) => {
@@ -1080,13 +1106,19 @@ export async function IssuesList({
                     const claim = bug.claims?.find((c) => c.status === "active");
                     const offer = bug.claims?.find((c) => c.status === "offered");
                     // Someone is on it: an active claim, or the issue was moved to in progress.
-                    const work = claim || bug.status === "in_progress"
+                    // On Your Work it is you, shown once in its own column, and What's next says the deadline:
+                    // the row shows the plain status instead of who is on it.
+                    const work = !isYourWorkView && (claim || bug.status === "in_progress")
                       ? { person: claim?.beneficiary?.name ?? bug.assignee?.name ?? null, since: claim ? (claim.claimedAt ?? claim.createdAt) : null }
                       : null;
                     // Importance in a list is a number to read, not a button: it is marked on the issue's page.
                     // Green once an Open issue has a bid: someone wants to do it.
                     const hasBids = bug.substatus === "open" && bug._count.bids > 0;
                     const importance = <ImportanceVoteBadge bugId={bug.id} count={bug.voteCount} highlighted={hasBids} votable={false} />;
+                    // Your Work: which kind of your work this is, and the next step (lib/whats-next.ts).
+                    const next = isYourWorkView
+                      ? whatsNext(bug.substatus, (bug.claims ?? []).filter((c) => c.beneficiaryUserId === userId), myBidIds.has(bug.id))
+                      : null;
                     const rowStatus = (
                       <IssueRowStatus substatus={bug.substatus} stage={stage} botConfirmations={confirmationCounts.get(bug.id) ?? 0} work={work}
                         closeReason={bug.closeReason}
@@ -1106,6 +1138,11 @@ export async function IssuesList({
                         <div className="issues-vote w-[76px] shrink-0">
                           <RewardBadge reward={Number(bug.reward)} estimates={bug.rewardEstimateCount} fixed={Boolean(bug.rewardFixedAt)} />
                         </div>
+                        {isYourWorkView ? (
+                          <span className="hidden w-10 shrink-0 items-center lg:flex">
+                            {bug.assignee ? <RowAssignee name={bug.assignee.name} image={bug.assignee.image} /> : null}
+                          </span>
+                        ) : null}
                         <Link
                           href={issueHref(bug)}
                           data-issue-link=""
@@ -1157,11 +1194,31 @@ export async function IssuesList({
                               <RowAge date={currentSort === "newest" ? bug.createdAt : bug.updatedAt} sort={currentSort === "newest" ? "newest" : "updated"} />
                               {/* The status rides at the end of this line; the column beside the title holds the bids. */}
                               <span className="inline-flex min-w-0">{rowStatus}</span>
+                              {/* On a phone the What's next column is hidden: its tag rides here. */}
+                              {next ? <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold md:hidden ${WORK_TAG_TONE[next.tag]}`}>{next.tag}</span> : null}
                             </span>
                             {snippets.has(bug.id) ? <SearchSnippet snippet={snippets.get(bug.id)!} /> : null}
                             {signals.has(bug.id) ? <DeliverySignalsLine signals={signals.get(bug.id)!} /> : null}
                           </span>
                         </Link>
+                        {isYourWorkView ? (
+                          (() => {
+                            if (!next) return null;
+                            return (
+                              <>
+                                <span className="hidden w-[260px] shrink-0 flex-col items-start gap-1 text-xs md:flex">
+                                  {/* Which kind of your work this is, then the next step. */}
+                                  <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-bold ${WORK_TAG_TONE[next.tag]}`}>{next.tag}</span>
+                                  <span className={next.late ? "font-semibold text-zk-bad-fg" : next.yours ? "font-semibold text-zk-text" : "text-zk-muted"}>
+                                    {next.text}
+                                    <span className="sr-only">{next.yours ? " (yours to do)" : " (waiting on others)"}</span>
+                                  </span>
+                                </span>
+                              </>
+                            );
+                          })()
+                        ) : (
+                          <>
                         <span className="issues-status-cell justify-center">
                           <BidsVoteBadge count={bug._count.bids} />
                         </span>
@@ -1185,6 +1242,8 @@ export async function IssuesList({
                             <UnwatchButton bugId={bug.id} label={`${formatIssueNumber(bug.number)} ${bug.title}`} />
                           ) : null}
                         </span>
+                          </>
+                        )}
                       </li>
                     );
                   })}
@@ -1228,7 +1287,7 @@ export async function IssuesList({
     {/* The stages, centred, with Project notes at the right of the same row. The row is as wide
         as the panel below, so the project icons line up with the panel's right edge. */}
     {/* On a phone the icons take their own row above the stages, so they never cover them. */}
-    <div className={`relative mx-auto mb-4 flex min-h-8 w-full items-start justify-center max-sm:flex-col-reverse max-sm:items-stretch max-sm:gap-2 ${isIdeasView ? "max-w-[920px]" : "max-w-6xl"}`}>
+    <div className={`relative mx-auto mb-4 flex min-h-8 w-full items-start justify-center max-sm:mb-3 max-sm:flex-col-reverse max-sm:items-stretch max-sm:gap-1 ${isIdeasView ? "max-w-[920px]" : "max-w-6xl"}`}>
       {!isDeletedView ? (
         <PipelineSteps
           stages={STAGE_GROUPS.flatMap((group, index) => {
