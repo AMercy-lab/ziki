@@ -1,5 +1,4 @@
-import type { Prisma } from "@prisma/client";
-import { TRACKS, type WorkTrack } from "@/lib/marketing/track";
+import type { Prisma, WorkTrack } from "@prisma/client";
 
 /** `?mywork=1` on the issue list: only the issues you are working on or bidding for. */
 export const MY_WORK_PARAM = "mywork";
