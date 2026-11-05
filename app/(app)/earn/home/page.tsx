@@ -4,14 +4,22 @@ import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { EARN_TASKS, WITHDRAW_THRESHOLD, stageTasks } from "@/lib/earn/draft";
 import { earnState } from "@/lib/earn/state";
-import { EarnLanding } from "@/components/earn-landing";
 import { formatZ } from "@/lib/points/rules";
 import { agentsLink, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
 import { earnAgentWhere } from "@/lib/earn/earner";
+import { taskProgress, type EarnTaskProgressView } from "@/lib/earn/progress";
 
 export const metadata = { title: "Earn with your agent" };
 
 const RING = 2 * Math.PI * 24;
+
+/** What a task's bar says beside it: the count for a counted task, otherwise where the task is. */
+function glanceStatus({ state, done, target }: EarnTaskProgressView): string {
+  if (state === "paid") return "Paid";
+  if (state === "in-review") return target > 1 ? `${done} of ${target} · in review` : "In review";
+  if (state === "open") return "Not started";
+  return target > 1 ? `0 of ${target}` : "Not done yet";
+}
 
 /**
  * Earn with your agent (#earn-drafts, Mark's call of 5 Nov): the one page for
@@ -20,20 +28,16 @@ const RING = 2 * Math.PI * 24;
  * next: Ziki's own projects. People who are already earning are sent to
  * My agents for their agents and to Earnings for their money.
  */
-export default async function EarnPage({ searchParams }: { searchParams: Promise<{ connected?: string }> }) {
+export default async function EarnHomePage() {
   const user = await requireUser();
-  // Just connected an agent: always land here, on choosing what it works on, whatever else the person has done.
-  const justConnected = (await searchParams).connected === "1";
   const agent = await prisma.agent.findFirst({ where: earnAgentWhere(user.id), orderBy: { createdAt: "asc" }, select: { id: true } }).catch(() => null);
-  const { stage, started } = await earnState(user.id);
-  // Someone who has just arrived, with no agent yet, gets the page of its own (the layout drops the site's chrome for it).
-  if (!agent) return <EarnLanding />;
-  // Mark's four pages: this one is only for someone who has just arrived. Once an earner has started
-  // (a task begun or paid), they have a different job: seeing how their agent is doing, on Earnings.
-  if (!justConnected && (stage !== "new" || started !== null)) redirect("/earn/earnings");
+  const { stage, rows: taskRows } = await earnState(user.id);
+  // No agent yet: connecting it comes first.
+  if (!agent) redirect("/earn/agent");
 
   const paidTasks = stageTasks(stage).filter((task) => task.done).length;
-  const maxPay = Math.max(...EARN_TASKS.map((task) => task.pay));
+  // Each task's real progress, from its row: never a stand-in.
+  const glance = taskProgress(taskRows);
   // Open source opens once the marketing tasks are done, not at $30: the rest of the $30 is earned there.
   const unlocked = paidTasks === EARN_TASKS.length;
   const rows = [
@@ -42,7 +46,7 @@ export default async function EarnPage({ searchParams }: { searchParams: Promise
       title: "Marketing",
       tag: "Starter",
       tagTone: "bg-zk-info-bg text-zk-info-fg",
-      text: "Where your agent takes its first task: help people find Ziki, one task at a time.",
+      text: "Where your agent takes its first task: help people find Ziki with four short tasks, in any order.",
       ringText: String(EARN_TASKS.length - paidTasks),
       ringTone: "stroke-electric-blue-strong",
       share: paidTasks / EARN_TASKS.length || 0.04,
@@ -124,24 +128,37 @@ export default async function EarnPage({ searchParams }: { searchParams: Promise
           <aside aria-labelledby="glance-heading" className={`${agentsSurface} space-y-4 p-5`}>
             <div>
               <h3 id="glance-heading" className="text-base font-extrabold tracking-tight text-zk-text">Marketing at a glance</h3>
-              <p className="text-xs text-zk-muted">Four tasks, done one at a time.</p>
+              <p className="text-xs text-zk-muted">Four tasks, all open at once.</p>
             </div>
             <ul className="m-0 flex list-none flex-col gap-3.5 p-0">
-              {EARN_TASKS.map((task) => (
-                <li key={task.id} className="space-y-1.5">
-                  <span className="flex items-baseline justify-between gap-3 text-sm">
-                    <span className="min-w-0 truncate font-semibold text-zk-text">{task.title}</span>
-                    <span className="font-mono text-xs font-bold tabular-nums text-zk-ok-fg">+${task.pay}</span>
-                  </span>
-                  <span aria-hidden="true" className="block h-1.5 overflow-hidden rounded-full bg-zk-seg">
-                    <span className="block h-full rounded-full bg-zk-accent/70" style={{ width: `${(task.pay / maxPay) * 100}%` }} />
-                  </span>
-                </li>
-              ))}
+              {glance.map((item) => {
+                const { task, state, done, target } = item;
+                const status = glanceStatus(item);
+                return (
+                  <li key={task.id} className="space-y-1.5">
+                    <span className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className="min-w-0 truncate font-semibold text-zk-text">{task.title}</span>
+                      <span className="font-mono text-xs font-bold tabular-nums text-zk-ok-fg">+${task.pay}</span>
+                    </span>
+                    <span
+                      role="progressbar"
+                      aria-label={task.title}
+                      aria-valuemin={0}
+                      aria-valuemax={target}
+                      aria-valuenow={done}
+                      aria-valuetext={status}
+                      className="block h-1.5 overflow-hidden rounded-full bg-zk-seg"
+                    >
+                      <span
+                        className={`block h-full rounded-full transition-[width] duration-500 ease-out ${state === "paid" ? "bg-zk-ok-fg" : "bg-zk-accent/70"}`}
+                        style={{ width: `${(done / target) * 100}%` }}
+                      />
+                    </span>
+                    <span className="block text-xs tabular-nums text-zk-muted">{status}</span>
+                  </li>
+                );
+              })}
             </ul>
-            <p className="border-t border-zk-divider pt-3 text-xs leading-relaxed text-zk-muted">
-              Marketing alone won’t reach $30. Finish its tasks and Open source pays the rest.
-            </p>
           </aside>
         </div>
 
