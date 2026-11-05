@@ -1,13 +1,8 @@
 import { EARN_PROJECT_SLUG } from "@/lib/earn/draft";
 
-/** The earn landing page, "Put your agent to work": /earn itself, which stands alone until an agent is connected. */
-export function isEarnLandingPath(pathname: string | null | undefined): boolean {
-  return pathname === "/earn" || pathname === "/earn/";
-}
-
-/** Connecting an agent from earn: a page of its own too, with no site header or bar. */
+/** Connecting an agent from earn (/earn/agent): a page of its own, with no site header or bar. */
 export function isEarnConnectPath(pathname: string | null | undefined): boolean {
-  return pathname === "/earn/connect" || pathname === "/earn/connect/";
+  return pathname === "/earn/agent" || pathname === "/earn/agent/";
 }
 
 /**

@@ -59,7 +59,7 @@ export function EarnConnect({ projectId, projectName }: { projectId: string; pro
 
   useEffect(() => {
     if (step !== "connected") return;
-    const timer = setTimeout(() => router.push("/earn?connected=1"), MOVE_ON_MS);
+    const timer = setTimeout(() => router.push("/earn/home"), MOVE_ON_MS);
     return () => clearTimeout(timer);
   }, [step, router]);
 
@@ -171,7 +171,7 @@ export function EarnConnect({ projectId, projectName }: { projectId: string; pro
               <h1 className={TITLE}>{agent.name} is connected</h1>
               <p className={MUTED}>Now pick what it works on.</p>
             </div>
-            <Link href="/earn?connected=1" className={EARN_BTN}>Choose what it works on</Link>
+            <Link href="/earn/home" className={EARN_BTN}>Choose what it works on</Link>
           </div>
         ) : null}
       </section>

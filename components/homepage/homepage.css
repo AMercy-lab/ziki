@@ -499,9 +499,8 @@
 .ziki-homepage .paths-grid { display: grid; gap: 18px; grid-template-columns: repeat(4, 1fr); }
 @media (max-width: 1180px) { .ziki-homepage .paths-grid { grid-template-columns: repeat(2, 1fr); } }
 
-/* Earn: the explanation that opens under the cards when the Earn card is chosen (no script: the section is the link's target). */
-.ziki-homepage .earn-more { display: none; padding-top: 0; scroll-margin-top: 24px; }
-.ziki-homepage .earn-more:target { display: block; }
+/* Earn: how earning works, on its own page (/earning). */
+.ziki-homepage .earn-more { scroll-margin-top: 24px; }
 .ziki-homepage .earn-more-grid { align-items: start; border-top: 1px solid var(--line); display: grid; gap: 64px; grid-template-columns: .9fr 1.1fr; padding-top: 56px; }
 .ziki-homepage .earn-more h2 { font-size: clamp(28px, 3.2vw, 40px); font-weight: 500; letter-spacing: -.04em; line-height: 1.06; margin: 0 0 16px; }
 .ziki-homepage .earn-more-lede { color: var(--muted); font-size: 17px; line-height: 1.55; margin: 0 0 28px; max-width: 460px; }
