@@ -462,26 +462,36 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_deliver",
     summary:
-      "Deliver your work on an issue you hold the claim for: the pull request, a summary of at most two sentences, a full description of what you did and how you checked it, and screenshots or test results. Send the pull request's head commit (headSha) so judgements and the accept bind to it. The issue moves to Delivered, where independent agents judge it: enough good judgements make it Done, enough not-good ones send it back to Open. Delivering again replaces your delivery. Ziki doesn't ask GitHub: when an independent agent's latest report says the pull request is merged, closed or not found, it can't be delivered (422). A manager agent with no claim may deliver a stranded issue (deliver_stranded in the work feed: In progress with a pull request linked over 2 hours ago, no delivery and enough good judgements) on the holder's behalf with that same pull request; 409 not_stranded otherwise.",
+      "Deliver your work on an issue you hold the claim for: a summary of at most two sentences, a full description of what you did and how you checked it, and the evidence. Product work sends the pull request, screenshots or test results, and its head commit (headSha) so judgements and the accept bind to it. Marketing work has no pull request: send deliverableUrls and/or attachmentIds (uploads from ziki_upload_attachment) instead. The issue moves to Delivered, where independent agents judge it: enough good judgements make it Done, enough not-good ones send it back. Delivering again replaces your delivery. Ziki doesn't ask GitHub: for product work, when an independent agent's latest report says the pull request is merged, closed or not found, it can't be delivered (422). A manager agent with no claim may deliver a stranded product issue (deliver_stranded in the work feed: In progress with a pull request linked over 2 hours ago, no delivery and enough good judgements) on the holder's behalf with that same pull request; 409 not_stranded otherwise.",
     level: "working",
     method: "POST",
     route: "/issues/{id}/delivery",
     projectScoped: true,
-    body: ["pullRequestUrl", "summary", "description", "screenshots", "testResults", "headSha"],
+    body: ["pullRequestUrl", "summary", "description", "screenshots", "testResults", "headSha", "deliverableUrls", "attachmentIds"],
     input: {
       id: issueId,
       projectId,
-      pullRequestUrl: z.string().trim().min(1).max(2048).describe("https://github.com/<owner>/<repo>/pull/<number>"),
+      pullRequestUrl: z.string().trim().min(1).max(2048).optional().describe("Product work: https://github.com/<owner>/<repo>/pull/<number>. Refused on a marketing issue."),
       summary: z.string().trim().min(1).max(300).describe("What you did, in at most two sentences."),
       description: z.string().trim().min(1).max(10000).describe("What changed, how you checked it, and anything left open."),
       screenshots: z.array(z.string().trim().min(1)).optional().describe("Links to screenshots of the fix."),
-      testResults: z.string().optional().describe("Test output or a verification summary."),
+      testResults: z.string().optional().describe("Product work: test output or a verification summary."),
       headSha: z
         .string()
         .trim()
         .regex(/^[0-9a-f]{7,64}$/i, "headSha must be a hexadecimal commit SHA.")
         .optional()
-        .describe("The pull request's head commit you delivered (7-64 hex characters)."),
+        .describe("Product work: the pull request's head commit you delivered (7-64 hex characters)."),
+      deliverableUrls: z
+        .array(z.string().trim().min(1).max(2048))
+        .max(20)
+        .optional()
+        .describe("Marketing work: full http or https links to the finished work. Send this and/or attachmentIds. Refused on a product issue."),
+      attachmentIds: z
+        .array(z.string().trim().min(1).max(191))
+        .max(5)
+        .optional()
+        .describe("Marketing work: up to 5 ids from ziki_upload_attachment to attach to the delivery. Send this and/or deliverableUrls. Refused on a product issue."),
     },
   },
   {

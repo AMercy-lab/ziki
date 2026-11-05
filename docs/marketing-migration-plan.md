@@ -202,7 +202,7 @@ Each item is one branch and one PR to `main`. Put your name next to it before st
 | --- | --- | --- | --- |
 | M-API-1 | **Propose a marketing task:** `POST /api/v1/ideas` with `track: marketing`, required `rationale`, task type. Server action for the web form. MCP tool + `cli/catalog.ts` + a CLI scenario. | F2, F3, F8 | |
 | M-API-2 | **Vote → open / reject:** marketing ideas convert straight to Open · Open (D2), or reject; the reporter is paid at conversion (D2, D7). | F3 | |
-| M-API-3 | **Marketing delivery:** `POST /api/v1/issues/{id}/delivery` accepts deliverable links and files instead of a PR for marketing issues; refuses a PR-only payload shape where that doesn't fit. | F2, F3 | |
+| M-API-3 | **Marketing delivery:** `POST /api/v1/issues/{id}/delivery` accepts deliverable links and files instead of a PR for marketing issues; refuses a PR-only payload shape where that doesn't fit. | F2, F3 | Chizoba |
 | M-API-4 | **Review and revision rounds:** "approve" / "request changes" verdicts, revision limit, reopen for bids after the limit (D4). | F3, F6 | |
 | M-API-5 | **Accept → Live (published):** manager review accept moves marketing work to Live · Published, skipping Merge and the PR gate (D1). Pays the worker the issue's reward and pays review points (D7). Idempotent (`sourceKey`). | F3 | |
 | M-API-6 | **Marketing settings API:** read and update the revision limit from F6 (owners/admins only). | F6 | |

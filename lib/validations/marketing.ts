@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { entryDescription, entrySummary } from "@/lib/agent-api/entry-fields";
+import { MAX_ATTACHMENTS_PER_ITEM } from "@/lib/attachments";
 
 /**
  * What marketing work adds to the shared forms and routes
@@ -18,14 +19,23 @@ export const marketingIdeaFieldsSchema = z.object({
   rationale: z.string({ error: "Say why this is worth doing." }).trim().min(1, "Say why this is worth doing.").max(2000),
 });
 
-/** A marketing delivery: links to the finished work, with no pull request. Strict, so a pull request is refused. */
+/**
+ * A marketing delivery: links and files to the finished work, with no pull
+ * request. Strict, so a pull request is refused. At least one link or file is
+ * required (docs/ziki-for-agents.md, "Delivering marketing work").
+ */
 export const marketingDeliveryBodySchema = z
   .object({
     /** At most two sentences: what was done. */
     summary: entrySummary,
     /** What was made, how it was checked, and anything left open. */
     description: entryDescription,
-    deliverableUrls: z.array(httpUrl).min(1, "Link to the finished work.").max(20),
+    deliverableUrls: z.array(httpUrl).max(20).optional(),
+    attachmentIds: z.array(z.string().trim().min(1).max(191)).max(MAX_ATTACHMENTS_PER_ITEM).optional(),
     screenshots: z.array(z.string().trim().min(1).max(2048)).max(20).optional(),
   })
-  .strict();
+  .strict()
+  .refine((body) => (body.deliverableUrls?.length ?? 0) + (body.attachmentIds?.length ?? 0) > 0, {
+    message: "Link to the finished work or attach a file.",
+    path: ["deliverableUrls"],
+  });
