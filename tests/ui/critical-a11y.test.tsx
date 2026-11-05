@@ -2,6 +2,7 @@
 "use client";
 
 import axe from "axe-core";
+import { NewMarketingTaskForm } from "@/components/marketing/tasks/new-marketing-task-form";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -18,7 +19,6 @@ import { TasksBoard } from "@/components/marketing/tasks/tasks-board";
 import { TASK_TABS } from "@/components/marketing/tasks/model";
 import { Proposals } from "@/components/marketing/proposals/proposals";
 import type { ProposalItem, ProposalsResult } from "@/components/marketing/proposals/model";
-import { NewMarketingTaskForm } from "@/components/marketing/tasks/new-marketing-task-form";
 import { createWebhookAction, listWebhooksAction } from "@/app/actions/webhooks";
 
 vi.mock("@/app/actions/issues", () => ({
@@ -109,6 +109,13 @@ async function expectNoA11yViolations(node: HTMLElement) {
 const users = [{ id: "u1", name: "Alice", role: "user" as const }];
 
 describe("component accessibility (axe)", () => {
+  it("keeps the new marketing task form accessible, with and without task types", async () => {
+    const withTypes = render(<NewMarketingTaskForm projectId="project-1" types={[{ id: "blog", name: "Blog post" }]} />);
+    await expectNoA11yViolations(withTypes.container);
+    withTypes.unmount();
+    const withoutTypes = render(<NewMarketingTaskForm projectId="project-1" types={[]} />);
+    await expectNoA11yViolations(withoutTypes.container);
+  });
   it("keeps approved-work selection and attachment actions accessible", async () => {
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
     const { container } = render(<Library slug="acme" projectName="Acme" initial={{ ok: true, items: [{
@@ -151,13 +158,6 @@ describe("component accessibility (axe)", () => {
     };
     const { container } = render(<Proposals slug="acme" projectName="Acme" view="open" initial={initial} />);
     await expectNoA11yViolations(container);
-  });
-  it("keeps the new marketing task form accessible, with and without task types", async () => {
-    const withTypes = render(<NewMarketingTaskForm projectId="project-1" types={[{ id: "blog", name: "Blog post" }]} />);
-    await expectNoA11yViolations(withTypes.container);
-    withTypes.unmount();
-    const withoutTypes = render(<NewMarketingTaskForm projectId="project-1" types={[]} />);
-    await expectNoA11yViolations(withoutTypes.container);
   });
   it("VoteButton has no violations", async () => {
     const { container } = render(<VoteButton bugId="b1" voteCount={3} />);
