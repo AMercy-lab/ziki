@@ -1313,7 +1313,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
           <NextStepBar step={liveFix ? liveNextStep(liveFix.check, liveFix.repo) : nextStep} agentInstructions={agentInstructions} />
 
           <IssueBlockersPanel
-            projectSlug={bug.project.slug}
+            projectSlug={refOf(bug.project)}
             issueId={bug.id}
             blockedBy={blockedBy}
             blocking={blocking}

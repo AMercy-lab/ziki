@@ -8,20 +8,31 @@ import { blockerGuidance } from "@/lib/issue-blockers";
 import { issuePath } from "@/lib/issue-ref";
 import { formatIssueNumber } from "@/lib/issue-number";
 import { stateLabel } from "@/lib/labels";
+import type { ProjectRef } from "@/lib/project-paths";
+import { useProjectRef } from "@/lib/use-project-ref";
 
 type Props = {
-  projectSlug: string;
+  projectSlug?: ProjectRef | null;
   issueId: string;
   blockedBy: IssueBlockerCandidate[];
   blocking: IssueBlockerCandidate[];
   canEdit: boolean;
 };
 
-function IssueLink({ issue, projectSlug }: { issue: IssueBlockerCandidate; projectSlug: string }) {
-  return <Link href={issuePath(projectSlug, issue.number)} className="font-semibold text-zk-accent hover:underline">{formatIssueNumber(issue.number)} · {issue.title}</Link>;
+function IssueLink({ issue, projectSlug }: { issue: IssueBlockerCandidate; projectSlug: ProjectRef | null }) {
+  return (
+    <Link
+      href={projectSlug ? issuePath(projectSlug, issue.number) : `#${issue.number}`}
+      className="font-semibold text-zk-accent hover:underline"
+    >
+      {formatIssueNumber(issue.number)} · {issue.title}
+    </Link>
+  );
 }
 
-export function IssueBlockersPanel({ projectSlug, issueId, blockedBy, blocking, canEdit }: Props) {
+export function IssueBlockersPanel({ projectSlug: propProjectSlug, issueId, blockedBy, blocking, canEdit }: Props) {
+  const currentProjectRef = useProjectRef();
+  const projectSlug = propProjectSlug ?? currentProjectRef;
   const router = useRouter();
   const [reference, setReference] = useState("");
   const [error, setError] = useState<string | null>(null);
