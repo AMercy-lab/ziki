@@ -21,6 +21,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { readAgentResolution } from "@/lib/agent-resolution";
 import { requireUser } from "@/lib/auth-helpers";
+import { canContributeToProject } from "@/lib/project-permissions";
 import {
   resolveSessionUserId,
   SESSION_EXPIRED_MESSAGE,
@@ -246,6 +247,9 @@ export async function createBugAction(
     return { error: NO_TENANT_MESSAGE };
   }
   const projectId = targetProject.id;
+  if (!(await canContributeToProject(user, projectId, tenantId))) {
+    return { error: "You must be a member of this project to submit issues." };
+  }
 
   if (typeId) {
     const issueType = await issueTypeForCreate(typeId, tenantId);

@@ -12,9 +12,9 @@ import { orgHomePath, projectPath, projectRef, type ProjectRef } from "@/lib/pro
  * for every project page:
  *
  * - The organisation slug is looked up among the organisations the signed-in
- *   person belongs to (any for the site super admin), and the project slug
- *   inside it. No match is a 404, so a project you can't see looks the same
- *   as one that doesn't exist.
+ *   person belongs to, direct project memberships, or public projects (any for
+ *   the site super admin), and the project slug inside it. No match is a 404,
+ *   so a project you can't see looks the same as one that doesn't exist.
  * - When the organisation isn't the current one, the request goes through
  *   /projects/<slug>/open, which makes it current and comes back, so
  *   everything the page and its actions read agrees with the URL.
@@ -22,7 +22,21 @@ import { orgHomePath, projectPath, projectRef, type ProjectRef } from "@/lib/pro
 export type ProjectContext = {
   user: Awaited<ReturnType<typeof requireUser>>;
   tenantId: string;
-  project: { id: string; slug: string; name: string; goal: string | null; tenantId: string; orgSlug: string; ref: ProjectRef };
+  project: {
+    id: string;
+    slug: string;
+    name: string;
+    goal: string | null;
+    tenantId: string;
+    orgSlug: string;
+    ref: ProjectRef;
+    visibility: "public" | "private";
+    isOpenForContributors: boolean;
+  };
+  isOrgMember: boolean;
+  isProjectMember: boolean;
+  isOrgAdmin: boolean;
+  canContribute: boolean;
 };
 
 function decode(segment: string): string {
@@ -55,20 +69,66 @@ export const requireProject = cache(async (orgParam: string, projectParam: strin
   const orgSlug = decode(orgParam);
   const slug = decode(projectParam);
   const tenantIds = await openableTenantIds(user);
-  if (tenantIds && tenantIds.length === 0) notFound();
+
+  // Direct project memberships
+  const userProjectMemberships = await prisma.projectMembership.findMany({
+    where: { userId: user.id, project: { archivedAt: null, tenant: { archivedAt: null } } },
+    select: { projectId: true },
+  });
+  const directProjectIds = userProjectMemberships.map((m) => m.projectId);
+
+  const where: any = {
+    slug,
+    archivedAt: null,
+    tenant: { slug: orgSlug, archivedAt: null },
+  };
+
+  if (user.role !== "super_admin") {
+    where.OR = [
+      { visibility: "public" },
+      { id: { in: directProjectIds } },
+      ...(tenantIds && tenantIds.length > 0 ? [{ tenantId: { in: tenantIds } }] : []),
+    ];
+  }
 
   const project = await prisma.project.findFirst({
-    where: { slug, archivedAt: null, tenant: { slug: orgSlug, archivedAt: null }, ...(tenantIds ? { tenantId: { in: tenantIds } } : {}) },
-    select: { id: true, slug: true, name: true, goal: true, tenantId: true },
+    where,
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      goal: true,
+      tenantId: true,
+      visibility: true,
+      isOpenForContributors: true,
+    },
   });
   if (!project) notFound();
+
+  const isOrgMember = tenantIds === null || (tenantIds ? tenantIds.includes(project.tenantId) : false);
+  const isProjectMember = directProjectIds.includes(project.id);
+  const isOrgAdmin = user.role === "super_admin" || Boolean(
+    await prisma.membership.findFirst({
+      where: { tenantId: project.tenantId, userId: user.id, role: { in: ["owner", "admin"] } },
+      select: { id: true },
+    })
+  );
+  const canContribute = isOrgMember || isProjectMember || user.role === "super_admin";
 
   const ref = projectRef(orgSlug, project.slug);
   if (project.tenantId !== (await currentTenantIdFor(user.id))) {
     // Switch to the project's organisation first, then come back to this page.
     switchTo(project.tenantId, project.slug, await requestPath(projectPath(ref)));
   }
-  return { user, tenantId: project.tenantId, project: { ...project, orgSlug, ref } };
+  return {
+    user,
+    tenantId: project.tenantId,
+    project: { ...project, orgSlug, ref },
+    isOrgMember,
+    isProjectMember,
+    isOrgAdmin,
+    canContribute,
+  };
 });
 
 /**
@@ -133,11 +193,17 @@ export async function projectFirstTarget(user: { id: string; role: string }, pat
 /** The first project someone can open, for addresses with no project (the site root, sign-in). */
 export async function firstProjectRefFor(userId: string): Promise<ProjectRef | null> {
   const tenantId = await currentTenantIdFor(userId);
-  if (!tenantId) return null;
-  const project = await prisma.project.findFirst({
-    where: { tenantId, archivedAt: null },
-    orderBy: { createdAt: "asc" },
-    select: { slug: true, tenant: { select: { slug: true } } },
+  if (tenantId) {
+    const project = await prisma.project.findFirst({
+      where: { tenantId, archivedAt: null },
+      orderBy: { createdAt: "asc" },
+      select: { slug: true, tenant: { select: { slug: true } } },
+    });
+    if (project) return projectRef(project.tenant.slug, project.slug);
+  }
+  const projectMember = await prisma.projectMembership.findFirst({
+    where: { userId, project: { archivedAt: null, tenant: { archivedAt: null } } },
+    select: { project: { select: { slug: true, tenant: { select: { slug: true } } } } },
   });
-  return project ? projectRef(project.tenant.slug, project.slug) : null;
+  return projectMember?.project ? projectRef(projectMember.project.tenant.slug, projectMember.project.slug) : null;
 }
