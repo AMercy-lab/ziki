@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
 import { canManageProject } from "@/lib/project-permissions";
-import { orgPath, overviewPath } from "@/lib/project-paths";
+import { orgPath, projectPath, projectRef } from "@/lib/project-paths";
 
 export type JoinRequestActionResult = {
   ok?: boolean;
@@ -23,7 +23,15 @@ export async function requestToJoinProjectAction(formData: FormData): Promise<Jo
 
   const project = await prisma.project.findFirst({
     where: { id: projectId, archivedAt: null },
-    select: { id: true, slug: true, name: true, tenantId: true, isOpenForContributors: true, visibility: true },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      tenantId: true,
+      isOpenForContributors: true,
+      visibility: true,
+      tenant: { select: { slug: true } },
+    },
   });
 
   if (!project) return { error: "Project not found." };
@@ -64,6 +72,7 @@ export async function requestToJoinProjectAction(formData: FormData): Promise<Jo
     select: { userId: true },
   });
 
+  const pRef = projectRef(project.tenant.slug, project.slug);
   if (managers.length > 0) {
     await prisma.notification.createMany({
       data: managers.map((m) => ({
@@ -71,36 +80,46 @@ export async function requestToJoinProjectAction(formData: FormData): Promise<Jo
         tenantId: project.tenantId,
         kind: "join_request",
         title: `${user.name || user.email} requested to join ${project.name}`,
-        url: orgPath(project.slug, "invites"),
+        url: orgPath(pRef, "invites"),
       })),
       skipDuplicates: true,
     }).catch(() => {});
   }
 
   revalidatePath("/discover");
-  revalidatePath(orgPath(project.slug, "invites"));
+  revalidatePath(orgPath(pRef, "invites"));
   return { ok: true };
 }
 
 /**
  * Accept a pending join request. Org admins only.
  */
-export async function acceptJoinRequestAction(formData: FormData): Promise<JoinRequestActionResult> {
+export async function acceptJoinRequestAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const requestId = String(formData.get("requestId") ?? "").trim();
-  if (!requestId) return { error: "Request ID is required." };
+  if (!requestId) return;
 
   const joinRequest = await prisma.projectJoinRequest.findUnique({
     where: { id: requestId },
-    include: { project: { select: { id: true, slug: true, name: true, tenantId: true } } },
+    include: {
+      project: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          tenantId: true,
+          tenant: { select: { slug: true } },
+        },
+      },
+    },
   });
 
   if (!joinRequest || joinRequest.status !== "pending") {
-    return { error: "Join request not found or already reviewed." };
+    return;
   }
 
   if (!(await canManageProject(user, joinRequest.project.tenantId))) {
-    return { error: "Only organization owners and admins can accept join requests." };
+    return;
   }
 
   await prisma.$transaction(async (tx) => {
@@ -121,6 +140,7 @@ export async function acceptJoinRequestAction(formData: FormData): Promise<JoinR
       update: {},
     });
 
+    const pRef = projectRef(joinRequest.project.tenant.slug, joinRequest.project.slug);
     // 3. Notify the applicant
     await tx.notification.create({
       data: {
@@ -128,36 +148,47 @@ export async function acceptJoinRequestAction(formData: FormData): Promise<JoinR
         tenantId: joinRequest.project.tenantId,
         kind: "join_request_accepted",
         title: `Your request to join ${joinRequest.project.name} was accepted!`,
-        url: overviewPath(joinRequest.project.slug),
+        url: projectPath(pRef),
       },
     });
   });
 
-  revalidatePath(orgPath(joinRequest.project.slug, "invites"));
-  revalidatePath(orgPath(joinRequest.project.slug, "members"));
+  const pRef = projectRef(joinRequest.project.tenant.slug, joinRequest.project.slug);
+  revalidatePath(orgPath(pRef, "invites"));
+  revalidatePath(orgPath(pRef, "members"));
+  revalidatePath("/[org]/[project]/org", "layout");
   revalidatePath("/discover");
-  return { ok: true };
 }
 
 /**
  * Reject a pending join request. Org admins only.
  */
-export async function rejectJoinRequestAction(formData: FormData): Promise<JoinRequestActionResult> {
+export async function rejectJoinRequestAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const requestId = String(formData.get("requestId") ?? "").trim();
-  if (!requestId) return { error: "Request ID is required." };
+  if (!requestId) return;
 
   const joinRequest = await prisma.projectJoinRequest.findUnique({
     where: { id: requestId },
-    include: { project: { select: { id: true, slug: true, name: true, tenantId: true } } },
+    include: {
+      project: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          tenantId: true,
+          tenant: { select: { slug: true } },
+        },
+      },
+    },
   });
 
   if (!joinRequest || joinRequest.status !== "pending") {
-    return { error: "Join request not found or already reviewed." };
+    return;
   }
 
   if (!(await canManageProject(user, joinRequest.project.tenantId))) {
-    return { error: "Only organization owners and admins can reject join requests." };
+    return;
   }
 
   await prisma.$transaction(async (tx) => {
@@ -181,37 +212,43 @@ export async function rejectJoinRequestAction(formData: FormData): Promise<JoinR
     });
   });
 
-  revalidatePath(orgPath(joinRequest.project.slug, "invites"));
+  const pRef = projectRef(joinRequest.project.tenant.slug, joinRequest.project.slug);
+  revalidatePath(orgPath(pRef, "invites"));
+  revalidatePath("/[org]/[project]/org", "layout");
   revalidatePath("/discover");
-  return { ok: true };
 }
 
 /**
  * Remove an external contributor from a project. Org admins only.
  */
-export async function removeProjectMemberAction(formData: FormData): Promise<JoinRequestActionResult> {
+export async function removeProjectMemberAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const projectId = String(formData.get("projectId") ?? "").trim();
   const targetUserId = String(formData.get("userId") ?? "").trim();
 
-  if (!projectId || !targetUserId) return { error: "Project and user IDs are required." };
+  if (!projectId || !targetUserId) return;
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { tenantId: true, slug: true },
+    select: {
+      tenantId: true,
+      slug: true,
+      tenant: { select: { slug: true } },
+    },
   });
 
-  if (!project) return { error: "Project not found." };
+  if (!project) return;
 
   if (!(await canManageProject(user, project.tenantId))) {
-    return { error: "Only organization owners and admins can remove project members." };
+    return;
   }
 
   await prisma.projectMembership.deleteMany({
     where: { projectId, userId: targetUserId },
   });
 
-  revalidatePath(orgPath(project.slug, "members"));
+  const pRef = projectRef(project.tenant.slug, project.slug);
+  revalidatePath(orgPath(pRef, "members"));
+  revalidatePath("/[org]/[project]/org", "layout");
   revalidatePath("/discover");
-  return { ok: true };
 }

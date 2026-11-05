@@ -8,6 +8,9 @@ import { prisma } from "@/lib/prisma";
 import { joinedSummary, listShareLinks, shareLinkStatusLabel } from "@/lib/share-invites";
 import { MEMBERSHIP_ROLE_LABELS, tenantMembersFrom } from "@/lib/tenants";
 import { revokeInviteAction, revokeShareLinkAction } from "@/app/(app)/tenants/actions";
+import { acceptJoinRequestAction, rejectJoinRequestAction } from "@/app/actions/project-join-requests";
+import { projectPath, projectRef } from "@/lib/project-paths";
+import Link from "next/link";
 import { loadOrg } from "../org-context";
 import { OrgPageHeader, ReadOnlyNote, orgCard, orgListCard, orgListHeading } from "../org-ui";
 import { InviteForm } from "./invite-form";
@@ -47,6 +50,30 @@ async function loadManagers(tenantId: string) {
     })(),
     [],
   );
+}
+
+
+async function loadPendingJoinRequests(tenantId: string) {
+  try {
+    return await prisma.projectJoinRequest.findMany({
+      where: { project: { tenantId }, status: "pending" },
+      include: {
+        project: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            tenant: { select: { slug: true } },
+          },
+        },
+        user: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (error) {
+    console.error("[org] loadPendingJoinRequests failed", error);
+    return [];
+  }
 }
 
 /**
@@ -98,17 +125,96 @@ export default async function OrgInvitesPage() {
     );
   }
 
-  const [invites, shareLinks] = await Promise.all([
+  const [invites, shareLinks, pendingRequests] = await Promise.all([
     loadQuietly("invites", pendingInvites(prisma, org.id), []),
     loadQuietly("share links", listShareLinks(prisma, org.id), []),
+    loadPendingJoinRequests(org.id),
   ]);
 
   return (
     <div className="space-y-6">
       <OrgPageHeader title="Invites">
-        People join {org.name} only by an invite. Send an email invite to one person, or share an
-        invite link with several. Revoking either stops it working at once.
+        Manage member invites and review external contributor applications for your projects.
       </OrgPageHeader>
+
+      <section aria-labelledby="join-requests" className={orgListCard}>
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6">
+          <h3 id="join-requests" className={orgListHeading}>
+            Project Join Requests
+          </h3>
+          {pendingRequests.length > 0 ? (
+            <Badge className="rounded-full bg-zk-tint text-xs font-semibold text-zk-accent">
+              {pendingRequests.length} pending
+            </Badge>
+          ) : null}
+        </div>
+        {pendingRequests.length === 0 ? (
+          <p className="px-4 py-4 text-sm text-zk-text2 sm:px-6">
+            No pending join requests. When contributors apply to join your projects from the Discover page, their applications appear here.
+          </p>
+        ) : (
+          <ul className="divide-y divide-zk-border">
+            {pendingRequests.map((req) => (
+              <li key={req.id} className="flex flex-col gap-3 p-4 sm:p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-zk-text">
+                        {req.user.name || req.user.email}
+                      </span>
+                      {req.user.name && req.user.email ? (
+                        <span className="text-xs text-zk-muted">({req.user.email})</span>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-xs text-zk-muted">
+                      Applied to collaborate on{" "}
+                      <Link
+                        href={projectPath(projectRef(req.project.tenant.slug, req.project.slug))}
+                        className="font-medium text-zk-accent hover:underline"
+                      >
+                        {req.project.name}
+                      </Link>{" "}
+                      · <LocalTime date={req.createdAt} />
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <form action={acceptJoinRequestAction}>
+                      <input type="hidden" name="requestId" value={req.id} />
+                      <button
+                        type="submit"
+                        className="inline-flex items-center justify-center rounded-full bg-teal-700 px-3.5 py-1.5 text-xs font-medium text-white transition hover:bg-teal-800"
+                      >
+                        Accept
+                      </button>
+                    </form>
+                    <form action={rejectJoinRequestAction}>
+                      <input type="hidden" name="requestId" value={req.id} />
+                      <ConfirmSubmitButton
+                        aria-label={`Reject request from ${req.user.name || req.user.email}`}
+                        variant="danger-secondary"
+                        confirm={{
+                          title: `Reject request from ${req.user.name || req.user.email}?`,
+                          body: "They will not be added as a collaborator to this project. They can re-apply later.",
+                          confirmLabel: "Reject request",
+                        }}
+                      >
+                        Reject
+                      </ConfirmSubmitButton>
+                    </form>
+                  </div>
+                </div>
+                {req.message ? (
+                  <div className="mt-1 rounded-xl border border-zk-border bg-zk-card p-3 text-xs text-zk-text2">
+                    <span className="font-semibold text-zk-text">Note: </span>
+                    {req.message}
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
 
       <section aria-labelledby="invite-someone" className={orgCard}>
         <h3 id="invite-someone" className="text-base font-semibold text-zk-text">

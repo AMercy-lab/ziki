@@ -4,6 +4,7 @@ import { MEMBERSHIP_ROLE_LABELS } from "@/lib/tenants";
 import { loadOrg } from "./org-context";
 import { OrgTabs } from "./org-tabs";
 import { requireProject } from "@/lib/project-route";
+import { prisma } from "@/lib/prisma";
 
 /**
  * The organization admin area (/<org>/<project>/org, #project-urls): everything an organization's owners and
@@ -16,6 +17,11 @@ export default async function OrgLayout({ children, params }: { children: React.
   // The address picks the organisation and checks access (lib/project-route.ts).
   await requireProject(orgParam, project);
   const { org } = await loadOrg();
+  const pendingJoinCount = org?.admin
+    ? await prisma.projectJoinRequest.count({
+        where: { project: { tenantId: org.id }, status: "pending" },
+      })
+    : 0;
 
   if (!org) {
     return (
@@ -52,7 +58,7 @@ export default async function OrgLayout({ children, params }: { children: React.
             </Link>
           </p>
         </div>
-        <OrgTabs />
+        <OrgTabs pendingJoinCount={pendingJoinCount} />
       </div>
       {children}
     </div>

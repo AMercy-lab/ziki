@@ -25,7 +25,7 @@ function isActive(pathname: string, href: string, overview: boolean): boolean {
  * The segmented tab bar under the organization's name. On a phone it scrolls
  * sideways inside itself, so the page never does.
  */
-export function OrgTabs() {
+export function OrgTabs({ pendingJoinCount = 0 }: { pendingJoinCount?: number }) {
   const pathname = usePathname() ?? "";
   const params = useParams<{ org: string; project: string }>();
   const slug = projectRef(params.org, params.project);
@@ -47,6 +47,11 @@ export function OrgTabs() {
                 }`}
               >
                 {tab.label}
+                {tab.section === "invites" && pendingJoinCount > 0 ? (
+                  <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-zk-accent px-1 text-[10px] font-bold text-white">
+                    {pendingJoinCount}
+                  </span>
+                ) : null}
               </Link>
             </li>
           );
