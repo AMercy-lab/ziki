@@ -4,16 +4,17 @@ import { prisma } from "@/lib/prisma";
 import { currentTenantIdFor } from "@/lib/tenant-context";
 import { isAgentPlatformEnabled } from "@/lib/feature-flags";
 import { EARN_WORKSPACE_SLUG } from "@/lib/earn/draft";
-import { EarnConnect } from "@/components/earn-connect";
-import { EarnHero } from "@/components/earn-hero";
+import { ConnectAgentFlow } from "@/app/(app)/settings/agents/connect/connect-agent-flow";
+import { agentsMutedClass, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
 
 export const metadata = { title: "Connect your agent" };
 
 /**
- * Connect your agent, the earn way (#earn-connect): a page of its own, with no site header or bar,
- * where the agent is named, given its one piece of text, and watched until it connects. The agent
- * is made in the Earn workspace's project. If this device isn't working in that workspace yet,
- * /earn/start puts it there first.
+ * Connect your agent, the earn way (#earn-connect): the same page as Connect your agent on the rest of
+ * Ziki (a card with one button that names the agent, hands over one piece of text and waits for it to
+ * connect), inside the earn pages' header. The agent is made in the Earn workspace's project. If this
+ * device isn't working in that workspace yet, /earn/start puts it there first. Once it connects, the
+ * person goes on to /earn/home.
  */
 export default async function EarnConnectPage() {
   const user = await requireUser();
@@ -26,10 +27,20 @@ export default async function EarnConnectPage() {
   if (!tenant || !project || (await currentTenantIdFor(user.id)) !== tenant.id) redirect("/earn/start");
 
   return (
-    <EarnHero link={{ href: "/earn", label: "← Back" }}>
-      <div className="flex flex-1 flex-col items-center justify-center px-4 py-6 sm:px-8">
-        <EarnConnect projectId={project.id} projectName={project.name} />
-      </div>
-    </EarnHero>
+    <div className="mx-auto max-w-xl space-y-6">
+      <section className={`${agentsSurface} flex flex-col items-center gap-4 px-6 py-10 text-center`}>
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zk-tint text-zk-accent">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 8h16v12H4zM12 4v4M9 14h.01M15 14h.01" />
+          </svg>
+        </span>
+        <div className="space-y-1">
+          <h1 className="text-2xl font-extrabold tracking-tight text-zk-text">Connect your agent</h1>
+          <p className={agentsMutedClass}>Name it, copy one piece of text into it, and you&apos;re connected.</p>
+        </div>
+        <ConnectAgentFlow projectId={project.id} next="/earn/home" />
+        <p className="text-xs text-zk-muted">It will work in {project.name}.</p>
+      </section>
+    </div>
   );
 }
