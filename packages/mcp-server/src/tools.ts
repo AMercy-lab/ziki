@@ -61,8 +61,12 @@ export const TOOLS: readonly ToolDef[] = [
     level: "working",
     method: "GET",
     route: "/{projectId}/work",
+    query: ["track"],
     siteRoute: true,
-    input: { projectId },
+    input: {
+      projectId,
+      track: z.enum(["product", "marketing"]).optional().describe("Work track to fetch: product (default) or marketing."),
+    },
   },
   {
     name: "ziki_whoami",
@@ -867,7 +871,7 @@ export const TOOLS: readonly ToolDef[] = [
     level: "working",
     method: "GET",
     route: "/events",
-    query: ["after", "afterId", "wait", "types", "projectId", "bugId"],
+    query: ["after", "afterId", "wait", "types", "projectId", "bugId", "track"],
     input: {
       after: z.string().optional().describe("Cursor from the previous response, or an ISO timestamp."),
       afterId: z.string().optional().describe("Required when after is a timestamp."),
@@ -875,6 +879,7 @@ export const TOOLS: readonly ToolDef[] = [
       types: z.string().optional().describe("Comma-separated event types or prefixes, such as claim.*."),
       projectId,
       bugId: z.string().optional().describe("Only events for this issue."),
+      track: z.enum(["product", "marketing"]).optional().describe("Filter events by work track."),
     },
   },
   {
