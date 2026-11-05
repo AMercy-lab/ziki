@@ -381,6 +381,24 @@ describe("the marketing tasks board", () => {
   });
 });
 
+describe("the issue list's track filter (M-UI-8)", () => {
+  it("lists, and searches, only marketing issues when asked", async () => {
+    indexedSearch.mockResolvedValue({ found: 1, hits: [{ id: "bug-1", kind: "bug", score: 10 }] });
+    await renderList({ q: "launch", status: "all", track: "marketing" });
+    expect(indexedSearch).toHaveBeenCalledWith(expect.objectContaining({ kind: "bug", track: "marketing" }));
+    // The first query lists the rows; a later one only reads their descriptions by id.
+    expect(findMany.mock.calls[0]![0].where.track).toBe("marketing");
+  });
+
+  it("names no track when asked for all work", async () => {
+    indexedSearch.mockResolvedValue({ found: 1, hits: [{ id: "bug-1", kind: "bug", score: 10 }] });
+    await renderList({ q: "launch", status: "all", track: "all" });
+    expect(indexedSearch.mock.calls.at(-1)![0]).not.toHaveProperty("track");
+    expect(findMany.mock.calls[0]![0].where.tenantId).toBe("tenant-acme");
+    expect(findMany.mock.calls[0]![0].where).not.toHaveProperty("track");
+  });
+});
+
 describe("keeping marketing work out of the product list", () => {
   it("lists and counts only product issues", async () => {
     await renderList({ status: "open" });

@@ -253,7 +253,7 @@ export async function listOwnerQuestions(userId: string, tenantId: string) {
       bugId: true,
       createdAt: true,
       agent: { select: { id: true, name: true } },
-      bug: { select: { id: true, number: true, title: true, project: { select: { slug: true } } } },
+      bug: { select: { id: true, number: true, title: true, track: true, project: { select: { slug: true } } } },
     },
   });
 }
