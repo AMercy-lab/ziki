@@ -37,6 +37,9 @@ export function isPublicPath(
     pathWithoutBase === "/how-it-works" ||
     pathWithoutBase === "/for-agents" ||
     pathWithoutBase === "/developers" ||
+    // The public comparison directory and every comparison page (#compare).
+    pathWithoutBase === "/compare" ||
+    pathWithoutBase.startsWith("/compare/") ||
     isAuthPage ||
     isPasswordResetPage ||
     isPublicAgentPath(pathWithoutBase) ||
