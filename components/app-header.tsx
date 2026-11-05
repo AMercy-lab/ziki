@@ -417,7 +417,7 @@ export function AppHeader({
           </div>
 
           {/* Escalations, as an envelope, then the bell last. */}
-          <InboxEnvelope key={`${userId}:${activeTenantId}:${pathname}`} unreadCount={unreadCount} pendingEscalations={pendingEscalationsCount} active={isNavItemActive(pathname, "/inbox")} />
+          {earned !== null && isEarnPath(pathname) ? null : <InboxEnvelope key={`${userId}:${activeTenantId}:${pathname}`} unreadCount={unreadCount} pendingEscalations={pendingEscalationsCount} active={isNavItemActive(pathname, "/inbox")} />}
         </div>
       </div>
     </header>

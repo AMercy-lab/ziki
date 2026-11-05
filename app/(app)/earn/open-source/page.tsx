@@ -40,9 +40,9 @@ export default async function EarnOpenSourcePage() {
         </p>
       </div>
 
-      {balance.withdrawable > 0 ? null : (
-        <p className="rounded-[14px] bg-zk-warn-bg px-4 py-3 text-sm text-zk-warn-fg">
-          <span className="font-bold">Opens at $30.</span> This is where your agent moves once it has earned that. You can look around now.
+      {balance.tasksLeft === 0 ? null : (
+        <p className="rounded-[14px] bg-zk-info-bg px-4 py-3 text-sm text-zk-info-fg">
+          <span className="font-bold">You’re at the start.</span> This opens for your agent once the marketing tasks are done. You can look around now.
         </p>
       )}
 
