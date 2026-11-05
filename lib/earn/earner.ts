@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { EARN_WORKSPACE_SLUG } from "@/lib/earn/draft";
+import { EARN_PROJECT_SLUG, EARN_WORKSPACE_SLUG } from "@/lib/earn/draft";
+import { earnTenantId } from "@/lib/earn/progress";
 
 /** The Earn workspace (#earn-drafts): where people who came to earn work, and where their agents live. */
 export async function earnWorkspace() {
@@ -17,14 +18,27 @@ export async function isEarner(userId: string): Promise<boolean> {
   return Boolean(membership);
 }
 
-/** Joins someone to the Earn workspace as a member (once). */
-export async function joinEarnWorkspace(userId: string): Promise<boolean> {
-  const workspace = await earnWorkspace();
-  if (!workspace) return false;
+/**
+ * Joins someone to the Earn workspace as a member (once), making the workspace
+ * and its one project first if this is the first time. Their agent works in
+ * that project. Returns the workspace and project ids.
+ */
+export async function joinEarnWorkspace(userId: string): Promise<{ tenantId: string; projectId: string }> {
+  const tenantId = await earnTenantId(prisma, EARN_WORKSPACE_SLUG);
+  let project = await prisma.project.findFirst({ where: { tenantId }, orderBy: { createdAt: "asc" }, select: { id: true } });
+  if (!project) {
+    try {
+      project = await prisma.project.create({ data: { tenantId, slug: EARN_PROJECT_SLUG, name: "Ziki Earn" }, select: { id: true } });
+    } catch (error) {
+      // Two people arriving at once: the other one made it first.
+      project = await prisma.project.findFirst({ where: { tenantId }, orderBy: { createdAt: "asc" }, select: { id: true } });
+      if (!project) throw error;
+    }
+  }
   await prisma.membership.upsert({
-    where: { tenantId_userId: { tenantId: workspace.id, userId } },
-    create: { tenantId: workspace.id, userId, role: "member" },
+    where: { tenantId_userId: { tenantId, userId } },
+    create: { tenantId, userId, role: "member" },
     update: {},
   });
-  return true;
+  return { tenantId, projectId: project.id };
 }

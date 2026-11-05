@@ -123,18 +123,20 @@ export async function submitTask(db: Db, userId: string, n: number, proofInput: 
 }
 
 /**
- * Where a confirmed task's money lands: the Earn workspace when it exists and
- * the earner is in it, otherwise the first workspace they joined. Null when they
- * belong to none (nothing to credit).
+ * The Earn workspace, where all earn money lives: the $5 welcome and every
+ * confirmed task. Never a person's own workspaces, so earn money never counts
+ * in their points, leaderboards or totals there. It is made the first time it
+ * is needed (an upsert on the unique slug, so two at once make one), and a
+ * person does not have to be a member of it.
  */
-export async function creditTenantId(db: Db, userId: string, earnTenantSlug: string): Promise<string | null> {
-  const earn = await db.tenant.findUnique({ where: { slug: earnTenantSlug }, select: { id: true } });
-  if (earn) {
-    const member = await db.membership.findUnique({ where: { tenantId_userId: { tenantId: earn.id, userId } }, select: { id: true } });
-    if (member) return earn.id;
-  }
-  const first = await db.membership.findFirst({ where: { userId }, orderBy: { createdAt: "asc" }, select: { tenantId: true } });
-  return first?.tenantId ?? null;
+export async function earnTenantId(db: Db, earnTenantSlug: string): Promise<string> {
+  const tenant = await db.tenant.upsert({
+    where: { slug: earnTenantSlug },
+    create: { slug: earnTenantSlug, name: "Ziki Earn" },
+    update: {},
+    select: { id: true },
+  });
+  return tenant.id;
 }
 
 /**
@@ -142,14 +144,12 @@ export async function creditTenantId(db: Db, userId: string, earnTenantSlug: str
  * opens an earn page, new account or old. It is its own reward, separate from
  * the sign-up bonus the site pays every account. Under the `earn:` key prefix,
  * so the earn balance counts it, and unique per person, so asking again pays
- * nothing. Does nothing for someone who belongs to no workspace (nowhere to
- * credit). Returns true when it was paid now.
+ * nothing. It lands in the Earn workspace only. Returns true when it was paid now.
  */
 export async function grantWelcome(db: Db, userId: string, earnTenantSlug: string): Promise<boolean> {
   const sourceKey = `${EARN_KEY_PREFIX}welcome:${userId}`;
   if (await db.pointEntry.findUnique({ where: { sourceKey }, select: { id: true } })) return false;
-  const tenantId = await creditTenantId(db, userId, earnTenantSlug);
-  if (!tenantId) return false;
+  const tenantId = await earnTenantId(db, earnTenantSlug);
   return award(db, { tenantId, userId, bugId: null, role: "signup", points: SIGNUP_BONUS, sourceKey, exact: true });
 }
 
@@ -173,9 +173,7 @@ export async function confirmTask(
       data: { status: "confirmed", decidedAt: new Date(), decidedById: args.staffId, note: args.note?.trim() || null },
     });
     if (count !== 1) return { ok: false as const, error: "Nothing to confirm: it isn't waiting for checking." };
-    const tenantId = await creditTenantId(tx, args.userId, args.earnTenantSlug);
-    // Throwing rolls the confirmation back: no workspace means nowhere to credit.
-    if (!tenantId) throw new Error("earn: the earner belongs to no workspace to credit");
+    const tenantId = await earnTenantId(tx, args.earnTenantSlug);
     await award(tx, {
       tenantId,
       userId: args.userId,
