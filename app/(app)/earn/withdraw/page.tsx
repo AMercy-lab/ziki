@@ -2,10 +2,11 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { formatZ } from "@/lib/points/rules";
-import { CONVERSION_BONUS, WITHDRAW_THRESHOLD, stagePeople, stageTasks } from "@/lib/earn/draft";
-import { sampleBalance } from "@/lib/earn/state";
+import { CONVERSION_BONUS, WITHDRAW_THRESHOLD, earnPreviewEnabled, stagePeople, stageTasks } from "@/lib/earn/draft";
+import { earnBalanceFor } from "@/lib/earn/state";
 import { EarnBar, LockIcon } from "@/components/earn-money";
 import { agentsLink, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
+import { earnAgentWhere } from "@/lib/earn/earner";
 
 export const metadata = { title: "Withdraw" };
 
@@ -16,11 +17,11 @@ export const metadata = { title: "Withdraw" };
  */
 export default async function EarnWithdrawPage() {
   const user = await requireUser();
-  const balance = await sampleBalance();
+  const balance = await earnBalanceFor(user.id);
   const ready = balance.withdrawable > 0;
   const left = Math.max(0, WITHDRAW_THRESHOLD - balance.earned);
   const [agent] = await Promise.all([
-    prisma.agent.findFirst({ where: { ownerUserId: user.id, revokedAt: null }, orderBy: { createdAt: "asc" }, select: { name: true } }).catch(() => null),
+    prisma.agent.findFirst({ where: earnAgentWhere(user.id), orderBy: { createdAt: "asc" }, select: { name: true } }).catch(() => null),
   ]);
   const tasks = stageTasks(balance.stage);
   const signedUp = stagePeople(balance.stage).filter((person) => person.signedUp).length;
@@ -127,13 +128,15 @@ export default async function EarnWithdrawPage() {
         Paid to the wallet address in <Link href="/settings" className={agentsLink}>Settings</Link>.
       </p>
 
-      {/* Draft only: see this page at the sample earner's other stages. */}
-      <p className="flex flex-wrap gap-x-3 border-t border-dashed border-zk-border pt-4 text-xs text-zk-muted">
-        Draft preview:
-        <Link href="/earn/preview?state=new" prefetch={false} className={agentsLink}>$5, just signed up</Link>
-        <Link href="/earn/preview?state=progress" prefetch={false} className={agentsLink}>$19, tasks done</Link>
-        <Link href="/earn/preview?state=unlocked" prefetch={false} className={agentsLink}>$30, unlocked</Link>
-      </p>
+      {/* Development only: see this page at the demo stages. */}
+      {earnPreviewEnabled() ? (
+        <p className="flex flex-wrap gap-x-3 border-t border-dashed border-zk-border pt-4 text-xs text-zk-muted">
+          Demo stages:
+          <Link href="/earn/preview?state=new" prefetch={false} className={agentsLink}>Real data</Link>
+          <Link href="/earn/preview?state=progress" prefetch={false} className={agentsLink}>$19, tasks done</Link>
+          <Link href="/earn/preview?state=unlocked" prefetch={false} className={agentsLink}>$30, unlocked</Link>
+        </p>
+      ) : null}
     </div>
   );
 }

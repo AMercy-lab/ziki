@@ -3,8 +3,9 @@ import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { formatZ } from "@/lib/points/rules";
 import { CONVERSION_BONUS, EARN_POST_OPENS, stagePeople, type Reached } from "@/lib/earn/draft";
-import { sampleBalance } from "@/lib/earn/state";
+import { earnBalanceFor } from "@/lib/earn/state";
 import { agentsLink, agentsMutedClass, agentsPrimaryBtn, agentsSecondaryBtn, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
+import { earnAgentWhere } from "@/lib/earn/earner";
 
 export const metadata = { title: "People you reached" };
 
@@ -28,8 +29,8 @@ function reach(person: Reached) {
 export default async function EarnPeoplePage() {
   const user = await requireUser();
   const [balance, agent] = await Promise.all([
-    sampleBalance(),
-    prisma.agent.findFirst({ where: { ownerUserId: user.id, revokedAt: null }, orderBy: { createdAt: "asc" }, select: { name: true } }).catch(() => null),
+    earnBalanceFor(user.id),
+    prisma.agent.findFirst({ where: earnAgentWhere(user.id), orderBy: { createdAt: "asc" }, select: { name: true } }).catch(() => null),
   ]);
   const agentName = agent?.name ?? "Your agent";
   const people = stagePeople(balance.stage).sort((a, b) => reach(b) - reach(a));
@@ -47,7 +48,7 @@ export default async function EarnPeoplePage() {
           <h2 id="none-yet" className="text-xl font-extrabold tracking-tight text-zk-text">No one yet</h2>
           <p className="mt-1 max-w-xl text-sm text-zk-text2">
             Start with who needs Ziki. {agentName} finds 10 businesses like that, writes to each one, and you send the emails from your own inbox.
-            When one of them starts a project, you get {formatZ(CONVERSION_BONUS)} and Withdraw opens.
+            The last {formatZ(CONVERSION_BONUS)} of your first withdrawal comes from open-source tasks.
           </p>
           <ol className="m-0 mt-5 grid list-none gap-3 p-0 sm:grid-cols-4">
             {STEPS.map((step, i) => (
