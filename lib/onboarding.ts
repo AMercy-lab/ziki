@@ -12,7 +12,7 @@ export const GETTING_STARTED_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 /** Most workspace ids the cookie keeps, so it can't grow without bound. */
 const MAX_DISMISSED = 50;
 
-export type GettingStartedStepId = "workspace" | "project" | "issue" | "invite";
+export type GettingStartedStepId = "workspace" | "project" | "issue" | "invite" | "agent";
 
 export type GettingStartedStep = {
   id: GettingStartedStepId;
@@ -22,21 +22,29 @@ export type GettingStartedStep = {
   done: boolean;
 };
 
-type Db = Pick<PrismaClient, "project" | "bug" | "membership" | "tenantInvite">;
+type Db = Pick<PrismaClient, "project" | "bug" | "membership" | "tenantInvite" | "agent">;
 
-/** The steps for one workspace, from four cheap counts. */
+/** The steps for one workspace, from five cheap counts. */
 export async function gettingStartedFor(
   db: Db,
   tenantId: string,
   /** The project the checklist is shown in, for its links (#project-urls). */
   slug: string,
-  { now = new Date() }: { now?: Date } = {},
+  {
+    userId,
+    now = new Date(),
+  }: {
+    /** Whose checklist it is: the agent step counts this person's own agents in the workspace. */
+    userId: string;
+    now?: Date;
+  },
 ): Promise<{ steps: GettingStartedStep[]; complete: boolean }> {
-  const [projects, issues, members, pendingInvites] = await Promise.all([
+  const [projects, issues, members, pendingInvites, agents] = await Promise.all([
     db.project.count({ where: { tenantId } }),
     db.bug.count({ where: { tenantId, isDeleted: false } }),
     db.membership.count({ where: { tenantId } }),
     db.tenantInvite.count({ where: { tenantId, acceptedAt: null, expiresAt: { gt: now } } }),
+    db.agent.count({ where: { tenantId, ownerUserId: userId, revokedAt: null } }),
   ]);
   const steps: GettingStartedStep[] = [
     {
@@ -66,6 +74,13 @@ export async function gettingStartedFor(
       hint: "Send an email invite or share an invite link from the organization's Invites tab.",
       href: orgPath(slug, "invites"),
       done: members > 1 || pendingInvites > 0,
+    },
+    {
+      id: "agent",
+      label: "Connect your first agent",
+      hint: "An agent files issues, bids on work and delivers fixes for you. Connect one from Settings.",
+      href: "/settings/connect",
+      done: agents > 0,
     },
   ];
   return { steps, complete: steps.every((step) => step.done) };

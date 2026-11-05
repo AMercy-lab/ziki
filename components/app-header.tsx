@@ -9,6 +9,7 @@ import { WorkspaceSwitcher, type WorkspaceChoice } from "@/components/workspace-
 import {
   MANAGE_AGENTS_HREF,
   AGENTS_DIRECTORY_HREF,
+  LEADERBOARD_HREF,
   SITE_ADMIN_HREF,
   isNavItemActive,
   realRoleOf,
@@ -17,6 +18,9 @@ import {
 import { isSuperAdmin, type AppRole } from "@/lib/roles";
 import { Avatar } from "@/components/avatar";
 import { AccountThemeSelector } from "@/components/theme-toggle";
+import { CookieSettingsLink } from "@/components/consent-banner";
+import { VersionCredits } from "@/components/credits-dialog";
+import { leaderboardVisible } from "@/lib/agents-dock";
 import { recentNotificationsAction } from "@/app/actions/notifications";
 import { LocalTime } from "@/components/local-time";
 import { BASE_PATH } from "@/lib/base-path";
@@ -275,7 +279,13 @@ export function AppHeader({
   defaultProjectSlug = null,
   earned = null,
   withdraw = null,
+  version,
+  memberCount = null,
 }: {
+  /** The running version (package version), shown with Cookie settings at the foot of the account menu. */
+  version?: string;
+  /** Members of the current workspace: the Leaderboard entry needs more than one. Null when unknown. */
+  memberCount?: number | null;
   /** Earn (#earn-drafts): what the Withdraw window shows; null for everyone else. */
   withdraw?: WithdrawInfo | null;
   /** Earn (#earn-drafts): an earner's dollars, shown with Withdraw in the header; null for everyone else. */
@@ -395,6 +405,12 @@ export function AppHeader({
                 <MenuLink href={AGENTS_DIRECTORY_HREF} active={pathname === AGENTS_DIRECTORY_HREF}>
                   All agents
                 </MenuLink>
+                {/* You can't be the only person on a leaderboard: a workspace of one has none. */}
+                {leaderboardVisible(memberCount) && !earnQuiet ? (
+                  <MenuLink href={LEADERBOARD_HREF} active={isNavItemActive(pathname, LEADERBOARD_HREF)}>
+                    Leaderboard
+                  </MenuLink>
+                ) : null}
                 {isSuperAdmin(role) ? (
                   <MenuLink href={SITE_ADMIN_HREF} active={isNavItemActive(pathname, SITE_ADMIN_HREF)}>
                     Site admin
@@ -414,6 +430,14 @@ export function AppHeader({
                   userId={userId}
                   className={`${linkFocus} font-bold text-zk-bad-fg hover:bg-zk-bad-soft`}
                 />
+                {/* On every page, with or without the agents bar: Cookie settings and the version, small and grey.
+                    Cookie settings opens the consent banner, so the menu steps aside first. */}
+                <div className="flex items-center justify-between gap-3 px-3 pb-1 pt-1 text-[11px] text-zk-muted">
+                  <CookieSettingsLink onOpen={closeAccount} className={`rounded underline hover:text-zk-text ${linkFocus}`} />
+                  {version ? (
+                    <VersionCredits version={version} className={`rounded font-mono hover:text-zk-text hover:underline ${linkFocus}`} />
+                  ) : null}
+                </div>
               </div>
             ) : null}
           </div>

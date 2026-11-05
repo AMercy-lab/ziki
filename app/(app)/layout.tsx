@@ -105,11 +105,18 @@ export default async function AppLayout({
 
   let pendingEscalationsCount = 0;
   let dockAgents: DockAgent[] = [];
+  // Members of this workspace, for the Leaderboard link: nobody ranks against no one. Null when it couldn't be read.
+  let memberCount: number | null = null;
   if (tenantId) {
     try {
       pendingEscalationsCount = await countPendingEscalations(user.id, tenantId);
     } catch (error) {
       console.error("[layout] pending escalations count failed", error);
+    }
+    try {
+      memberCount = await prisma.membership.count({ where: { tenantId } });
+    } catch (error) {
+      console.error("[layout] member count failed", error);
     }
     try {
       const agents = await loadOwnAgents({ userId: user.id, tenantId });
@@ -168,6 +175,8 @@ export default async function AppLayout({
           organizationAdmin={tenantId !== null && isOrganizationAdmin(membershipRole, user.role)}
           earned={earnSample ? earnSample.earned : null}
           withdraw={earnSample ? withdrawInfo(earnSample.stage) : null}
+          version={appVersionLabel()}
+          memberCount={memberCount}
         />
         <main
           id={MAIN_CONTENT_ID}
@@ -180,8 +189,8 @@ export default async function AppLayout({
           {children}
         </main>
       </div>
-      {/* The agents dock keeps the page's foot clear of its floor line itself, as tall as what stands on it. */}
-      <AgentsDock agents={dockAgents} defaultProjectSlug={defaultProjectSlug} version={appVersionLabel()} earn={earnSample !== null} />
+      {/* The agents dock keeps the page's foot clear of its floor line itself, as tall as what stands on it, and draws nothing (no spacer either) where it doesn't help. */}
+      <AgentsDock agents={dockAgents} defaultProjectSlug={defaultProjectSlug} version={appVersionLabel()} earn={earnSample !== null} memberCount={memberCount} />
       <FocusMainOnNavigate />
       <KeyboardShortcuts
         enabled={shortcutsEnabled}
