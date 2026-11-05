@@ -222,8 +222,11 @@ export async function createProjectAction(
   const tenantId = await currentTenantIdFor(user.id);
   if (!tenantId) return { error: NO_TENANT_MESSAGE };
 
-  const parsed = projectNameSchema.safeParse({ name: formData.get("name") });
-  if (!parsed.success) return fromZodError(parsed.error, "Invalid project name");
+  const parsed = projectNameSchema.safeParse({
+    name: formData.get("name"),
+    goal: formData.get("goal"),
+  });
+  if (!parsed.success) return fromZodError(parsed.error, "Invalid project details");
 
   const existing = await prisma.project.findMany({
     where: { tenantId },
@@ -244,6 +247,7 @@ export async function createProjectAction(
         tenantId,
         name: parsed.data.name,
         slug,
+        goal: parsed.data.goal ?? undefined,
         rewardConfig: rewardConfig ?? undefined,
         workflow: { create: {} },
       },
