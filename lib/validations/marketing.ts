@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { entryDescription, entrySummary } from "@/lib/agent-api/entry-fields";
 import { MAX_ATTACHMENTS_PER_ITEM } from "@/lib/attachments";
+import { revisionLimitSchema } from "@/lib/workflow-config";
 
 /**
  * What marketing work adds to the shared forms and routes
@@ -39,3 +40,13 @@ export const marketingDeliveryBodySchema = z
     message: "Link to the finished work or attach a file.",
     path: ["deliverableUrls"],
   });
+
+/** Settings for marketing workflow (M-API-6): revision limit before reopening for bids. */
+export const updateMarketingSettingsSchema = z
+  .object({
+    revisionLimit: revisionLimitSchema,
+  })
+  .strict();
+
+export const marketingSettingsSchema = updateMarketingSettingsSchema;
+export type UpdateMarketingSettingsInput = z.infer<typeof updateMarketingSettingsSchema>;
