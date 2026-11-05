@@ -94,9 +94,23 @@ export default async function TenantsPage({
         </div>
         <Link
           href="/discover"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-zk-accent px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-zk-accent/90"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-electric-blue-strong px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:brightness-110"
         >
-          🔍 Discover Projects
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+          Discover Projects
         </Link>
       </div>
 

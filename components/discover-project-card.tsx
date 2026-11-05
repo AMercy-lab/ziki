@@ -68,7 +68,23 @@ export function DiscoverProjectCard({ project }: { project: DiscoverableProject 
               {project._count.bugs} open issues
             </span>
             <span className="flex items-center gap-1.5">
-              💡 {project._count.ideas} ideas
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="shrink-0 text-zk-muted"
+                aria-hidden="true"
+              >
+                <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
+                <path d="M9 18h6" />
+                <path d="M10 22h4" />
+              </svg>
+              {project._count.ideas} ideas
             </span>
           </div>
         </div>
@@ -100,31 +116,50 @@ export function DiscoverProjectCard({ project }: { project: DiscoverableProject 
           <div>
             {currentStatus === "guest" ? (
               <Link href={`/login?callbackUrl=${encodeURIComponent("/discover")}`}>
-                <Button variant={project.isOpenForContributors ? "primary" : "secondary"} className="text-xs">
+                <Button
+                  className={`text-xs ${
+                    project.isOpenForContributors
+                      ? "bg-electric-blue-strong text-white hover:brightness-110 font-bold"
+                      : "border border-zk-border bg-zk-surface text-zk-text hover:bg-zk-chip font-medium"
+                  }`}
+                >
                   {project.isOpenForContributors ? "Sign in to Join" : "Sign in to View"}
                 </Button>
               </Link>
             ) : currentStatus === "member" ? (
               <Link href={projectPath(projectRef(project.tenant.slug, project.slug))}>
-                <Button variant="secondary" className="text-xs">
+                <Button className="border border-zk-border bg-zk-surface text-zk-text hover:bg-zk-chip text-xs font-medium">
                   Open Project →
                 </Button>
               </Link>
             ) : currentStatus === "pending" ? (
-              <Button variant="ghost" disabled className="text-xs text-zk-muted">
-                Request Pending ⏳
-              </Button>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-zk-border bg-zk-chip/50 px-3.5 py-1.5 text-xs font-medium text-zk-muted">
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                Request Pending
+              </span>
             ) : project.isOpenForContributors ? (
               <Button
-                variant="primary"
                 onClick={() => setModalOpen(true)}
-                className="text-xs"
+                className="bg-electric-blue-strong text-white hover:brightness-110 text-xs font-bold shadow-sm"
               >
                 {currentStatus === "rejected" ? "Re-apply to Join" : "Request to Join"}
               </Button>
             ) : (
               <Link href={projectPath(projectRef(project.tenant.slug, project.slug))}>
-                <Button variant="secondary" className="text-xs">
+                <Button className="border border-zk-border bg-zk-surface text-zk-text hover:bg-zk-chip text-xs font-medium">
                   Browse Issues
                 </Button>
               </Link>

@@ -173,7 +173,7 @@ export default async function DiscoverPage(props: DiscoverPageProps) {
 
         <button
           type="submit"
-          className="rounded-xl bg-zk-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-zk-accent/90 focus:outline-none"
+          className="rounded-xl bg-electric-blue-strong px-5 py-2 text-sm font-bold text-white shadow-sm transition hover:brightness-110 focus:outline-none"
         >
           Search
         </button>
@@ -182,8 +182,21 @@ export default async function DiscoverPage(props: DiscoverPageProps) {
       {/* Project Grid */}
       {cardsData.length === 0 ? (
         <div className="rounded-[20px] border border-zk-border bg-zk-surface p-12 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zk-chip text-2xl">
-            🔍
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zk-chip text-zk-muted">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
           </div>
           <h3 className="mt-4 text-base font-semibold text-zk-text">No projects found</h3>
           <p className="mt-1 text-sm text-zk-text2">

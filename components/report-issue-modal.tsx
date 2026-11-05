@@ -94,7 +94,7 @@ export function ReportIssueModal(props: FormProps) {
                 <button
                   ref={keepWritingRef}
                   type="button"
-                  className="create-submit inline-flex min-h-11 items-center rounded-full bg-zk-accent px-5 text-sm font-bold text-white"
+                  className="create-submit inline-flex min-h-11 items-center rounded-full bg-electric-blue-strong px-5 text-sm font-bold text-white transition hover:brightness-105"
                   onClick={() => setConfirming(false)}
                 >
                   Keep writing

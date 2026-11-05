@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { selectTenantAction } from "@/app/(app)/tenants/actions";
 import { avatarTone } from "@/lib/avatar";
 import { orgHomePath, projectPath, projectRef } from "@/lib/project-paths";
@@ -79,8 +80,28 @@ export function WorkspaceSwitcher({
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   const shared = (name: string) => (counts.get(name.toLocaleLowerCase()) ?? 0) > 1;
-  const selected =
-    workspaces.find((workspace) => workspace.id === activeTenantId) ?? workspaces[0];
+  const params = useParams<{ org?: string; project?: string }>();
+  const currentOrgSlug = params?.org ? decodeURIComponent(params.org) : null;
+  const currentProjectSlug = params?.project ? decodeURIComponent(params.project) : null;
+
+  const externalOrg = currentOrgSlug
+    ? externalProjects.find((p) => p.tenantSlug === currentOrgSlug)
+    : null;
+
+  const selected: WorkspaceChoice | undefined =
+    (currentOrgSlug ? workspaces.find((w) => w.slug === currentOrgSlug) : null) ??
+    (externalOrg
+      ? {
+          id: externalOrg.tenantId,
+          name: externalOrg.tenantName,
+          slug: externalOrg.tenantSlug,
+          projects: externalProjects
+            .filter((p) => p.tenantSlug === externalOrg.tenantSlug)
+            .map((p) => ({ id: p.id, name: p.name, slug: p.slug })),
+        }
+      : null) ??
+    workspaces.find((workspace) => workspace.id === activeTenantId) ??
+    workspaces[0];
 
   const otherOrgs = workspaces.filter((w) => w.id !== selected?.id);
 
@@ -134,7 +155,12 @@ export function WorkspaceSwitcher({
     });
   }
 
-  const primaryOrgTarget = orgHref || (selected ? orgHomePath(selected.slug) : "/tenants");
+  const primaryOrgTarget =
+    selected?.slug === currentOrgSlug && orgHref
+      ? orgHref
+      : selected
+      ? orgHomePath(selected.slug)
+      : "/tenants";
 
   return (
     <div ref={rootRef} className={`relative ${fullWidth ? "w-full" : "w-max max-w-56"} ${className}`}>
@@ -213,17 +239,44 @@ export function WorkspaceSwitcher({
 
                 <div className="mt-1 space-y-0.5">
                   {selected.projects && selected.projects.length > 0 ? (
-                    selected.projects.map((p) => (
-                      <Link
-                        key={p.id}
-                        href={projectPath(projectRef(selected.slug, p.slug))}
-                        onClick={() => setOpen(false)}
-                        className="flex items-center gap-2 rounded-lg px-2.5 py-1 text-xs text-zk-text transition hover:bg-zk-chip hover:text-zk-accent"
-                      >
-                        <span className="text-zk-muted text-[11px]">📁</span>
-                        <span className="truncate font-medium">{p.name}</span>
-                      </Link>
-                    ))
+                    selected.projects.map((p) => {
+                      const isCurrent = currentProjectSlug === p.slug;
+                      return (
+                        <Link
+                          key={p.id}
+                          href={projectPath(projectRef(selected.slug, p.slug))}
+                          onClick={() => setOpen(false)}
+                          className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition ${
+                            isCurrent
+                              ? "bg-zk-tint font-bold text-zk-accent"
+                              : "text-zk-text hover:bg-zk-chip hover:text-zk-accent"
+                          }`}
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className={isCurrent ? "shrink-0 text-zk-accent" : "shrink-0 text-zk-muted"}
+                              aria-hidden="true"
+                            >
+                              <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
+                            </svg>
+                            <span className="truncate">{p.name}</span>
+                          </span>
+                          {isCurrent ? (
+                            <span className="shrink-0 rounded-full bg-zk-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-zk-accent">
+                              Active
+                            </span>
+                          ) : null}
+                        </Link>
+                      );
+                    })
                   ) : (
                     <p className="px-2.5 py-1 text-[11px] text-zk-muted">
                       No projects in this organization yet.
@@ -314,9 +367,23 @@ export function WorkspaceSwitcher({
                                     projectPath(projectRef(org.slug, p.slug))
                                   )}`}
                                   onClick={() => setOpen(false)}
-                                  className="block truncate py-0.5 text-xs text-zk-text2 transition hover:text-zk-accent"
+                                  className="flex items-center gap-2 truncate rounded-md px-2 py-1 text-xs text-zk-text2 transition hover:bg-zk-chip hover:text-zk-accent"
                                 >
-                                  • {p.name}
+                                  <svg
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.8"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="shrink-0 text-zk-muted"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
+                                  </svg>
+                                  <span className="truncate font-medium">{p.name}</span>
                                 </Link>
                               ))}
                             </div>
