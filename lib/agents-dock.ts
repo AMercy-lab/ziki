@@ -1,3 +1,4 @@
+import { isEarnPath } from "@/lib/earn/paths";
 import { isReservedProjectSlug } from "@/lib/project-slug";
 
 /** The agents strip's height (#agents-dock); the page keeps this much free at its foot. */
@@ -12,6 +13,8 @@ export const AGENTS_DOCK_HEIGHT = 76;
  * here. The pages, matched on whole path segments (a trailing slash is fine):
  *
  * - the workspace's `/home`, `/feed`, `/activity` and `/inbox` (and below it);
+ * - the earn pages (`isEarnPath`, lib/earn/paths.ts), where an earner keeps the
+ *   bar for their agents (#earn-drafts);
  * - a project's landing page `/<project>`, its `/ideas` and `/issues` pages
  *   (and below them), an issue `/<project>/<number>`, `/<project>/workstream`
  *   and `/<project>/work`.
@@ -24,6 +27,7 @@ export function dockVisibleOn(pathname: string | null | undefined, agentCount: n
   const segments = (pathname ?? "").split("/").filter(Boolean);
   const [first, second] = segments;
   if (!first) return false;
+  if (isEarnPath(pathname)) return true;
   if (first === "inbox") return true;
   if (first === "home" || first === "feed" || first === "activity") return segments.length === 1;
   if (isReservedProjectSlug(first)) return false;
