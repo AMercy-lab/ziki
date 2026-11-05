@@ -34,6 +34,7 @@ import { IssueApiError } from "@/lib/agent-api/errors";
 import { latestPullRequestReport, pullRequestStateView } from "@/lib/agent-api/pull-request-report";
 import { agentAttachmentUrl } from "@/lib/agent-api/attachment-read";
 import { entrySummary } from "@/lib/agent-api/entry-fields";
+import { searchWorkItems } from "@/lib/search-index";
 
 export { IssueApiError };
 
@@ -216,16 +217,59 @@ export async function listAgentIssues(scope: Scope, params: URLSearchParams) {
         { description: { contains: escapeSearchQuery(boundSearchTerm(q)), mode: "insensitive" } },
       ] }] }
     : {};
-  const filtered: Prisma.BugWhereInput = {
-    ...scope, ...trackFilter(parsedTrack.track), isDeleted: false, ...search,
+  const baseFiltered: Prisma.BugWhereInput = {
+    ...scope, ...trackFilter(parsedTrack.track), isDeleted: false,
     ...(status ? { status } : {}),
     ...(substatus ? { substatus } : {}),
     ...(assigneeId !== undefined ? { assigneeId } : {}),
     ...platformFilterWhere(requireKnownFilter("platform", params.get("platform"), parsePlatformFilter(params.get("platform"), platforms))),
     ...projectAreaFilterWhere(requireKnownFilter("area", requestedArea, parseProjectAreaFilter(requestedArea, areas))),
   };
-  const where: Prisma.BugWhereInput = { ...filtered, ...cursorWhere(cursor) };
-  const rows = await prisma.bug.findMany({ where, orderBy: cursorOrderBy(), take: limit + 1, select: issueSelect });
+  let rows;
+  if (q && boundSearchTerm(q).length >= 3) {
+    try {
+      const selectedPlatform = requireKnownFilter("platform", params.get("platform"), parsePlatformFilter(params.get("platform"), platforms));
+      const selectedArea = requireKnownFilter("area", requestedArea, parseProjectAreaFilter(requestedArea, areas));
+      const filters = [
+        ...(status ? [`status:=${status}`] : []),
+        ...(substatus ? [`substatus:=${substatus}`] : []),
+        ...(assigneeId === null ? ["hasAssignee:=false"] : typeof assigneeId === "string" ? [`assigneeId:=${assigneeId}`] : []),
+        ...(selectedPlatform === "none" ? ["hasCategory:=false"] : selectedPlatform ? [`categoryId:=${selectedPlatform}`] : []),
+        ...(selectedArea === "none" ? ["hasArea:=false"] : selectedArea ? [`areaId:=${selectedArea}`] : []),
+        // Typesense supports numeric ranges, not string range filters. Fetch
+        // through the cursor timestamp, then apply the full (time, id) cursor
+        // predicate in PostgreSQL before counting the page.
+        ...(cursor ? [`createdAt:<=${cursor.createdAt.getTime()}`] : []),
+      ];
+      const batchSize = limit + 1;
+      const ids: string[] = [];
+      let page = 1;
+      let found = 0;
+      while (true) {
+        const batch = await searchWorkItems({ query: boundSearchTerm(q), kind: "bug", tenantId: scope.tenantId, projectId: scope.projectId, track: parsedTrack.track, page, perPage: batchSize, sortBy: "createdAt:desc,sourceId:desc", queryBy: "title(infix:always),description(infix:always)", extraFilters: filters });
+        found = batch.found;
+        if (page === 1 && found === 0) throw new Error("Typesense returned no candidates; verifying with PostgreSQL.");
+        ids.push(...batch.hits.map((hit) => hit.id));
+        const currentRows = await prisma.bug.findMany({
+          where: { ...baseFiltered, ...cursorWhere(cursor), id: { in: ids } },
+          orderBy: cursorOrderBy(), take: limit + 1, select: issueSelect,
+        });
+        const literalQuery = boundSearchTerm(q).toLocaleLowerCase();
+        rows = currentRows.filter((row) => row.title.toLocaleLowerCase().includes(literalQuery) || row.description.toLocaleLowerCase().includes(literalQuery));
+        if (rows.length > limit || page * batchSize >= found || batch.hits.length === 0) break;
+        page += 1;
+      }
+      const sourceCount = await prisma.bug.count({ where: { ...baseFiltered, ...search, ...cursorWhere(cursor) } });
+      if (rows.length < Math.min(limit + 1, sourceCount)) throw new Error("Typesense candidate page is incomplete; verifying with PostgreSQL.");
+    } catch (error) {
+      console.error("[agent-api/issues] Typesense search failed; using PostgreSQL", error);
+      const where: Prisma.BugWhereInput = { ...baseFiltered, ...search, ...cursorWhere(cursor) };
+      rows = await prisma.bug.findMany({ where, orderBy: cursorOrderBy(), take: limit + 1, select: issueSelect });
+    }
+  } else {
+    const where: Prisma.BugWhereInput = { ...baseFiltered, ...search, ...cursorWhere(cursor) };
+    rows = await prisma.bug.findMany({ where, orderBy: cursorOrderBy(), take: limit + 1, select: issueSelect });
+  }
   return toPage(rows.map(withImportance), limit);
 }
 

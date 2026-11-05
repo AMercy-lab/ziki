@@ -9,8 +9,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const db = vi.hoisted(() => ({
   idempotencyKey: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), deleteMany: vi.fn() },
   issueType: { findUnique: vi.fn() },
-  bug: { findMany: vi.fn(), groupBy: vi.fn(), findFirst: vi.fn() },
-  idea: { findMany: vi.fn(), findFirst: vi.fn(), findUniqueOrThrow: vi.fn(), groupBy: vi.fn() },
+  bug: { findMany: vi.fn(), count: vi.fn(), groupBy: vi.fn(), findFirst: vi.fn() },
+  idea: { findMany: vi.fn(), count: vi.fn(), findFirst: vi.fn(), findUniqueOrThrow: vi.fn(), groupBy: vi.fn() },
   ideaVerdict: { groupBy: vi.fn(async () => []) },
   category: { findMany: vi.fn() },
   projectArea: { findMany: vi.fn() },
@@ -19,7 +19,9 @@ const db = vi.hoisted(() => ({
   $queryRaw: vi.fn(),
   $transaction: vi.fn(),
 }));
+const indexedSearch = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
+vi.mock("@/lib/search-index", () => ({ searchWorkItems: indexedSearch }));
 
 const sessionUser = vi.hoisted(() => ({ resolve: vi.fn() }));
 vi.mock("@/lib/session-user", () => ({ resolveSessionUserId: sessionUser.resolve }));
@@ -54,7 +56,7 @@ vi.mock("@anthropic-ai/sdk", () => {
 });
 vi.mock("@anthropic-ai/sdk/helpers/zod", () => ({ zodOutputFormat: (schema: unknown) => schema }));
 
-import { createIdeaWithPolicy, type CreatePolicyInput } from "@/lib/agent-api/create-policy";
+import { createIdeaWithPolicy, encodeCursor, type CreatePolicyInput } from "@/lib/agent-api/create-policy";
 import { listAgentIdeas, readAgentIdea } from "@/lib/agent-api/ideas";
 import { countAgentIssues, issueProject, listAgentIssues } from "@/lib/agent-api/issues";
 import { GET as suggestIssues } from "@/app/api/issues/suggest/route";
@@ -149,8 +151,11 @@ beforeEach(() => {
   activeProject.get.mockResolvedValue("p1");
   rateLimit.consume.mockResolvedValue({ allowed: true });
   db.idea.findMany.mockResolvedValue([idea]);
+  db.idea.count.mockResolvedValue(1);
   db.idea.findFirst.mockResolvedValue({ id: "i1" });
   db.idea.findUniqueOrThrow.mockResolvedValue({ ...idea, attachments: [] });
+  db.bug.count.mockResolvedValue(1);
+  indexedSearch.mockRejectedValue(new Error("Typesense is unavailable in this test."));
   insert.mockResolvedValue({ id: "new-idea" });
 });
 
@@ -251,6 +256,41 @@ describe("seeing an idea", () => {
     expect(page.items[0]).toMatchObject({ track: "marketing", rationale: "Supports the launch focus.", status: "rejected" });
     await expect(listAgentIdeas(scope, new URLSearchParams("track=web"))).rejects.toMatchObject({ status: 400, body: { field: "track" } });
   });
+
+  it("uses the Typesense match set, then applies the authenticated project scope and cursor order in PostgreSQL", async () => {
+    indexedSearch.mockResolvedValue({ found: 1, hits: [{ id: "i1", kind: "idea", score: 10 }] });
+    const result = await listAgentIdeas(scope, new URLSearchParams("q=Export%20activity%20as%20CSV&limit=1"));
+    expect(result.items).toHaveLength(1);
+    const query = db.idea.findMany.mock.calls.at(-1)![0];
+    expect(query.where.id).toEqual({ in: ["i1"] });
+    expect(query.where).toMatchObject({ tenantId: "t1", projectId: "p1", track: "product", isDeleted: false });
+    expect(query.where).not.toHaveProperty("AND");
+    expect(query.orderBy).toEqual([{ createdAt: "desc" }, { id: "desc" }]);
+    expect(indexedSearch).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "idea", tenantId: "t1", projectId: "p1", track: "product",
+      sortBy: "createdAt:desc,sourceId:desc", perPage: 2,
+    }));
+  });
+
+  it("falls back to the track and project scoped PostgreSQL idea search when Typesense is unavailable", async () => {
+    const page = await listAgentIdeas(scope, new URLSearchParams("track=marketing&q=Export%20activity%20as%20CSV"));
+    expect(page.items).toHaveLength(1);
+    expect(indexedSearch).toHaveBeenCalledWith(expect.objectContaining({ kind: "idea", track: "marketing" }));
+    expect(db.idea.findMany.mock.calls.at(-1)![0].where).toMatchObject({
+      tenantId: "t1", projectId: "p1", track: "marketing", isDeleted: false,
+    });
+    expect(db.idea.findMany.mock.calls.at(-1)![0].where).toHaveProperty("AND");
+  });
+
+  it("uses only the numeric timestamp in Typesense cursor filters, then keeps the full cursor predicate in PostgreSQL", async () => {
+    indexedSearch.mockResolvedValue({ found: 1, hits: [{ id: "i1", kind: "idea", score: 10 }] });
+    const cursor = encodeCursor({ createdAt: idea.createdAt, id: "idea-cursor" });
+    await listAgentIdeas(scope, new URLSearchParams(`q=Export&limit=1&cursor=${cursor}`));
+    expect(indexedSearch).toHaveBeenCalledWith(expect.objectContaining({
+      extraFilters: expect.arrayContaining([`createdAt:<=${idea.createdAt.getTime()}`]),
+    }));
+    expect(db.idea.findMany.mock.calls.at(-1)![0].where).toHaveProperty("OR");
+  });
 });
 
 describe("listing issues by track", () => {
@@ -291,6 +331,7 @@ describe("listing issues by track", () => {
       track: "marketing",
     });
     expect(page.items.map(({ id, track }) => ({ id, track }))).toEqual([{ id: "marketing-local", track: "marketing" }]);
+    expect(indexedSearch).toHaveBeenCalledWith(expect.objectContaining({ kind: "bug", track: "marketing" }));
   });
 
   it("rejects an invalid track with the ideas endpoint's 400 contract", async () => {
@@ -382,14 +423,16 @@ describe("issue suggestions by track", () => {
 
   beforeEach(() => {
     db.bug.findMany.mockImplementation(async ({ where }: { where: Record<string, unknown> }) => {
-      const matches = where.OR as Array<{ number?: number; title?: { contains?: string } }>;
+      const matches = (where.OR as Array<{ number?: number; title?: { contains?: string } }> | undefined) ?? [];
+      const ids = typeof where.id === "object" && where.id && "in" in where.id ? (where.id as { in: string[] }).in : null;
       return suggestionIssues.filter((row) =>
         row.tenantId === where.tenantId
         && row.projectId === where.projectId
         && row.track === where.track
         && !row.isDeleted
-        && matches.some((match) => match.number === row.number
-          || Boolean(match.title?.contains && row.title.toLowerCase().includes(match.title.contains.toLowerCase()))),
+        && (!ids || ids.includes(row.id))
+        && (!matches.length || matches.some((match) => match.number === row.number
+          || Boolean(match.title?.contains && row.title.toLowerCase().includes(match.title.contains.toLowerCase())))),
       );
     });
   });
@@ -398,13 +441,18 @@ describe("issue suggestions by track", () => {
     const product = await suggestIssues(new NextRequest("https://ziki.test/api/issues/suggest?q=42"));
     const marketing = await suggestIssues(new NextRequest("https://ziki.test/api/issues/suggest?q=43&track=marketing"));
     const noProductLeak = await suggestIssues(new NextRequest("https://ziki.test/api/issues/suggest?q=42&track=marketing"));
+    const marketingText = await suggestIssues(new NextRequest("https://ziki.test/api/issues/suggest?q=Marketing&track=marketing"));
 
     expect(product.status).toBe(200);
     await expect(product.json()).resolves.toMatchObject({ issues: [{ id: "product-42", number: 42, track: "product" }] });
     expect(marketing.status).toBe(200);
     await expect(marketing.json()).resolves.toMatchObject({ issues: [{ id: "marketing-43", number: 43, track: "marketing" }] });
     await expect(noProductLeak.json()).resolves.toEqual({ issues: [] });
-    expect(db.bug.findMany.mock.calls.map(([args]) => args.where.track)).toEqual(["product", "marketing", "marketing"]);
+    await expect(marketingText.json()).resolves.toMatchObject({ issues: [{ id: "marketing-43", track: "marketing" }] });
+    const requestedTracks = db.bug.findMany.mock.calls.map(([args]) => args.where.track);
+    expect(requestedTracks).toContain("product");
+    expect(requestedTracks).toContain("marketing");
+    expect(indexedSearch).toHaveBeenCalledWith(expect.objectContaining({ kind: "bug", track: "marketing" }));
   });
 
   it("rejects an invalid track", async () => {
