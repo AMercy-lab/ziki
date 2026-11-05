@@ -119,8 +119,8 @@ const RANK: Record<DockAgent["status"], number> = { waiting: 0, stuck: 1, workin
  * floor for its card; click it to open its page. At the strip's right end, the
  * leaderboard (only in a workspace of more than one member) and Workstream
  * (the agents' work feed, drawn for people, #workstream) stand over the
- * running version. The strip is drawn only where it helps (dockVisibleOn):
- * with no agents, and on settings, admin, reading and agent-management pages,
+ * running version. The strip is drawn only where it helps (dockVisibleOn, an
+ * allowlist of the work pages): with no agents, and on every other page,
  * nothing is drawn, not even its spacer. Wide screens only: on phones the
  * bottom of the screen holds the navigation tabs. Wording stays plain: no
  * issue numbers or title tags.
@@ -159,7 +159,7 @@ export function AgentsDock({
   const floorHeight = pixelOnFloor ? Math.round(CANVAS_H * ROBOT_SCALE) : LOW_FLOOR_H;
   const pathname = usePathname();
   const projectSlug = projectSlugFromPath(pathname) ?? defaultProjectSlug;
-  // Drawn only where it helps (lib/agents-dock.ts): never with no agents, and not on the pages that manage agents (they list them), settings, admin or reading.
+  // Drawn only where it helps (lib/agents-dock.ts): an allowlist of the work pages, and never with no agents.
   const visible = dockVisibleOn(pathname, all.length);
   const [panel, setPanel] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);

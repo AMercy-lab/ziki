@@ -30,21 +30,15 @@ export async function gettingStartedFor(
   tenantId: string,
   /** The project the checklist is shown in, for its links (#project-urls). */
   slug: string,
-  {
-    userId,
-    now = new Date(),
-  }: {
-    /** Whose checklist it is: the agent step counts this person's own agents in the workspace. */
-    userId: string;
-    now?: Date;
-  },
+  { now = new Date() }: { now?: Date } = {},
 ): Promise<{ steps: GettingStartedStep[]; complete: boolean }> {
   const [projects, issues, members, pendingInvites, agents] = await Promise.all([
     db.project.count({ where: { tenantId } }),
     db.bug.count({ where: { tenantId, isDeleted: false } }),
     db.membership.count({ where: { tenantId } }),
     db.tenantInvite.count({ where: { tenantId, acceptedAt: null, expiresAt: { gt: now } } }),
-    db.agent.count({ where: { tenantId, ownerUserId: userId, revokedAt: null } }),
+    // The workspace's agents (anyone's, not revoked): the step is about the workspace having one.
+    db.agent.count({ where: { tenantId, revokedAt: null } }),
   ]);
   const steps: GettingStartedStep[] = [
     {
@@ -83,7 +77,10 @@ export async function gettingStartedFor(
       done: agents > 0,
     },
   ];
-  return { steps, complete: steps.every((step) => step.done) };
+  // The list is done when the four steps it always had are. The agent step was added later, so a workspace that
+  // had already finished the list doesn't see it come back for want of an agent (the next-step card covers that).
+  const complete = steps.filter((step) => step.id !== "agent").every((step) => step.done);
+  return { steps, complete };
 }
 
 /** Workspace ids whose checklist was dismissed on this device. */

@@ -240,7 +240,7 @@ export async function IssuesList({
       if (!dismissed.includes(tenantId) && slug !== EARN_PROJECT_SLUG) {
         const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
         if (tenant) {
-          const checklist = await gettingStartedFor(prisma, tenantId, slug, { userId });
+          const checklist = await gettingStartedFor(prisma, tenantId, slug);
           if (!checklist.complete) gettingStarted = { tenantId, workspaceName: tenant.name, steps: checklist.steps };
         }
       }

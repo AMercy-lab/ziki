@@ -177,6 +177,7 @@ export default async function AppLayout({
           withdraw={earnSample ? withdrawInfo(earnSample.stage, earnSample.earned) : null}
           version={appVersionLabel()}
           memberCount={memberCount}
+          agentCount={dockAgents.length}
         />
         <main
           id={MAIN_CONTENT_ID}

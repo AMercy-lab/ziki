@@ -20,7 +20,7 @@ import { Avatar } from "@/components/avatar";
 import { AccountThemeSelector } from "@/components/theme-toggle";
 import { CookieSettingsLink } from "@/components/consent-banner";
 import { VersionCredits } from "@/components/credits-dialog";
-import { leaderboardVisible } from "@/lib/agents-dock";
+import { leaderboardInMenu } from "@/lib/agents-dock";
 import { recentNotificationsAction } from "@/app/actions/notifications";
 import { LocalTime } from "@/components/local-time";
 import { BASE_PATH } from "@/lib/base-path";
@@ -281,11 +281,14 @@ export function AppHeader({
   withdraw = null,
   version,
   memberCount = null,
+  agentCount = 0,
 }: {
   /** The running version (package version), shown with Cookie settings at the foot of the account menu. */
   version?: string;
   /** Members of the current workspace: the Leaderboard entry needs more than one. Null when unknown. */
   memberCount?: number | null;
+  /** How many agents the person has here: with any, the agents bar shows Leaderboard on the pages it is drawn on. */
+  agentCount?: number;
   /** Earn (#earn-drafts): what the Withdraw window shows; null for everyone else. */
   withdraw?: WithdrawInfo | null;
   /** Earn (#earn-drafts): an earner's dollars, shown with Withdraw in the header; null for everyone else. */
@@ -405,8 +408,9 @@ export function AppHeader({
                 <MenuLink href={AGENTS_DIRECTORY_HREF} active={pathname === AGENTS_DIRECTORY_HREF}>
                   All agents
                 </MenuLink>
-                {/* You can't be the only person on a leaderboard: a workspace of one has none. */}
-                {leaderboardVisible(memberCount) && !earnQuiet ? (
+                {/* The agents bar carries Leaderboard wherever it is drawn, so the menu offers it only elsewhere. And you
+                    can't be the only person on a leaderboard: a workspace of one has none. */}
+                {leaderboardInMenu(pathname, agentCount, memberCount) && !earnQuiet ? (
                   <MenuLink href={LEADERBOARD_HREF} active={isNavItemActive(pathname, LEADERBOARD_HREF)}>
                     Leaderboard
                   </MenuLink>

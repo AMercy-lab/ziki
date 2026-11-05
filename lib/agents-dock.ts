@@ -4,48 +4,33 @@ import { isReservedProjectSlug } from "@/lib/project-slug";
 export const AGENTS_DOCK_HEIGHT = 76;
 
 /**
- * Pages whose first path segment hides the bar: managing agents, creating or
- * approving one, settings and admin, and the reading pages. Matched on whole
- * segments, so a project called "organic" is not "/org".
- */
-const HIDDEN_ROOTS: ReadonlySet<string> = new Set([
-  // Managing agents: the page already lists them.
-  "agent",
-  // The agents directory, My agents (/agents/mine) and a skill's agents.
-  "agents",
-  // Settings, which holds the connect and pair flows (/settings/connect, /settings/agents/connect, /settings/agents/pair).
-  "settings",
-  // Admin.
-  "superadmin",
-  "tenants",
-  "security",
-  // Reading: nothing for your agents to do.
-  "docs",
-  "workers",
-]);
-
-/**
  * Whether the agents bar is drawn on this page (#agents-dock).
  *
- * The bar is there to watch your agents work, so it shows where that happens
- * (a project's ideas, issues and workstream, the inbox, home, activity and the
- * feed) and only when you have agents. Settings, admin, the pages that manage
- * or create agents, and the reading pages hide it. Pages the rules don't name
- * keep drawing it when you have agents, as before.
+ * The bar is there to watch your agents work, so it is an allowlist: it shows
+ * only on the pages where that happens, and only when you have agents.
+ * Everything else hides it, including pages added later until they are named
+ * here. The pages, matched on whole path segments (a trailing slash is fine):
+ *
+ * - the workspace's `/home`, `/feed`, `/activity` and `/inbox` (and below it);
+ * - a project's landing page `/<project>`, its `/ideas` and `/issues` pages
+ *   (and below them), an issue `/<project>/<number>`, `/<project>/workstream`
+ *   and `/<project>/work`.
+ *
+ * A project's slug is any first segment that isn't a reserved top-level route,
+ * so `/settings/...`, `/agents/...` and the rest never count as projects.
  */
 export function dockVisibleOn(pathname: string | null | undefined, agentCount: number): boolean {
   if (agentCount <= 0) return false;
   const segments = (pathname ?? "").split("/").filter(Boolean);
-  const [first, second, third] = segments;
-  if (!first) return true;
-  if (HIDDEN_ROOTS.has(first)) return false;
-  // Disputes sit under /points; /points itself is not named.
-  if (first === "points" && second === "disputes") return false;
-  // A project's settings: /projects/<slug>/settings.
-  if (first === "projects" && third === "settings") return false;
-  // A project's organization area: /<project>/org and below.
-  if (second === "org" && !isReservedProjectSlug(first)) return false;
-  return true;
+  const [first, second] = segments;
+  if (!first) return false;
+  if (first === "inbox") return true;
+  if (first === "home" || first === "feed" || first === "activity") return segments.length === 1;
+  if (isReservedProjectSlug(first)) return false;
+  // A project's pages.
+  if (segments.length === 1) return true;
+  if (second === "ideas" || second === "issues") return true;
+  return segments.length === 2 && (second === "workstream" || second === "work" || /^\d+$/.test(second!));
 }
 
 /**
@@ -55,4 +40,17 @@ export function dockVisibleOn(pathname: string | null | undefined, agentCount: n
  */
 export function leaderboardVisible(memberCount: number | null | undefined): boolean {
   return memberCount == null || memberCount > 1;
+}
+
+/**
+ * Whether the account menu offers Leaderboard: when the workspace has more than
+ * one member and the bar isn't already showing it. The bar carries the link
+ * wherever it is drawn (dockVisibleOn), so the menu is where it lives otherwise.
+ */
+export function leaderboardInMenu(
+  pathname: string | null | undefined,
+  agentCount: number,
+  memberCount: number | null | undefined,
+): boolean {
+  return leaderboardVisible(memberCount) && !dockVisibleOn(pathname, agentCount);
 }

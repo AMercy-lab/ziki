@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dockVisibleOn, leaderboardVisible } from "@/lib/agents-dock";
+import { dockVisibleOn, leaderboardInMenu, leaderboardVisible } from "@/lib/agents-dock";
 import { gettingStartedFor, parseDismissed, withDismissed } from "@/lib/onboarding";
 import { NEXT_STEP_COOKIE, workspaceNextStep, type WorkspaceNextStepInput } from "@/lib/workspace-next-step";
 
@@ -20,8 +20,8 @@ describe("dockVisibleOn: where the agents bar shows", () => {
     "/acme/issues/open",
     "/acme/issues/new",
     "/acme/42",
-    "/acme/42/history",
     "/acme/workstream",
+    "/acme/work",
     "/inbox",
     "/inbox/escalations/abc",
     "/home",
@@ -78,28 +78,59 @@ describe("dockVisibleOn: where the agents bar shows", () => {
   });
 
   it("matches whole path segments, not prefixes", () => {
-    // A project called "organic" or "settings-ui" is not /settings or /org.
+    // A project called "organic" or "settings-ui" is a project: its pages are work pages.
     expect(dockVisibleOn("/organic/issues", 1)).toBe(true);
     expect(dockVisibleOn("/settings-ui/issues", 1)).toBe(true);
-    expect(dockVisibleOn("/acme/organisation", 1)).toBe(true);
-    // A project page named org*: only the second segment "org" is the organization area.
+    // Only the named sections count: not a look-alike, and not a page below one that isn't named.
+    expect(dockVisibleOn("/acme/ideasx", 1)).toBe(false);
+    expect(dockVisibleOn("/acme/issuesx", 1)).toBe(false);
+    expect(dockVisibleOn("/acme/42x", 1)).toBe(false);
+    expect(dockVisibleOn("/acme/organisation", 1)).toBe(false);
+    expect(dockVisibleOn("/homepage", 1)).toBe(false);
+    // Home, feed and activity are those pages only, not what sits below them.
+    expect(dockVisibleOn("/home/extra", 1)).toBe(false);
+    expect(dockVisibleOn("/feed/x", 1)).toBe(false);
+    expect(dockVisibleOn("/activity/x", 1)).toBe(false);
+    // A project that happens to be called "feeds" is a project: its landing page is a work page.
+    expect(dockVisibleOn("/feeds", 1)).toBe(true);
+    // Under issues, whatever it is.
     expect(dockVisibleOn("/acme/issues/org", 1)).toBe(true);
   });
 
   it("ignores a trailing slash", () => {
     expect(dockVisibleOn("/agents/mine/", 1)).toBe(false);
     expect(dockVisibleOn("/acme/issues/", 1)).toBe(true);
+    expect(dockVisibleOn("/home/", 1)).toBe(true);
   });
 
-  it("keeps today's behaviour on pages the table does not list", () => {
-    // Not named in the table: shown when you have agents, as before.
-    expect(dockVisibleOn("/questions", 1)).toBe(true);
-    expect(dockVisibleOn("/earn/tasks", 1)).toBe(true);
-    expect(dockVisibleOn("/users/abc", 1)).toBe(true);
+  it.each([
+    "/questions",
+    "/questions/abc",
+    "/earn",
+    "/earn/tasks",
+    "/users/abc",
+    "/team",
+    "/milestones",
+    "/jobs",
+    "/marketing",
+    "/redesigns",
+    "/redesigns/abc",
+    "/leaderboard",
+    "/acme/notes",
+    "/acme/notes/agents/robo",
+    "/acme/tasks/3",
+    "/acme/projects",
+    "/acme/42/history",
+    "/acme/something-new",
+    "/",
+  ])("hides on a page the allowlist doesn't name: %s", (path) => {
+    expect(dockVisibleOn(path, 1)).toBe(false);
+    expect(dockVisibleOn(path, 5)).toBe(false);
   });
 
-  it("treats a missing path as nothing to hide", () => {
-    expect(dockVisibleOn(null, 1)).toBe(true);
+  it("hides when the path is unknown", () => {
+    expect(dockVisibleOn(null, 1)).toBe(false);
+    expect(dockVisibleOn(undefined, 1)).toBe(false);
     expect(dockVisibleOn(undefined, 0)).toBe(false);
   });
 });
@@ -121,6 +152,29 @@ describe("leaderboardVisible: you can't be the only person on a leaderboard", ()
   });
 });
 
+describe("leaderboardInMenu: the account menu only offers what the bar isn't showing", () => {
+  it("is in the menu when the bar isn't drawn (no agents, or a page that hides it)", () => {
+    expect(leaderboardInMenu("/acme/issues", 0, 5)).toBe(true);
+    expect(leaderboardInMenu("/settings", 2, 5)).toBe(true);
+    expect(leaderboardInMenu("/agents/mine", 2, 5)).toBe(true);
+  });
+
+  it("is left out when the bar is showing it", () => {
+    expect(leaderboardInMenu("/acme/issues", 1, 5)).toBe(false);
+    expect(leaderboardInMenu("/home", 3, 2)).toBe(false);
+  });
+
+  it("is never offered in a workspace of one member, bar or no bar", () => {
+    expect(leaderboardInMenu("/acme/issues", 0, 1)).toBe(false);
+    expect(leaderboardInMenu("/settings", 2, 1)).toBe(false);
+  });
+
+  it("is offered when the member count is unknown and the bar isn't there", () => {
+    expect(leaderboardInMenu("/settings", 0, null)).toBe(true);
+    expect(leaderboardInMenu("/acme/issues", 1, null)).toBe(false);
+  });
+});
+
 type AgentRow = { tenantId: string; ownerUserId: string; revokedAt: Date | null };
 
 /** A small fake database: the four counts the checklist always reads, and the agents it filters. */
@@ -131,44 +185,54 @@ function checklistDb({ agents = [] as AgentRow[], members = 1, projects = 1, iss
     membership: { count: async () => members },
     tenantInvite: { count: async () => invites },
     agent: {
-      count: async ({ where }: { where: { tenantId: string; ownerUserId: string; revokedAt: null } }) =>
-        agents.filter((a) => a.tenantId === where.tenantId && a.ownerUserId === where.ownerUserId && a.revokedAt === where.revokedAt).length,
+      count: async ({ where }: { where: { tenantId: string; revokedAt: null } }) =>
+        agents.filter((a) => a.tenantId === where.tenantId && a.revokedAt === where.revokedAt).length,
     },
   } as unknown as Parameters<typeof gettingStartedFor>[0];
 }
 
 describe("Getting started: Connect your first agent", () => {
   const mine: AgentRow = { tenantId: "t1", ownerUserId: "owner", revokedAt: null };
+  /** Everything the list always asked for is done: a project, an issue and a teammate. */
+  const original = { members: 2, issues: 3 };
 
-  it("adds a 5th step after the four that were there, open until you have an agent", async () => {
-    const { steps, complete } = await gettingStartedFor(checklistDb(), "t1", "acme", { userId: "owner" });
+  it("adds a 5th step after the four that were there, open until the workspace has an agent", async () => {
+    const { steps } = await gettingStartedFor(checklistDb(), "t1", "acme");
     expect(steps.map((step) => step.id)).toEqual(["workspace", "project", "issue", "invite", "agent"]);
     const agent = steps[4]!;
     expect(agent.label).toBe("Connect your first agent");
     expect(agent.href).toBe("/settings/connect");
     expect(agent.done).toBe(false);
-    expect(complete).toBe(false);
   });
 
-  it("ticks once you have an agent in this workspace", async () => {
-    const { steps } = await gettingStartedFor(checklistDb({ agents: [mine] }), "t1", "acme", { userId: "owner" });
+  it("ticks once the workspace has an agent, whoever owns it", async () => {
+    const { steps } = await gettingStartedFor(checklistDb({ agents: [mine] }), "t1", "acme");
     expect(steps.find((step) => step.id === "agent")?.done).toBe(true);
+    const teammates = { ...mine, ownerUserId: "teammate" };
+    const other = await gettingStartedFor(checklistDb({ agents: [teammates] }), "t1", "acme");
+    expect(other.steps.find((step) => step.id === "agent")?.done).toBe(true);
   });
 
-  it("does not count a revoked agent, someone else's agent or another workspace's", async () => {
-    const agents: AgentRow[] = [
-      { ...mine, revokedAt: new Date("2026-01-01") },
-      { ...mine, ownerUserId: "teammate" },
-      { ...mine, tenantId: "t2" },
-    ];
-    const { steps } = await gettingStartedFor(checklistDb({ agents }), "t1", "acme", { userId: "owner" });
+  it("does not count a revoked agent or another workspace's", async () => {
+    const agents: AgentRow[] = [{ ...mine, revokedAt: new Date("2026-01-01") }, { ...mine, tenantId: "t2" }];
+    const { steps } = await gettingStartedFor(checklistDb({ agents }), "t1", "acme");
     expect(steps.find((step) => step.id === "agent")?.done).toBe(false);
   });
 
-  it("is complete only when the agent step is done too", async () => {
-    const rest = { members: 2, issues: 3 };
-    expect((await gettingStartedFor(checklistDb(rest), "t1", "acme", { userId: "owner" })).complete).toBe(false);
-    expect((await gettingStartedFor(checklistDb({ ...rest, agents: [mine] }), "t1", "acme", { userId: "owner" })).complete).toBe(true);
+  it("stays hidden for a list that was already complete: no agent doesn't bring it back", async () => {
+    const { steps, complete } = await gettingStartedFor(checklistDb(original), "t1", "acme");
+    expect(steps.find((step) => step.id === "agent")?.done).toBe(false);
+    expect(complete).toBe(true);
+    // Done the same way when the agent is there too.
+    expect((await gettingStartedFor(checklistDb({ ...original, agents: [mine] }), "t1", "acme")).complete).toBe(true);
+  });
+
+  it("is still open while any of the four original steps is, agent or not", async () => {
+    expect((await gettingStartedFor(checklistDb({ agents: [mine] }), "t1", "acme")).complete).toBe(false);
+    expect((await gettingStartedFor(checklistDb({ members: 2 }), "t1", "acme")).complete).toBe(false);
+    expect((await gettingStartedFor(checklistDb({ issues: 1, invites: 0 }), "t1", "acme")).complete).toBe(false);
+    // A pending invite counts as the teammate step, as before.
+    expect((await gettingStartedFor(checklistDb({ issues: 1, invites: 1 }), "t1", "acme")).complete).toBe(true);
   });
 });
 
