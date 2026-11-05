@@ -73,73 +73,72 @@ export default async function SkillDetailPage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* Main Header */}
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between border-b border-zk-border pb-8">
-        <div className="space-y-3 max-w-2xl">
-          <div className="flex items-center gap-2.5">
-            <span className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              {skill.badge}
-            </span>
-            <span className="rounded bg-zk-chip px-2 py-0.5 text-xs font-mono text-zk-muted">
-              #{skill.category}
-            </span>
+      {/* Skill banner */}
+      <div className="rounded-xl border border-zk-border bg-zk-surface p-6 sm:p-8 overflow-hidden">
+        <div className="sm:flex sm:items-start sm:justify-between gap-4">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                {skill.badge}
+              </span>
+              <span className="rounded bg-zk-chip px-2.5 py-0.5 text-xs font-mono text-zk-muted">
+                #{skill.category}
+              </span>
+            </div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-zk-text sm:text-3xl sm:leading-tight">
+              {skill.title}
+            </h1>
+            <p className="text-sm text-zk-muted leading-relaxed sm:text-base">
+              {skill.description}
+            </p>
           </div>
 
-          <h1 className="text-3xl font-extrabold tracking-tight text-zk-text sm:text-4xl">
-            {skill.title}
-          </h1>
-
-          <p className="text-base text-zk-muted leading-relaxed">
-            {skill.description}
-          </p>
-
-          <div className="flex flex-wrap items-center gap-4 text-xs text-zk-muted pt-1">
-            <span>By <strong>{skill.author.name}</strong></span>
-            <span>•</span>
-            <span>{skill.usersCount} agents equipped</span>
-            {skill.spec.documentationUrl && (
-              <>
-                <span>•</span>
-                <a
-                  href={skill.spec.documentationUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-zk-accent hover:underline"
-                >
-                  Official Documentation ↗
-                </a>
-              </>
-            )}
+          <div className="flex flex-col sm:flex-row gap-2 sm:shrink-0">
+            <CopyPromptButton prompt={skill.prompt} />
+            <Link
+              href="/skills"
+              className="inline-flex items-center justify-center rounded-lg border border-zk-border bg-zk-chip px-4 py-2 text-xs font-semibold text-zk-text hover:bg-zk-border transition sm:px-5 sm:py-2.5"
+            >
+              ← Back to Skills Library
+            </Link>
           </div>
         </div>
 
-        {/* Action Button & Back Link */}
-        <div className="shrink-0 flex flex-col gap-2.5">
-          <CopyPromptButton prompt={skill.prompt} />
-          <Link
-            href="/skills"
-            className="inline-flex items-center justify-center rounded-lg border border-zk-border bg-zk-chip px-4 py-2 text-xs font-semibold text-zk-text hover:bg-zk-border transition"
-          >
-            ← Back to Skills Library
-          </Link>
+        <div className="mt-5 sm:mt-6 flex flex-wrap items-center gap-3 text-xs text-zk-muted pt-3 border-t border-zk-border/50">
+          <span>By <strong className="text-zk-text">{skill.author.name}</strong></span>
+          <span className="hidden sm:inline">•</span>
+          <span>{skill.usersCount} agents equipped</span>
+          {skill.spec.documentationUrl && (
+            <>
+              <span className="hidden sm:inline">•</span>
+              <a
+                href={skill.spec.documentationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-zk-accent hover:underline sm:inline"
+              >
+                Official Documentation ↗
+              </a>
+            </>
+          )}
         </div>
       </div>
 
       {/* Main Grid: Content & Meta */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:gap-8 lg:grid-cols-3">
         {/* Left Column: Spec, Capabilities, Checklist, Prompt */}
-        <div className="space-y-8 lg:col-span-2">
+        <div className="space-y-6 lg:col-span-2">
           {/* Overview */}
-          <div className="space-y-3">
+          <section className="space-y-3">
             <h2 className="text-lg font-bold text-zk-text">Overview</h2>
             <p className="text-sm text-zk-muted leading-relaxed">
               {skill.spec.overview}
             </p>
-          </div>
+          </section>
 
           {/* Capabilities */}
-          <div className="space-y-3">
-            <h2 className="text-lg font-bold text-zk-text">Capabilities & Features</h2>
+          <section className="space-y-3">
+            <h2 className="text-lg font-bold text-zk-text">Capabilities &amp; Features</h2>
             <ul className="space-y-2 rounded-xl border border-zk-border bg-zk-surface p-5">
               {skill.spec.capabilities.map((cap, i) => (
                 <li key={i} className="flex items-start gap-2.5 text-sm text-zk-text">
@@ -148,10 +147,10 @@ export default async function SkillDetailPage({
                 </li>
               ))}
             </ul>
-          </div>
+          </section>
 
           {/* Verification Checklist */}
-          <div className="space-y-3">
+          <section className="space-y-3">
             <h2 className="text-lg font-bold text-zk-text">Verification Checklist</h2>
             <p className="text-xs text-zk-muted">
               Agents equipped with this skill must satisfy the following assertions prior to delivery:
@@ -164,11 +163,11 @@ export default async function SkillDetailPage({
                 </div>
               ))}
             </div>
-          </div>
+          </section>
 
           {/* Sample CLI Command */}
           {skill.spec.sampleCommand && (
-            <div className="space-y-2.5">
+            <section className="space-y-3">
               <h2 className="text-lg font-bold text-zk-text">Sample Execution Command</h2>
               <div className="flex items-center justify-between rounded-lg border border-zk-border bg-zk-chip px-4 py-3">
                 <code className="text-xs font-mono text-zk-text">
@@ -176,11 +175,11 @@ export default async function SkillDetailPage({
                 </code>
                 <CopyCommandButton command={skill.spec.sampleCommand} />
               </div>
-            </div>
+            </section>
           )}
 
           {/* Agent System Instructions Box */}
-          <div className="space-y-3">
+          <section className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-zk-text">Agent System Instructions</h2>
               <CopyPromptButton prompt={skill.prompt} label="Copy Instructions" />
@@ -190,13 +189,13 @@ export default async function SkillDetailPage({
                 {skill.prompt}
               </pre>
             </div>
-          </div>
+          </section>
         </div>
 
         {/* Right Sidebar: Skill Information & Tags */}
-        <div className="space-y-6">
+        <div className="space-y-6 lg:col-span-1">
           <div className="rounded-xl border border-zk-border bg-zk-surface p-5 space-y-4">
-            <h3 className="text-sm font-bold text-zk-text">Skill Information</h3>
+            <h3 className="text-sm font-bold text-zk-text uppercase tracking-wider">Skill Information</h3>
             <div className="space-y-3 text-xs divide-y divide-zk-border">
               <div className="pt-2 flex justify-between">
                 <span className="text-zk-muted">Category</span>
@@ -220,12 +219,12 @@ export default async function SkillDetailPage({
           </div>
 
           <div className="rounded-xl border border-zk-border bg-zk-surface p-5 space-y-3">
-            <h3 className="text-sm font-bold text-zk-text">Tags</h3>
+            <h3 className="text-sm font-bold text-zk-text uppercase tracking-wider">Tags</h3>
             <div className="flex flex-wrap gap-1.5">
               {skill.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-md bg-zk-chip px-2 py-1 text-xs font-mono text-zk-text2"
+                  className="rounded-md bg-zk-chip px-2 py-1 text-[10px] font-mono text-zk-text2"
                 >
                   #{tag}
                 </span>
