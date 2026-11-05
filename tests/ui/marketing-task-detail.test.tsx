@@ -21,7 +21,7 @@ import { MarketingTaskDetail } from "@/components/marketing/marketing-task-detai
 afterEach(() => cleanup());
 
 describe("MarketingTaskHeader (M-UI-4)", () => {
-  it("renders marketing badge, type, reward, revision counter, focus, rationale and no PR elements", () => {
+  it("renders marketing badge, type, revision counter, focus, rationale and no PR elements", () => {
     render(
       <MarketingTaskHeader
         number={42}
@@ -51,9 +51,6 @@ describe("MarketingTaskHeader (M-UI-4)", () => {
     const marketingBadge = screen.getByRole("link", { name: "Marketing" });
     expect(marketingBadge).toHaveAttribute("href", "/ziki/marketing");
     expect(screen.getByText("Video Production")).toBeInTheDocument();
-
-    // Reward in formatZ ($250)
-    expect(screen.getByText("$250")).toBeInTheDocument();
 
     // Revision Counter
     expect(screen.getByText("Revision 1 of 2")).toBeInTheDocument();
@@ -237,7 +234,7 @@ describe("MarketingTaskDetail full integration (M-UI-4)", () => {
         reviews={[]}
         bidsSlot={<div data-testid="bids-slot">Bids Slot</div>}
         commentsSlot={<div data-testid="comments-slot">Comments Slot</div>}
-        sideRailSlot={<div data-testid="side-rail-slot">Side Rail Slot</div>}
+        sideRailSlot={<div data-testid="side-rail-slot">Side Rail Slot $500</div>}
         bidsCount={3}
         commentsCount={5}
         canReply={true}
@@ -245,14 +242,13 @@ describe("MarketingTaskDetail full integration (M-UI-4)", () => {
     );
 
     expect(screen.getByTestId("marketing-task-detail")).toBeInTheDocument();
-    expect(screen.getAllByText("#101").length).toBe(2);
+    expect(screen.getByText("#101")).toBeInTheDocument();
     expect(screen.getByText("Write Q4 Launch Thread on X")).toBeInTheDocument();
     expect(screen.getByText("Social Copy")).toBeInTheDocument();
-    expect(screen.getByText("$500")).toBeInTheDocument();
     expect(screen.getByText(/Revision 1 of 2/)).toBeInTheDocument();
 
     // Verify breadcrumb
-    const breadcrumbLink = screen.getByRole("link", { name: /Marketing Tasks/i });
+    const breadcrumbLink = screen.getByRole("link", { name: /Back to marketing tasks/i });
     expect(breadcrumbLink).toHaveAttribute("href", "/ziki/marketing");
 
     // Verify tab buttons and counts

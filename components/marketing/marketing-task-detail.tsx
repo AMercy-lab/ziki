@@ -1,9 +1,6 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import Link from "next/link";
-import { marketingPath } from "@/lib/project-paths";
-import { formatIssueNumber } from "@/lib/issue-number";
 import { MarketingTaskHeader } from "./marketing-task-header";
 import { MarketingDeliverablesPanel, type MarketingDeliveryView } from "./marketing-deliverables-panel";
 import { MarketingReviewsPanel, type MarketingReviewView } from "./marketing-reviews-panel";
@@ -99,67 +96,58 @@ export function MarketingTaskDetail({
   }, []);
 
   return (
-    <div className="issue-detail-scope flex flex-col gap-6 pb-12" data-testid="marketing-task-detail">
-      {/* Top Breadcrumb Navigation & Top Actions (Upvote + Menu) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zk-divider pb-3">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs">
-          <Link
-            href={marketingPath(bug.project.slug)}
-            className="inline-flex items-center gap-1.5 font-medium text-zk-muted transition-colors hover:text-zk-text"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
-            <span>Marketing Tasks</span>
-          </Link>
-          <span className="text-zk-muted/50" aria-hidden="true">/</span>
-          <span className="font-mono font-bold text-zk-text">
-            {formatIssueNumber(bug.number)}
-          </span>
-        </nav>
+    <div className="issue-detail-scope flex flex-col gap-5 pb-12" data-testid="marketing-task-detail">
+      {/* 1. TOP PAGE HEADER: Back Link + #Number + Title + Badges + Upvote/Actions */}
+      <MarketingTaskHeader
+        headerOnly
+        number={bug.number}
+        title={bug.title}
+        status={bug.status}
+        substatus={bug.substatus}
+        taskType={bug.type}
+        revisionCount={bug.revisionCount}
+        maxRevisions={revisionLimit}
+        projectSlug={bug.project.slug}
+        reporter={bug.reporter}
+        reporterAgent={bug.createdByAgent}
+        createdAt={bug.createdAt}
+        voteButtonSlot={voteButtonSlot}
+        actionsMenuSlot={actionsMenuSlot}
+      />
 
-        <div className="flex items-center gap-2 print:hidden">
-          {voteButtonSlot}
-          {actionsMenuSlot}
-        </div>
-      </div>
-
-      {/* Top Alerts (Deleted notice, duplicate notice, resolution note) */}
+      {/* 2. TOP ALERTS: Deletion notice, Duplicate notice, Resolution note */}
       {alertsSlot}
 
-      {/* Main Grid: Left Primary Column (65%), Right Side Rail (35%) */}
-      <div className="flex flex-wrap items-start gap-6">
+      {/* 3. TWO-COLUMN GRID: Main Content (Left, ~65%) and Side Rail (Right, ~35%) */}
+      <div className="flex flex-wrap items-start gap-5">
         {/* Main Column */}
-        <div className="flex min-w-0 flex-[999_1_640px] flex-col gap-6">
-          {/* Status Alert Banner (DeliveredBanner) */}
-          {bannerSlot}
-
-          {/* Next Step Bar (Guidance for next agent action) */}
-          {nextStepSlot}
-
-          {/* Marketing Context Header (Title, Badges, Rationale, Description, Campaign Focus) */}
+        <div className="flex min-w-0 flex-[999_1_600px] flex-col gap-5">
+          {/* Campaign Focus Banner & Unified Description Card */}
           <MarketingTaskHeader
+            contentOnly
             number={bug.number}
             title={bug.title}
             description={bug.description}
             status={bug.status}
             substatus={bug.substatus}
-            taskType={bug.type}
-            reward={bug.reward}
-            revisionCount={bug.revisionCount}
-            maxRevisions={revisionLimit}
-            projectSlug={bug.project.slug}
             projectName={bug.project.name}
             projectFocus={bug.project.goal}
             projectSiteUrl={bug.project.siteUrl}
             rationale={bug.idea?.rationale}
-            reporter={bug.reporter}
-            reporterAgent={bug.createdByAgent}
+            projectSlug={bug.project.slug}
+            revisionCount={bug.revisionCount}
+            maxRevisions={revisionLimit}
             createdAt={bug.createdAt}
           />
 
-          {/* Attachments Card (if uploaded assets exist) */}
+          {/* Attachments Card (if any files attached) */}
           {attachmentsSlot}
+
+          {/* Delivered Banner (if work was delivered/sent back) */}
+          {bannerSlot}
+
+          {/* Next Step Bar (Guidance for next action) */}
+          {nextStepSlot}
 
           {/* Active Claim / Award Box (when claimed & in progress) */}
           {hold?.status === "active" && isInProgress ? (
@@ -356,7 +344,7 @@ export function MarketingTaskDetail({
 
         {/* Side Rail (Status, Reward, People, Links, ActivityTimeline) */}
         {sideRailSlot ? (
-          <aside className="flex min-w-[280px] flex-[1_1_320px] flex-col gap-4">
+          <aside className="flex min-w-0 flex-[1_1_340px] flex-col gap-4">
             {sideRailSlot}
           </aside>
         ) : null}
