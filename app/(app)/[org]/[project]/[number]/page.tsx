@@ -306,13 +306,15 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   if (lookup.kind === "elsewhere") {
     // A link into another of the viewer's tenants should not dead-end (#519):
     // name the tenant and offer the switch. Non-members still get the 404.
+    const activeTenantId = await currentTenantIdFor(userId);
     const hint = await issueTenantHintFor(prisma, {
       userId,
-      activeTenantId: await currentTenantIdFor(userId),
+      activeTenantId,
       issueId: lookup.issueId,
     });
     if (!hint) notFound();
-    return <IssueTenantSwitch issueId={lookup.issueId} tenant={hint} />;
+    const currentWorkspace = activeTenantId ? await prisma.tenant.findFirst({ where: { id: activeTenantId, archivedAt: null, memberships: { some: { userId } } }, select: { name: true } }) : null;
+    return <IssueTenantSwitch issueId={lookup.issueId} tenant={hint} currentWorkspace={currentWorkspace?.name} destination={`${issuePath(projectRef(org, projectSlug), number)}${queryString(query)}`} />;
   }
   if (lookup.kind === "moved") {
     // #project-urls: the number lives in another project of this organisation.

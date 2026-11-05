@@ -17,7 +17,7 @@ import {
 } from "@/lib/invites";
 import { acceptShareLink, createShareLink, revokeShareLink } from "@/lib/share-invites";
 import { prisma } from "@/lib/prisma";
-import { issueHref } from "@/lib/issue-ref";
+import { resolveIssueWorkspaceSwitch } from "@/lib/issue-workspace-switch";
 import { RATE_LIMIT_MESSAGE, consumeRateLimit } from "@/lib/rate-limit";
 import {
   CREATE_TENANT_RATE_LIMIT,
@@ -85,16 +85,11 @@ export async function selectTenantAction(formData: FormData): Promise<void> {
  */
 export async function switchTenantForIssueAction(formData: FormData): Promise<void> {
   const user = await requireUser();
-  const issueId = String(formData.get("issueId") ?? "");
-  const tenant = await memberTenantById(prisma, user.id, String(formData.get("tenantId") ?? ""));
-  if (!tenant || tenant.archivedAt) redirect("/home");
-  await setActiveTenantCookie(tenant.id);
+  const result = await resolveIssueWorkspaceSwitch(prisma, user.id, {issueId: String(formData.get("issueId") ?? ""), tenantId: String(formData.get("tenantId") ?? ""), returnTo: formData.get("returnTo")});
+  if (!result) redirect("/home");
+  await setActiveTenantCookie(result.tenantId);
   revalidatePath("/", "layout");
-  const bug = await prisma.bug.findFirst({
-    where: { id: issueId, tenantId: tenant.id },
-    select: { number: true, project: { select: { slug: true, tenant: { select: { slug: true } } } } },
-  });
-  redirect(bug ? issueHref(bug) : "/home");
+  redirect(result.destination);
 }
 
 /** Create a tenant owned by the person, with its first project, and enter it. */

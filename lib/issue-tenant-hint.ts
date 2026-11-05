@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient, Substatus } from "@prisma/client";
 
 /**
  * Cross-tenant issue links (#519).
@@ -9,7 +9,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
  * it, so non-members keep the plain 404 and nothing is revealed.
  */
 
-export type IssueTenantHint = { id: string; name: string; slug: string };
+export type IssueTenantHint = { id: string; name: string; slug: string; issue: { number: number; title: string; substatus: Substatus; projectName: string } };
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -19,16 +19,16 @@ export async function issueTenantHintFor(
 ): Promise<IssueTenantHint | null> {
   try {
     const bug = await db.bug.findUnique({
-      where: { id: viewer.issueId, isDeleted: false },
-      select: { tenantId: true },
+      where: { id: viewer.issueId, isDeleted: false, project: { archivedAt: null } },
+      select: { tenantId: true, number: true, title: true, substatus: true, project: { select: { name: true } } },
     });
     if (!bug || bug.tenantId === viewer.activeTenantId) return null;
 
     const membership = await db.membership.findFirst({
-      where: { userId: viewer.userId, tenantId: bug.tenantId },
+      where: { userId: viewer.userId, tenantId: bug.tenantId, tenant: { archivedAt: null } },
       select: { tenant: { select: { id: true, name: true, slug: true } } },
     });
-    return membership?.tenant ?? null;
+    return membership ? { ...membership.tenant, issue: { number: bug.number, title: bug.title, substatus: bug.substatus, projectName: bug.project.name } } : null;
   } catch (error) {
     // A schema-repair deployment may lack the relation; the page then keeps
     // its plain 404 instead of failing.

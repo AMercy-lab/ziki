@@ -57,11 +57,11 @@ export const findProjectIssue = cache(async (orgParam: string, projectParam: str
   const inUrl = { slug: projectSlug, tenant: { slug: orgSlug } };
   const scope = await viewerBugScope();
   if (!("tenantId" in scope)) {
-    const rows = await prisma.bug.findMany({ where: { number, project: inUrl }, select, take: 2 });
+    const rows = await prisma.bug.findMany({ where: { number, isDeleted: false, project: { ...inUrl, archivedAt: null }, tenant: { archivedAt: null } }, select, take: 2 });
     return rows.length === 1 ? { kind: "found", issue: toIssue(rows[0]) } : null;
   }
 
-  const row = await prisma.bug.findFirst({ where: { number, ...scope }, select });
+  const row = await prisma.bug.findFirst({ where: { number, isDeleted: false, ...scope, project: { archivedAt: null }, tenant: { archivedAt: null } }, select });
   if (row && row.project.slug === projectSlug && row.project.tenant.slug === orgSlug) return { kind: "found", issue: toIssue(row) };
 
   const resolved = await resolveSessionUserId();
@@ -70,14 +70,16 @@ export const findProjectIssue = cache(async (orgParam: string, projectParam: str
       where: {
         number,
         isDeleted: false,
-        project: inUrl,
+        project: { ...inUrl, archivedAt: null },
         ...(typeof scope.tenantId === "string" ? { tenantId: { not: scope.tenantId } } : {}),
-        tenant: { memberships: { some: { userId: resolved.userId } } },
+        tenant: { archivedAt: null, memberships: { some: { userId: resolved.userId } } },
       },
       select: { id: true },
     });
     if (other) return { kind: "elsewhere", issueId: other.id };
   }
 
-  return row ? { kind: "moved", issue: toIssue(row) } : null;
+  // Never replace a link into an inaccessible workspace with a same-numbered
+  // issue from the active workspace. Only project moves within the named org.
+  return row && row.project.tenant.slug === orgSlug ? { kind: "moved", issue: toIssue(row) } : null;
 });
