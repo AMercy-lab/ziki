@@ -22,3 +22,8 @@ it("returns the original issue after switching and on refresh/new tabs",async()=
  const target={...active,id:"b-issue",project:{slug:"app",tenant:{slug:"ziki"}}};m.scope.mockResolvedValue({tenantId:"b"});m.first.mockResolvedValue(target);
  expect(await findProjectIssue("ziki","app",482)).toMatchObject({kind:"found",issue:{id:"b-issue"}});expect(m.first).toHaveBeenCalledTimes(1);
 });
+it("preserves the existing deleted-issue Restore page in the active workspace",async()=>{
+ const deleted={...active,isDeleted:true};
+ m.first.mockImplementation(async({where})=>where.tenantId==="a"&&where.isDeleted!==false?deleted:null);
+ expect(await findProjectIssue("zedu","app",482)).toMatchObject({kind:"found",issue:{id:"a-issue",isDeleted:true}});
+});

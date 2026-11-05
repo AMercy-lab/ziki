@@ -61,7 +61,9 @@ export const findProjectIssue = cache(async (orgParam: string, projectParam: str
     return rows.length === 1 ? { kind: "found", issue: toIssue(rows[0]) } : null;
   }
 
-  const row = await prisma.bug.findFirst({ where: { number, isDeleted: false, ...scope, project: { archivedAt: null }, tenant: { archivedAt: null } }, select });
+  // The active workspace's issue page also hosts authorized Restore controls.
+  // Keep deleted rows here; cross-workspace previews below still exclude them.
+  const row = await prisma.bug.findFirst({ where: { number, ...scope, project: { archivedAt: null }, tenant: { archivedAt: null } }, select });
   if (row && row.project.slug === projectSlug && row.project.tenant.slug === orgSlug) return { kind: "found", issue: toIssue(row) };
 
   const resolved = await resolveSessionUserId();
