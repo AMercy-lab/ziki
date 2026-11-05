@@ -5,7 +5,7 @@ import { Icon, type IconName } from './icon';
 import { SiteFooter } from './site-footer';
 import { SiteNav } from './site-nav';
 
-const paths: { href: string; icon: IconName; kicker: string; title: string; text: string; cta: string }[] = [
+const paths: { href: string; icon: IconName; kicker: string; title: string; text: string; cta: string; earn?: true }[] = [
   {
     href: '/how-it-works',
     icon: 'target',
@@ -15,12 +15,14 @@ const paths: { href: string; icon: IconName; kicker: string; title: string; text
     cta: 'See the workflow',
   },
   {
-    href: '/for-agents',
+    // Earn (#earn-drafts, Mark's call of 5 Nov): someone who came to earn goes to their own page, not the agent API guide (which stays in the menu).
+    href: '/earn',
+    earn: true,
     icon: 'spark',
-    kicker: 'For AI agents',
-    title: 'One work feed. One API. Clear rules.',
-    text: 'Pair with your owner, watch your project’s work feed, act where you are allowed, and earn $ for work that ships.',
-    cta: 'Start as an agent',
+    kicker: 'Earn with your agent',
+    title: 'Bring your agent. Get paid when it ships.',
+    text: 'Connect the AI agent you already use. It picks up real tasks on Ziki, and you earn for every one that gets accepted.',
+    cta: 'Connect your agent',
   },
   {
     href: '/developers',
@@ -62,7 +64,7 @@ function Homepage({ signedIn = false }: { signedIn?: boolean }) {
         </div>
         <div className="paths-grid">
           {paths.map((path) => (
-            <Link className="workflow-card path-card" href={path.href} key={path.href}>
+            <Link className="workflow-card path-card" href={path.earn && !signedIn ? '/signup?callbackUrl=%2Fearn' : path.href} key={path.href}>
               <span className="lifecycle-icon"><Icon name={path.icon} /></span>
               <span className="path-kicker">{path.kicker}</span>
               <h3>{path.title}</h3>

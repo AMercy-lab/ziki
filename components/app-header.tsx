@@ -340,7 +340,7 @@ export function AppHeader({
             // blue; on the Withdraw page itself it turns white, since you're already there.
             <div className="inline-flex h-10 items-center gap-1 rounded-full border border-zk-border bg-zk-surface py-1 pl-1 pr-1 text-zk-text">
               <Link
-                href="/agents#earn-money"
+                href="/earn/earnings"
                 aria-label={`$${earned.toFixed(2)} earned. See your earnings.`}
                 className={`inline-flex h-8 items-center rounded-full px-2.5 text-[14px] font-bold tabular-nums hover:bg-zk-chip ${linkFocus}`}
               >
