@@ -23,6 +23,7 @@ import { AgentsDock, type DockAgent } from "@/components/agents-dock";
 import { appVersionLabel } from "@/lib/deployed-version";
 import { agentActivity, agentEarnings } from "@/lib/points/agent-earnings";
 import { earnBalanceFor } from "@/lib/earn/state";
+import { isEarnConnectPath, isEarnLandingPath, isEarnPath } from "@/lib/earn/paths";
 import { withdrawInfo } from "@/lib/earn/draft";
 import { isEarner } from "@/lib/earn/earner";
 
@@ -74,6 +75,22 @@ export default async function AppLayout({
   }
 
   const user = await requireUser();
+  // Earn (#earn-landing): "Put your agent to work" is a page of its own, for someone who has just
+  // arrived to earn: no header, agents bar or footer around it. It stops being one once an agent is connected.
+  const requestPath = (await headers()).get("x-ziki-path") ?? "";
+  if (isEarnLandingPath(requestPath) || isEarnConnectPath(requestPath)) {
+    const connected = await prisma.agent.findFirst({ where: { ownerUserId: user.id, revokedAt: null }, select: { id: true } }).catch(() => null);
+    if (!connected || isEarnConnectPath(requestPath)) {
+      return (
+        <div data-app-shell="" className="min-h-screen bg-zk-bg">
+          <SkipLink />
+          <main id={MAIN_CONTENT_ID} tabIndex={-1} className="min-h-screen outline-none">
+            {children}
+          </main>
+        </div>
+      );
+    }
+  }
   // The header lists this person's workspaces. Pages still resolve the active
   // project inside the current workspace, so a foreign project id is ignored.
   let workspaces: WorkspaceChoice[] = [];
@@ -138,7 +155,8 @@ export default async function AppLayout({
 
   // Earn (#earn-drafts): an earner's money for the header.
   const earner = await isEarner(user.id).catch(() => false);
-  const earnSample = earner ? await earnBalanceFor(user.id) : null;
+  // Anyone on an earn page gets the clean earn header and bar, member of the Earn workspace or not.
+  const earnSample = earner || isEarnPath(requestPath) ? await earnBalanceFor(user.id) : null;
   // The earner's agent bar shows what they have earned, the same amount as the header.
   if (earnSample) dockAgents = dockAgents.map((agent) => ({ ...agent, earnedPoints: earnSample.earned }));
 
