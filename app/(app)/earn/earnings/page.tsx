@@ -6,6 +6,8 @@ import { CONVERSION_BONUS, SIGNUP_BONUS, WITHDRAW_THRESHOLD, earnAgentActivity, 
 import { sampleBalance } from "@/lib/earn/state";
 import { EarnBar } from "@/components/earn-money";
 import { EarnWithdraw } from "@/components/earn-withdraw";
+import { EarnAgentPortrait } from "@/components/earn-agent";
+import { agentPageHref } from "@/lib/header-nav";
 import { agentsLink, agentsPrimaryBtn, agentsSecondaryBtn, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
 
 export const metadata = { title: "Earnings" };
@@ -20,7 +22,7 @@ export const metadata = { title: "Earnings" };
 export default async function EarningsPage() {
   const user = await requireUser();
   const balance = await sampleBalance();
-  const agent = await prisma.agent.findFirst({ where: { ownerUserId: user.id, revokedAt: null }, orderBy: { createdAt: "asc" }, select: { name: true } }).catch(() => null);
+  const agent = await prisma.agent.findFirst({ where: { ownerUserId: user.id, revokedAt: null }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, avatar: true, username: true } }).catch(() => null);
   const info = withdrawInfo(balance.stage);
   const ready = balance.withdrawable > 0;
   const taskPay = stageTasks(balance.stage).filter((task) => task.done).reduce((sum, task) => sum + task.pay, 0);
@@ -43,16 +45,16 @@ export default async function EarningsPage() {
       {/* The started page (Mark's four pages): how the agent is doing comes first. */}
       {agent ? (
         <div className={`${agentsSurface} flex flex-wrap items-center gap-3 p-4`}>
-          <span aria-hidden="true" className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zk-ok-fg text-white">
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="8" width="16" height="11" rx="4" /><path d="M12 8V5M9.5 13h.01M14.5 13h.01M9.5 16a3.5 3.5 0 0 0 5 0" /></svg>
-            <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-zk-surface bg-zk-ok-fg motion-safe:animate-pulse" />
+          <span className="relative shrink-0">
+            <EarnAgentPortrait agentId={agent.id} agentName={agent.name} avatar={agent.avatar} size={48} />
+            <span aria-hidden="true" className="absolute -right-0.5 bottom-0 h-3 w-3 rounded-full border-2 border-zk-surface bg-zk-ok-fg motion-safe:animate-pulse" />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-extrabold text-zk-text">{agent.name}</span>
             <span className="block text-sm text-zk-text2">{earnAgentActivity(balance.stage)}</span>
           </span>
           <Link href="/earn/marketing" className={agentsSecondaryBtn}>Marketing tasks</Link>
-          <Link href="/agents/mine" className={agentsLink}>My agents</Link>
+          <Link href={agentPageHref(agent.username)} className={agentsLink}>Change its look</Link>
         </div>
       ) : null}
 

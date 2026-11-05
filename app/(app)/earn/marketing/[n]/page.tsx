@@ -6,7 +6,7 @@ import { formatZ } from "@/lib/points/rules";
 import { EARN_TASKS, WITHDRAW_THRESHOLD, earnBalance, stageAfterPaying, tasksPaid, zikiTaskPath } from "@/lib/earn/draft";
 import { sampleStage, startedTask } from "@/lib/earn/state";
 import { EarnTaskWork } from "@/components/earn-task-work";
-import { EarnBar } from "@/components/earn-bar";
+import { EarnTopStrip } from "@/components/earn-top-strip";
 import { EarnCelebrate } from "@/components/earn-celebrate";
 import { agentsLink, agentsPrimaryBtn, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
 
@@ -59,7 +59,8 @@ export default async function EarnTaskPage({
   const celebrate = state === "paid" && query.celebrate === "1" && index === paid - 1;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="mx-auto max-w-3xl space-y-5">
+      <EarnTopStrip balance={balance} />
       <Link href="/earn/marketing" className={`text-sm ${agentsLink}`}>← Marketing</Link>
 
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -71,9 +72,9 @@ export default async function EarnTaskPage({
         <span className="rounded-[10px] bg-zk-ok-bg px-3.5 py-1.5 text-lg font-extrabold tabular-nums text-zk-ok-fg">+{formatZ(task.pay)}</span>
       </div>
 
-      {celebrate ? <EarnCelebrate agentName={agentName} taskNumber={n} pay={task.pay} from={balance.earned - task.pay} to={balance.earned} total={WITHDRAW_THRESHOLD} /> : null}
+      {celebrate ? <EarnCelebrate agent={agent} taskNumber={n} pay={task.pay} from={balance.earned - task.pay} to={balance.earned} total={WITHDRAW_THRESHOLD} /> : null}
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+      <div>
         <div className="min-w-0 space-y-5">
           {/* Three plain beats, only once the task is under way. */}
           {beat >= 0 ? (
@@ -140,17 +141,6 @@ export default async function EarnTaskPage({
           ) : null}
         </div>
 
-        <aside className="space-y-4">
-          <section aria-labelledby="road-heading" className={`${agentsSurface} space-y-3 p-5`}>
-            <h2 id="road-heading" className="text-xs font-bold uppercase tracking-[0.06em] text-zk-muted">Your road to {formatZ(WITHDRAW_THRESHOLD)}</h2>
-            <p className="flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold tabular-nums tracking-tight text-zk-text">${balance.earned.toFixed(2)}</span>
-              <span className="text-sm text-zk-muted">of {formatZ(WITHDRAW_THRESHOLD)}</span>
-            </p>
-            <EarnBar balance={balance} />
-            <Link href="/earn/earnings" className={`${agentsLink} text-sm`}>See your earnings</Link>
-          </section>
-        </aside>
       </div>
     </div>
   );

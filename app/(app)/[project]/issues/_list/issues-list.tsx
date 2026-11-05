@@ -105,7 +105,7 @@ import { openIssueConfirmations, parseIssueStageView, type IssueStage } from "@/
 import { issueHref } from "@/lib/issue-ref";
 import { PROJECT_ALL_PARAM, showsAllProjects } from "@/lib/issue-list-filters";
 import { ideaVoteTotals, NO_VOTES } from "@/lib/idea-vote-totals";
-import { EARN_PROJECT_SLUG, EARN_TASKS, ZIKI_TASKS_PATH, tasksPaid } from "@/lib/earn/draft";
+import { EARN_PROJECT_SLUG, EARN_TASKS, tasksPaid } from "@/lib/earn/draft";
 import { isEarner } from "@/lib/earn/earner";
 import { sampleStage, startedTask } from "@/lib/earn/state";
 import { ZikiTasksTable } from "@/components/ziki-tasks-table";
@@ -1303,7 +1303,7 @@ export async function IssuesList({
             // Earn: the Ziki tasks still to do count as work in progress.
             count: group.statuses.reduce((sum, value) => sum + (value === ERROR_STATUS || value === POSSIBLY_DELIVERED ? 0 : statusCount(value)), 0) + (showZikiTasks && group.label === "In Progress" ? zikiTasksLeft : 0),
             // Earn: while Ziki tasks remain, In Progress opens straight onto them.
-            href: showZikiTasks && group.label === "In Progress" ? ZIKI_TASKS_PATH : statusLink(group.statuses[0]),
+            href: statusLink(group.statuses[0]),
             selected: index === stageIndex,
           }))}
         />
@@ -1337,9 +1337,6 @@ export async function IssuesList({
         {stageIndex >= 0 && !isIdeasView ? (
           <StageSidebar
             steps={[
-              ...(showZikiTasks && STAGE_GROUPS[stageIndex].label === "In Progress"
-                ? [{ label: "Ziki tasks", count: zikiTasksLeft, href: ZIKI_TASKS_PATH, selected: onZikiTasks, tone: "earn" as const }]
-                : []),
               // In Progress: Your call joins the top of the steps, in amber, only while the agents have split on something.
               ...(stageIndex === IN_PROGRESS_STAGE && yourCall.length > 0
                 ? [{ label: "Your call", count: yourCall.length, href: statusLink(YOUR_CALL_STATUS), selected: isYourCallView, tone: "warn" as const }]

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { sampleBalance } from "@/lib/earn/state";
+import { EarnTopStrip } from "@/components/earn-top-strip";
 import { agentsChipClass, agentsLink, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
 
 export const metadata = { title: "Open source" };
@@ -25,9 +27,11 @@ export default async function EarnOpenSourcePage() {
   const user = await requireUser();
   const agent = await prisma.agent.findFirst({ where: { ownerUserId: user.id, revokedAt: null }, orderBy: { createdAt: "asc" }, select: { name: true } }).catch(() => null);
   const agentName = agent?.name ?? "Your agent";
+  const balance = await sampleBalance();
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
+      <EarnTopStrip balance={balance} />
       <div className="space-y-1">
         <Link href="/earn" className={`text-sm ${agentsLink}`}>← What should it work on?</Link>
         <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">Open source</h1>

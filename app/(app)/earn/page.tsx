@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { isEarner } from "@/lib/earn/earner";
 import { EarnWaiting } from "@/components/earn-waiting";
-import { SIGNUP_BONUS, WITHDRAW_THRESHOLD, earnAgentActivity } from "@/lib/earn/draft";
+import { WITHDRAW_THRESHOLD, earnAgentActivity } from "@/lib/earn/draft";
 import { sampleStage, startedTask } from "@/lib/earn/state";
 import { formatZ } from "@/lib/points/rules";
 import { agentsChipClass, agentsLink, agentsPrimaryBtn, agentsSecondaryBtn, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
@@ -24,7 +24,7 @@ export default async function EarnPage() {
   const user = await requireUser();
   const earner = await isEarner(user.id);
   const agent = earner
-    ? await prisma.agent.findFirst({ where: { ownerUserId: user.id, revokedAt: null }, orderBy: { createdAt: "asc" }, select: { name: true } }).catch(() => null)
+    ? await prisma.agent.findFirst({ where: { ownerUserId: user.id, revokedAt: null }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, avatar: true, username: true } }).catch(() => null)
     : null;
   const stage = await sampleStage();
   // Mark's four pages: this one is only for someone who has just arrived. Once an earner has started
@@ -44,15 +44,15 @@ export default async function EarnPage() {
         <ol className="m-0 flex max-w-xl list-none flex-col gap-3 p-0">
           {STEPS.map((step, index) => (
             <li key={step} className="flex items-center gap-3 text-[15px] font-semibold text-zk-text">
-              <span aria-hidden="true" className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${earner && index < 2 ? "bg-zk-ok-fg text-white" : "bg-zk-tint text-zk-info-fg"}`}>
-                {earner && index < 2 ? "✓" : index + 1}
+              <span aria-hidden="true" className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${agent && index < 2 ? "bg-zk-ok-fg text-white" : "bg-zk-tint text-zk-info-fg"}`}>
+                {agent && index < 2 ? "✓" : index + 1}
               </span>
               {step}
             </li>
           ))}
         </ol>
         <div className="flex flex-wrap items-center gap-3 pt-1">
-          {earner ? (
+          {agent ? (
             <>
               <Link href="/agents/mine" className={agentsPrimaryBtn}>My agents</Link>
               <Link href="/earn/earnings" className={agentsSecondaryBtn}>My earnings</Link>
@@ -61,14 +61,16 @@ export default async function EarnPage() {
           ) : (
             <>
               <Link href="/earn/start" className={agentsPrimaryBtn}>Connect my agent</Link>
-              <span className="text-sm text-zk-muted">Get {formatZ(SIGNUP_BONUS)} when you sign up. Your agent can wait here for work at no cost.</span>
+              <span className="text-sm text-zk-muted">Your agent can wait here for work at no cost.</span>
             </>
           )}
         </div>
       </div>
       </section>
 
-      {agent ? <EarnWaiting agentName={agent.name} status={earnAgentActivity(stage)} /> : null}
+      {agent ? (
+        <>
+      <EarnWaiting agent={agent} status={earnAgentActivity(stage)} />
 
       <section aria-labelledby="projects-heading" className="space-y-4">
         <div className="space-y-1">
@@ -110,6 +112,8 @@ export default async function EarnPage() {
           Withdrawals open at {formatZ(WITHDRAW_THRESHOLD)}. <Link href="/earn/earnings" className={agentsLink}>See the way there</Link>
         </p>
       </section>
+        </>
+      ) : null}
 
       <p className="text-sm text-zk-muted">
         Here to build something instead? <Link href="/tenants" className={agentsLink}>Start a project</Link>

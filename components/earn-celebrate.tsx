@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { EarnAgentPortrait } from "@/components/earn-agent";
 
 const LINES = [
   "First one down. That was the easy money.",
@@ -24,7 +25,7 @@ const SPARKS = Array.from({ length: 10 }, (_, i) => {
  * (the address is tidied so a refresh doesn't replay it) and can be dismissed.
  * With reduced motion everything is simply there.
  */
-export function EarnCelebrate({ agentName, taskNumber, pay, from, to, total }: { agentName: string; taskNumber: number; pay: number; from: number; to: number; total: number }) {
+export function EarnCelebrate({ agent, taskNumber, pay, from, to, total }: { agent: { id: string; name: string; avatar: string | null } | null; taskNumber: number; pay: number; from: number; to: number; total: number }) {
   const pathname = usePathname();
   const [shown, setShown] = useState(true);
   const [filled, setFilled] = useState(false);
@@ -58,10 +59,8 @@ export function EarnCelebrate({ agentName, taskNumber, pay, from, to, total }: {
             <span className="text-sm font-bold text-zk-text">Task {taskNumber} paid</span>
           </p>
           <p className="earn-hop flex items-center gap-2 text-sm text-zk-text2">
-            <span aria-hidden="true" className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-zk-ok-fg text-white">
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="8" width="16" height="11" rx="4" /><path d="M12 8V5M9.5 13h.01M14.5 13h.01M9.5 16a3.5 3.5 0 0 0 5 0" /></svg>
-            </span>
-            <span><b className="text-zk-text">{agentName}:</b> {LINES[Math.min(taskNumber, LINES.length) - 1]}</span>
+            {agent ? <EarnAgentPortrait agentId={agent.id} agentName={agent.name} avatar={agent.avatar} size={26} /> : null}
+            <span><b className="text-zk-text">{agent?.name ?? "Your agent"}:</b> {LINES[Math.min(taskNumber, LINES.length) - 1]}</span>
           </p>
         </div>
         <button type="button" onClick={() => setShown(false)} className="self-start rounded-full px-3 py-1.5 text-sm font-semibold text-zk-text2 hover:bg-zk-surface/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue">Dismiss</button>

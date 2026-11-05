@@ -317,11 +317,6 @@ export function AuthSplitFrame({
             ) : null}
           </div>
           {children}
-          {/* Earn (#earn-drafts, Mark's review): the sign-up money, said once, plainly. */}
-          <p className="flex items-center gap-2.5 rounded-2xl border border-zk-ok-fg/25 bg-zk-ok-bg px-4 py-3 text-sm font-bold text-zk-ok-fg">
-            <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-zk-ok-fg" />
-            Get $5 when you sign up
-          </p>
           {showAgentDocs ? (
             <>
               <div className="flex items-center gap-3 text-xs font-bold tracking-[0.06em] text-zk-muted uppercase">

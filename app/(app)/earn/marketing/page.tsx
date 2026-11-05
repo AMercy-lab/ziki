@@ -2,9 +2,9 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { formatZ } from "@/lib/points/rules";
-import { CONVERSION_BONUS, EARN_CC_ADDRESS, EARN_TASKS, WITHDRAW_THRESHOLD, earnBalance, stageTasks, zikiTaskPath } from "@/lib/earn/draft";
+import { CONVERSION_BONUS, EARN_CC_ADDRESS, EARN_TASKS, earnBalance, stageTasks, zikiTaskPath } from "@/lib/earn/draft";
 import { sampleStage, startedTask } from "@/lib/earn/state";
-import { EarnBar } from "@/components/earn-money";
+import { EarnTopStrip } from "@/components/earn-top-strip";
 import { agentsLink, agentsPrimaryBtn, agentsSecondaryBtn, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
 
 export const metadata = { title: "Marketing tasks" };
@@ -35,7 +35,8 @@ export default async function EarnTasksPage() {
   const inProgress = current !== null && started === index + 1;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6">
+      <EarnTopStrip balance={balance} />
       <div className="space-y-1">
         <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">Marketing</h1>
         <p className="max-w-2xl text-sm text-zk-text2">Help people find Ziki. One task at a time. Your agent does the work, you check it and send it from your own accounts. Each one that’s checked earns you money.</p>
@@ -65,7 +66,7 @@ export default async function EarnTasksPage() {
         </ol>
       </section>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+      <div>
         {current ? (
           <section aria-labelledby="now-heading" className={`${agentsSurface} space-y-5 p-5 sm:p-7`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -110,21 +111,10 @@ export default async function EarnTasksPage() {
           </section>
         )}
 
-        <aside className="space-y-4">
-          <section aria-labelledby="bal-heading" className={`${agentsSurface} space-y-3 p-5`}>
-            <h2 id="bal-heading" className="text-xs font-bold uppercase tracking-[0.06em] text-zk-muted">Earned</h2>
-            <p className="flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold tabular-nums tracking-tight text-zk-text">${balance.earned.toFixed(2)}</span>
-              <span className="text-sm text-zk-muted">{ready ? "ready to withdraw" : `of ${formatZ(WITHDRAW_THRESHOLD)}`}</span>
-            </p>
-            <EarnBar balance={balance} />
-            <Link href="/earn/earnings" className={`${agentsLink} text-sm`}>See the way to {formatZ(WITHDRAW_THRESHOLD)}</Link>
-          </section>
-          <p className="px-1 text-xs leading-relaxed text-zk-muted">
-            Not for you? <Link href="/earn/open-source" className={agentsLink}>Try open source</Link> instead. Here to build something? <Link href="/tenants" className={agentsLink}>Start a project</Link>
-          </p>
-        </aside>
       </div>
+      <p className="px-1 text-xs leading-relaxed text-zk-muted">
+        Not for you? <Link href="/earn/open-source" className={agentsLink}>Try open source</Link> instead.
+      </p>
     </div>
   );
 }

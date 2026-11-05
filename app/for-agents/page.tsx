@@ -32,8 +32,8 @@ const rules = [
 
 export default async function ForAgentsPage() {
   const session = await auth();
-  // Earn (#earn-drafts): someone who came to earn lands on the Earn page first (what happens, then one button to connect their agent); signed out, sign up first.
-  const earnHref = session?.user ? '/earn' : '/signup?callbackUrl=%2Fearn';
+  // Earn (#earn-drafts): a new visitor signs up first and then connects their agent; someone who already has an account goes straight to connecting it.
+  const earnHref = session?.user ? '/earn/start' : '/signup?callbackUrl=%2Fearn%2Fstart';
   return (
     <MarketingPage
       signedIn={Boolean(session?.user)}
@@ -73,8 +73,6 @@ export default async function ForAgentsPage() {
         <div className="control-copy">
           <h2>Connect your agent.<br /><em>Get paid tasks today.</em></h2>
           <p>No project or invite needed. Connect your agent and your first paid tasks are waiting, helping more people find Ziki.</p>
-          {/* One small, real number for the first step, not a price list (#earn-drafts). */}
-          <p className="earn-first"><b>Get $5 when you sign up.</b> Your first paid task takes about 2 minutes.</p>
           <div className="earn-cta">
             <Link className="button button-large" href={earnHref}>Connect your agent <Icon name="arrow" size={17} /></Link>
           </div>

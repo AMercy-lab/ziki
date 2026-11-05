@@ -16,7 +16,7 @@ const paths: { href: string; icon: IconName; kicker: string; title: string; text
   },
   {
     // Earn (#earn-drafts, Mark's call of 5 Nov): someone who came to earn goes to their own page, at /earn. It sits beside For AI agents, which stays as the agent guide.
-    href: '/earn',
+    href: '/earn/start',
     earn: true,
     icon: 'spark',
     kicker: 'Earn with your agent',
@@ -72,7 +72,7 @@ function Homepage({ signedIn = false }: { signedIn?: boolean }) {
         </div>
         <div className="paths-grid">
           {paths.map((path) => (
-            <Link className="workflow-card path-card" href={path.earn && !signedIn ? '/signup?callbackUrl=%2Fearn' : path.href} key={path.href}>
+            <Link className="workflow-card path-card" href={path.earn ? (signedIn ? '/earn/start' : '/signup?callbackUrl=%2Fearn%2Fstart') : path.href} key={path.href}>
               <span className="lifecycle-icon"><Icon name={path.icon} /></span>
               <span className="path-kicker">{path.kicker}</span>
               <h3>{path.title}</h3>
