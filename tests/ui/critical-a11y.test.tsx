@@ -2,6 +2,7 @@
 "use client";
 
 import axe from "axe-core";
+import { NewMarketingTaskForm } from "@/components/marketing/tasks/new-marketing-task-form";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -130,6 +131,13 @@ async function expectNoA11yViolations(node: HTMLElement) {
 const users = [{ id: "u1", name: "Alice", role: "user" as const }];
 
 describe("component accessibility (axe)", () => {
+  it("keeps the new marketing task form accessible, with and without task types", async () => {
+    const withTypes = render(<NewMarketingTaskForm projectId="project-1" types={[{ id: "blog", name: "Blog post" }]} />);
+    await expectNoA11yViolations(withTypes.container);
+    withTypes.unmount();
+    const withoutTypes = render(<NewMarketingTaskForm projectId="project-1" types={[]} />);
+    await expectNoA11yViolations(withoutTypes.container);
+  });
   it("keeps approved-work selection and attachment actions accessible", async () => {
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
     const { container } = render(<Library slug="acme" projectName="Acme" initial={{ ok: true, items: [{
