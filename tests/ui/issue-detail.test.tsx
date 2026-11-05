@@ -1,11 +1,18 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** The issue page's stage panels: bids with their votes and the Award control only where it may be used, confirmations and their banner, and judgements and merge reviews with their replies. */
 const mocks = vi.hoisted(() => ({ addComment: vi.fn() }));
+const libraryRefresh = vi.hoisted(() => vi.fn());
+vi.mock("@/app/(app)/[project]/marketing/library/actions", () => ({ refreshLibrary: libraryRefresh }));
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(window.location.search),
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useParams: () => ({ project: "demo" }),
+}));
 vi.mock("@/app/actions/issues", () => ({ addCommentAction: mocks.addComment }));
 vi.mock("@/app/actions/issue-bids", () => ({ awardIssueBidAction: vi.fn() }));
 vi.mock("@/app/actions/confirmations", () => ({ giveConfirmationAction: vi.fn() }));
@@ -13,6 +20,8 @@ vi.mock("@/app/actions/confirmations", () => ({ giveConfirmationAction: vi.fn() 
 import { MergeReviewsPanel, TestVerdictsPanel, type MergeReviewView, type TestVerdictView } from "@/components/issue-review-entries";
 import { IssueBidsPanel, type BidEntryView } from "@/components/issue-bids";
 import { IssueConfirmationsPanel, type ConfirmationEntryView, type ConfirmationsData } from "@/components/issue-confirmations";
+import { Library } from "@/components/marketing/library/library";
+import { deliveryFiles, filterLibrary, type LibraryItem } from "@/components/marketing/library/model";
 
 const PR = "https://github.com/emerjent/ziki/pull/42";
 
@@ -46,6 +55,98 @@ const review: MergeReviewView = {
 
 beforeEach(() => vi.clearAllMocks());
 afterEach(() => cleanup());
+
+describe("Library approved deliverables", () => {
+  const items: LibraryItem[] = [
+    { id: "launch", number: 42, title: "Launch campaign", summary: "Approved campaign", agent: "Studio", publishedAt: "2026-11-04T12:00:00Z", files: deliveryFiles(["https://example.com/social.png", "https://example.com/guide.docx"]) },
+    { id: "article", number: 38, title: "Agent workflow", summary: "A workflow guide", agent: "Writer", publishedAt: "2026-11-02T12:00:00Z", files: deliveryFiles(["https://example.com/blog/workflow"]) },
+  ];
+  beforeEach(() => {
+    window.history.replaceState(null, "", "/demo/marketing/library");
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("combines attachment type and search, sorts by publication, and refuses unsafe sources", () => {
+    expect(filterLibrary(items, "guide.docx", "Docs", false).map((item) => item.id)).toEqual(["launch"]);
+    expect(filterLibrary(items, "#38", "Articles", false).map((item) => item.id)).toEqual(["article"]);
+    expect(filterLibrary(items, "Studio", "Videos", false)).toEqual([]);
+    expect(filterLibrary(items, "", "All", true).map((item) => item.id)).toEqual(["article", "launch"]);
+    expect(deliveryFiles(["javascript:alert(1)", "data:text/html,bad", "https://user:password@example.com/file", "/api/attachments/unrelated"])).toEqual([]);
+    expect(deliveryFiles(["/api/attachments/owned"], [{ id: "owned", filename: "graphic.png", contentType: "image/png", size: 20 }])).toEqual([expect.objectContaining({ name: "graphic.png", local: true, kind: "Graphics" })]);
+  });
+
+  it("switches attachments and updates actions without changing the associated task", async () => {
+    const user = userEvent.setup();
+    const view = render(<Library slug="demo" projectName="Demo" initial={{ ok: true, items }} />);
+    await user.click(screen.getByRole("button", { name: "guide.docx" }));
+    view.rerender(<Library slug="demo" projectName="Demo" initial={{ ok: true, items }} />);
+    expect(screen.getByRole("link", { name: /Open original/ })).toHaveAttribute("href", "https://example.com/guide.docx");
+    expect(screen.getByRole("link", { name: /View task #42/ })).toHaveAttribute("href", "/demo/42");
+    expect(screen.getByRole("button", { name: /Download/ })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: /Agent workflow.*Task #38/ }));
+    view.rerender(<Library slug="demo" projectName="Demo" initial={{ ok: true, items }} />);
+    expect(screen.getByRole("link", { name: /Open original/ })).toHaveAttribute("href", "https://example.com/blog/workflow");
+    expect(screen.queryByRole("button", { name: /Download/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps everything typed in search while the URL catches up", async () => {
+    const user = userEvent.setup();
+    render(<Library slug="demo" projectName="Demo" initial={{ ok: true, items }} />);
+    const search = screen.getByRole("searchbox", { name: "Search approved work" });
+    await user.type(search, "workflow");
+    expect(search).toHaveValue("workflow");
+    expect(new URLSearchParams(window.location.search).get("q")).toBe("workflow");
+    expect(screen.queryByRole("button", { name: /Launch campaign.*Task #42/ })).not.toBeInTheDocument();
+  });
+
+  it("retries only a failed preview and keeps task access available", async () => {
+    const user = userEvent.setup();
+    render(<Library slug="demo" projectName="Demo" initial={{ ok: true, items }} />);
+    fireEvent.error(screen.getByRole("img", { name: /Launch campaign/ }));
+    await user.click(screen.getByRole("button", { name: "Retry preview" }));
+    expect(screen.getByRole("img", { name: /Launch campaign/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /View task #42/ })).toHaveAttribute("href", "/demo/42");
+    expect(libraryRefresh).not.toHaveBeenCalled();
+  });
+
+  it("retains results on refresh failure and recovers from an initial collection error", async () => {
+    const user = userEvent.setup();
+    libraryRefresh.mockResolvedValue({ ok: false });
+    const view = render(<Library slug="demo" projectName="Demo" initial={{ ok: true, items }} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/previous results/);
+    expect(screen.getByRole("link", { name: /View task #42/ })).toBeInTheDocument();
+    view.unmount();
+    libraryRefresh.mockResolvedValue({ ok: true, items });
+    render(<Library slug="demo" projectName="Demo" initial={{ ok: false }} />);
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("link", { name: /View task #42/ })).toBeInTheDocument();
+  });
+
+  it("keeps mobile selection and search in the URL when returning from the detail view", async () => {
+    window.history.replaceState(null, "", "/demo/marketing/library?q=Studio");
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true })));
+    const scroll = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const user = userEvent.setup();
+    const view = render(<Library slug="demo" projectName="Demo" initial={{ ok: true, items }} />);
+    await user.click(screen.getByRole("button", { name: /Launch campaign.*Task #42/ }));
+    view.rerender(<Library slug="demo" projectName="Demo" initial={{ ok: true, items }} />);
+    expect(new URLSearchParams(window.location.search).get("view")).toBe("detail");
+    expect(screen.getByRole("heading", { name: "Launch campaign" })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: /Back to Library/ }));
+    view.rerender(<Library slug="demo" projectName="Demo" initial={{ ok: true, items }} />);
+    expect(new URLSearchParams(window.location.search).get("q")).toBe("Studio");
+    expect(new URLSearchParams(window.location.search).get("item")).toBe("launch");
+    expect(new URLSearchParams(window.location.search).has("view")).toBe(false);
+    expect(screen.getByRole("button", { name: /Launch campaign.*Task #42/ })).toHaveAttribute("aria-pressed", "true");
+    scroll.mockRestore();
+  });
+});
 
 describe("TestVerdictsPanel (#review-entries)", () => {
   it("shows each verdict's chip, agent, owner, summary, description, pull request and replies", () => {

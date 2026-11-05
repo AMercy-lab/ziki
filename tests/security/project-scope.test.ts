@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const findFirst = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/prisma", () => ({ prisma: { project: { findFirst } } }));
+const publishedTasks = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/prisma", () => ({ prisma: { project: { findFirst }, bug: { findMany: publishedTasks } } }));
 
 const section = vi.hoisted(() => ({
   notFound: vi.fn(() => { throw new Error("NOT_FOUND"); }),
@@ -16,6 +17,8 @@ vi.mock("@/lib/auth-helpers", () => ({ requireUser: section.requireUser }));
 
 import MarketingHomePage from "@/app/(app)/[project]/marketing/page";
 import MarketingPage from "@/app/(app)/marketing/page";
+import LibraryPage from "@/app/(app)/[project]/marketing/library/page";
+import { readLibrary } from "@/app/(app)/[project]/marketing/library/data";
 import { AgentProjectError } from "@/lib/agents/require-agent";
 import { marketingTabHref } from "@/lib/header-nav";
 import { issueProject } from "@/lib/agent-api/issues";
@@ -59,6 +62,43 @@ describe("issueProject project scope (#742)", () => {
         new URLSearchParams("projectId=project_web"),
       ),
     ).rejects.toBeInstanceOf(AgentProjectError);
+  });
+});
+
+describe("Library project isolation", () => {
+  it("refuses access before reading published deliverables", async () => {
+    section.requireProject.mockRejectedValue(new Error("NOT_FOUND"));
+    publishedTasks.mockClear();
+    await expect(LibraryPage({ params: Promise.resolve({ project: "private" }) })).rejects.toThrow("NOT_FOUND");
+    expect(publishedTasks).not.toHaveBeenCalled();
+  });
+
+  it("returns only published marketing work in the authorized tenant and project, with the latest delivery", async () => {
+    const approved = {
+      id: "approved", number: 42, title: "Launch campaign", projectId: "project_web", tenantId: "tenant_zedu",
+      track: "marketing", status: "resolved", substatus: "published", isDeleted: false,
+      deliveries: [
+        { id: "new", updatedAt: new Date("2026-11-03"), summary: "Approved version", deliverableUrls: ["https://example.com/final.png"], agent: { name: "Studio" } },
+        { id: "old", updatedAt: new Date("2026-11-01"), summary: "Earlier version", deliverableUrls: ["https://example.com/draft.png"], agent: { name: "Earlier agent" } },
+      ],
+      mergeReviews: [{ updatedAt: new Date("2026-11-04") }],
+      attachments: [{ id: "evidence", filename: "unrelated-evidence.png", contentType: "image/png", size: 20 }],
+    };
+    const records = [approved,
+      { ...approved, id: "other-project", projectId: "project_other" },
+      { ...approved, id: "other-tenant", tenantId: "tenant_other" },
+      { ...approved, id: "product", track: "product" },
+      { ...approved, id: "unpublished", status: "done", substatus: "accepted" },
+      { ...approved, id: "deleted", isDeleted: true },
+    ];
+    publishedTasks.mockImplementation(async ({ where, select }) => records
+      .filter((row) => Object.entries(where).every(([key, value]) => row[key as keyof typeof row] === value))
+      .map((row) => ({ ...row, deliveries: select.deliveries.orderBy[0].updatedAt === "desc" ? [...row.deliveries].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()).slice(0, select.deliveries.take) : row.deliveries })));
+    const result = await readLibrary({ tenantId: "tenant_zedu", project: { id: "project_web" } } as Parameters<typeof readLibrary>[0]);
+    expect(result).toEqual([expect.objectContaining({
+      id: "approved", agent: "Studio", publishedAt: "2026-11-04T00:00:00.000Z",
+      files: [expect.objectContaining({ url: "https://example.com/final.png" })],
+    })]);
   });
 });
 

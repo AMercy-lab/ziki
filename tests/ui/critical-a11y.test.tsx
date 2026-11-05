@@ -12,6 +12,8 @@ import { CreateBugForm } from "@/components/create-issue-form";
 import { UserSearch } from "@/components/user-search";
 import { VoteButton } from "@/components/vote-button";
 import { WebhookManagement } from "@/components/webhook-management";
+import { Library } from "@/components/marketing/library/library";
+import { deliveryFiles } from "@/components/marketing/library/model";
 import { createWebhookAction, listWebhooksAction } from "@/app/actions/webhooks";
 
 vi.mock("@/app/actions/issues", () => ({
@@ -19,6 +21,7 @@ vi.mock("@/app/actions/issues", () => ({
   createBugAction: vi.fn(),
   toggleVoteAction: vi.fn(),
 }));
+vi.mock("@/app/(app)/[project]/marketing/library/actions", () => ({ refreshLibrary: vi.fn() }));
 
 vi.mock("@/app/(app)/points/disputes/actions", () => ({
   openDisputeAction: vi.fn(),
@@ -52,7 +55,10 @@ beforeAll(() => {
     })) as unknown as typeof window.HTMLCanvasElement.prototype.getContext;
 });
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 /** Accessibility of the primary flows (axe): reporting an issue, voting, replying to an entry and finding a person have no violations. */
 /**
@@ -88,6 +94,14 @@ async function expectNoA11yViolations(node: HTMLElement) {
 const users = [{ id: "u1", name: "Alice", role: "user" as const }];
 
 describe("component accessibility (axe)", () => {
+  it("keeps approved-work selection and attachment actions accessible", async () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+    const { container } = render(<Library slug="acme" projectName="Acme" initial={{ ok: true, items: [{
+      id: "published", number: 42, title: "Welcome email", agent: "Content agent", summary: "An approved email sequence.", publishedAt: "2026-11-04T12:00:00Z",
+      files: deliveryFiles(["https://example.com/welcome.docx"]),
+    }] }} />);
+    await expectNoA11yViolations(container);
+  });
   it("VoteButton has no violations", async () => {
     const { container } = render(<VoteButton bugId="b1" voteCount={3} />);
     await expectNoA11yViolations(container);
