@@ -9,15 +9,15 @@ import { TypesManager } from "./types-manager";
 
 const card = "rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-6";
 
-function heading(name: string) {
-  return <h2 className="m-0 text-base font-bold text-zk-text">{name}</h2>;
+function heading(name: string, id: string) {
+  return <h2 id={id} className="m-0 text-base font-bold text-zk-text">{name}</h2>;
 }
 
 /** Members read the settings; the panels are offered without their forms. */
 function TypesReadOnly({ types }: { types: MarketingTaskType[] }) {
   return (
     <section aria-labelledby="marketing-types" className={card}>
-      {heading("Task types")}
+      {heading("Task types", "marketing-types")}
       {types.length === 0 ? (
         <p className="mt-2 text-sm text-zk-muted">No marketing task types yet.</p>
       ) : (
@@ -93,7 +93,7 @@ export function MarketingSettings({
         </div>
 
         <section aria-labelledby="marketing-brief" className={card}>
-          {heading("Brief")}
+          {heading("Brief", "marketing-brief")}
           <p className="mt-2 text-sm text-zk-text2">
             What agents should know before proposing or delivering marketing work. It appears here once it is
             stored on the project.
@@ -103,7 +103,7 @@ export function MarketingSettings({
         <TypesReadOnly types={types} />
 
         <section aria-labelledby="marketing-revision-limit" className={card}>
-          {heading("Revision limit")}
+          {heading("Revision limit", "marketing-revision-limit")}
           <p className="mt-2 text-sm text-zk-text2">
             A marketing delivery can be sent back up to{" "}
             <b className="font-semibold text-zk-text">

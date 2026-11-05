@@ -92,27 +92,28 @@ export function TypesManager({ slug, types }: { slug: string; types: MarketingTa
     }
 
     setInUse(null);
-    startTransition(async () => {
-      try {
-        const agreed = await confirm({
-          title: `Delete task type "${type.name}"?`,
-          body: "This cannot be undone.",
-          confirmLabel: "Delete type",
-          tone: "danger",
-        });
-        if (!agreed) return;
-
-        const result = await deleteMarketingIssueTypeAction(slug, type.id);
-        if (result.error) {
-          setError(result.error);
-          toast(result.error, "error");
-        } else {
-          toast(`Task type "${type.name}" deleted.`);
+    // Ask before the transition starts: its state updates wait for it to finish, so a dialog opened inside it never shows.
+    void confirm({
+      title: `Delete task type "${type.name}"?`,
+      body: "This cannot be undone.",
+      confirmLabel: "Delete type",
+      tone: "danger",
+    }).then((agreed) => {
+      if (!agreed) return;
+      startTransition(async () => {
+        try {
+          const result = await deleteMarketingIssueTypeAction(slug, type.id);
+          if (result.error) {
+            setError(result.error);
+            toast(result.error, "error");
+          } else {
+            toast(`Task type "${type.name}" deleted.`);
+          }
+        } catch {
+          setError("Failed to delete the task type.");
+          toast("Failed to delete the task type.", "error");
         }
-      } catch {
-        setError("Failed to delete the task type.");
-        toast("Failed to delete the task type.", "error");
-      }
+      });
     });
   }
 

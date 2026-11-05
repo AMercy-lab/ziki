@@ -83,7 +83,8 @@ function parseTypeInput(formData: FormData) {
   const rawName = formData.get("name")?.toString() ?? "";
   const rawDescription = formData.get("description")?.toString() ?? "";
   const rawActive = formData.get("isActive");
-  const isActive = rawActive !== null ? rawActive === "true" || rawActive === "on" : true;
+  // An unticked checkbox isn't sent, so a missing value means inactive.
+  const isActive = rawActive === "true" || rawActive === "on";
   return issueTypeInputSchema.safeParse({
     name: rawName,
     description: rawDescription ? rawDescription : null,

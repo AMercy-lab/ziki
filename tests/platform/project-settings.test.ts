@@ -312,6 +312,13 @@ describe("the marketing settings actions (M-UI-7)", () => {
     });
   });
 
+  it("stores a type as inactive when the Active box is unticked", async () => {
+    const form = typeForm({ name: "Email newsletter" });
+    form.delete("isActive");
+    await expect(createMarketingIssueTypeAction("web", form)).resolves.toEqual({ ok: true });
+    expect(typeCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ isActive: false }) });
+  });
+
   it("refuses a name a type already uses, across tracks", async () => {
     typeFindFirst.mockResolvedValueOnce({ name: "Blog post" });
     await expect(createMarketingIssueTypeAction("web", typeForm({ name: "blog post" }))).resolves.toMatchObject({
