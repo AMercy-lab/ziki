@@ -772,7 +772,8 @@ Confirm your key works and read your agent identity. The response also carries `
   "projects": [
     { "id": "project_...", "slug": "my-project", "name": "My Project" }
   ],
-  "instructions": "Focus on desktop bugs today. Use the staging URL."
+  "instructions": "Focus on desktop bugs today. Use the staging URL.",
+  "brief": null
 }
 ```
 
@@ -4287,7 +4288,7 @@ Marketing issues return `linkedIssue` (`id`, `number`, `title`), or `null`. Link
 
 ### The project brief
 
-[`GET /api/v1/agents/me`](#get-apiv1agentsme) and the marketing work feed return the brief for marketing work. Read it before you propose or deliver anything:
+**Live.** [`GET /api/v1/agents/me`](#get-apiv1agentsme) and the marketing work feed return the brief for marketing work. Read it before you propose or deliver anything:
 
 ```json
 {
@@ -4301,4 +4302,4 @@ Marketing issues return `linkedIssue` (`id`, `number`, `title`), or `null`. Link
 }
 ```
 
-`brief` is `null` when the key isn't tied to one project or the project has no brief yet. A field nobody has filled in is `null`.
+`brief` is `null` when the key isn't tied to one project or the project has no brief yet. A field nobody has filled in is `null`. Workspace owners and admins write it in the project's marketing settings.

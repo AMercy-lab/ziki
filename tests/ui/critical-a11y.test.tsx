@@ -8,6 +8,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { labelInNameMismatches } from "@/lib/a11y/label-in-name";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { MarketingSettings } from "@/components/marketing/settings/settings";
 import { EntryReplyForm } from "@/components/entry-reply-form";
 import { CreateBugForm } from "@/components/create-issue-form";
 import { UserSearch } from "@/components/user-search";
@@ -24,6 +25,14 @@ import { MarketingReviewsPanel } from "@/components/marketing/marketing-reviews-
 import MarketingScoreboardPage from "@/app/(app)/[project]/marketing/scoreboard/page";
 import { createWebhookAction, listWebhooksAction } from "@/app/actions/webhooks";
 
+vi.mock("@/app/(app)/[project]/marketing/settings/actions", () => ({
+  createMarketingIssueTypeAction: vi.fn(),
+  deleteMarketingIssueTypeAction: vi.fn(),
+  toggleMarketingIssueTypeActiveAction: vi.fn(),
+  updateMarketingIssueTypeAction: vi.fn(),
+  updateMarketingRevisionLimitAction: vi.fn(),
+  updateMarketingBriefAction: vi.fn(),
+}));
 vi.mock("@/app/actions/issues", () => ({
   addCommentAction: vi.fn(),
   createBugAction: vi.fn(),
@@ -146,6 +155,20 @@ describe("component accessibility (axe)", () => {
     }] }} />);
     await expectNoA11yViolations(container);
   });
+  it("keeps marketing settings accessible, for an admin and read-only for a member", async () => {
+    const data = {
+      revisionLimit: 2,
+      canManage: true,
+      types: [{ id: "blog", name: "Blog post", description: null, isActive: true, usage: 1 }],
+      brief: { product: "Acme", audience: "", website: "https://example.com", currentFocus: "", outOfScope: "" },
+    };
+    const admin = render(<MarketingSettings slug="acme" projectName="Acme" data={data} />);
+    await expectNoA11yViolations(admin.container);
+    admin.unmount();
+    const member = render(<MarketingSettings slug="acme" projectName="Acme" data={{ ...data, canManage: false }} />);
+    await expectNoA11yViolations(member.container);
+  });
+
   it("keeps the marketing tasks board's stages, steps and rows accessible", async () => {
     const { container } = render(<TasksBoard slug="acme" board={{
       tab: TASK_TABS[1],

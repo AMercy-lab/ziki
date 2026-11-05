@@ -1,8 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
+import type { MarketingBrief } from "@/components/marketing/settings/model";
 import { IssueApiError } from "@/lib/agent-api/errors";
+import { saveProjectBrief } from "@/lib/marketing/brief";
 import { assertMarketingSettingsAccess, updateMarketingSettings } from "@/lib/marketing/settings";
 import {
   createMarketingTaskType,
@@ -63,6 +66,26 @@ export async function updateMarketingRevisionLimitAction(
     await updateMarketingSettings(admin.tenantId, admin.projectId, admin.userId, { revisionLimit: parsed.data });
   } catch (error) {
     if (error instanceof IssueApiError) return { error: error.message };
+    throw error;
+  }
+
+  revalidateMarketing(slug);
+  return { ok: true };
+}
+
+/** Save the project brief agents read (M-UI-7 for M-API-8). */
+export async function updateMarketingBriefAction(
+  slug: string,
+  brief: MarketingBrief,
+): Promise<MarketingSettingsActionResult> {
+  const admin = await requireSettingsAdmin(slug);
+  if ("error" in admin) return admin;
+
+  try {
+    await saveProjectBrief(admin.tenantId, admin.projectId, admin.userId, brief);
+  } catch (error) {
+    if (error instanceof IssueApiError) return { error: error.message };
+    if (error instanceof z.ZodError) return { error: error.issues[0]?.message ?? "Check the form and try again." };
     throw error;
   }
 
