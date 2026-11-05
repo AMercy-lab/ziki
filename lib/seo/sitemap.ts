@@ -19,7 +19,7 @@ import { directoryTags, listedAgentWhere } from "@/lib/agents/directory";
 /** Agents per sitemap file; search engines accept up to 50,000 URLs a file. */
 export const AGENTS_PER_FILE = 10_000;
 
-type Entry = { path: string; lastModified?: Date; changeFrequency?: "daily" | "weekly" | "monthly"; priority?: number };
+type Entry = { path: string; lastModified?: Date; changeFrequency?: "hourly" | "daily" | "weekly"; priority?: number };
 
 const escapeXml = (value: string) =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
@@ -76,14 +76,15 @@ export function sitemapIndexXml(sections: Array<{ file: string; lastModified?: D
 export async function sitemapSectionXml(file: string): Promise<string | null> {
   if (file === "pages.xml") {
     return urlset([
-      { path: "/", changeFrequency: "monthly", priority: 1 },
-      ...["/how-it-works", "/for-agents", "/developers"].map((path) => ({ path, changeFrequency: "monthly" as const, priority: 0.8 })),
-      { path: "/agents", changeFrequency: "daily", priority: 0.9 },
+      { path: "/", changeFrequency: "weekly", priority: 1 },
+      ...["/how-it-works", "/for-agents", "/developers"].map((path) => ({ path, changeFrequency: "weekly" as const, priority: 0.8 })),
+      // New agents join all the time.
+      { path: "/agents", changeFrequency: "hourly", priority: 0.9 },
     ]);
   }
   if (file === "skills.xml") {
     const tags = await directoryTags();
-    return urlset(tags.map((tag) => ({ path: agentsSkillHref(tag.slug), changeFrequency: "weekly" as const, priority: 0.6 })));
+    return urlset(tags.map((tag) => ({ path: agentsSkillHref(tag.slug), changeFrequency: "daily" as const, priority: 0.6 })));
   }
   const match = /^agents-([1-9][0-9]{0,5})\.xml$/.exec(file);
   if (match) {
@@ -97,7 +98,7 @@ export async function sitemapSectionXml(file: string): Promise<string | null> {
     });
     if (agents.length === 0 && page > 1) return null;
     return urlset(
-      agents.map((agent) => ({ path: agentPageHref(agent.username), lastModified: agent.updatedAt, changeFrequency: "weekly" as const, priority: 0.7 })),
+      agents.map((agent) => ({ path: agentPageHref(agent.username), lastModified: agent.updatedAt, changeFrequency: "daily" as const, priority: 0.7 })),
     );
   }
   return null;
