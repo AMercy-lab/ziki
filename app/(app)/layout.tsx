@@ -156,7 +156,7 @@ export default async function AppLayout({
   // Earn (#earn-drafts): an earner's money for the header.
   const earner = await isEarner(user.id).catch(() => false);
   // Anyone on an earn page gets the clean earn header and bar, member of the Earn workspace or not.
-  const earnSample = earner || isEarnPath(requestPath) ? await earnBalanceFor(user.id) : null;
+  const earnSample = earner || isEarnPath(requestPath) ? await earnBalanceFor(user.id).catch(() => null) : null;
   // The earner's agent bar shows what they have earned, the same amount as the header.
   if (earnSample) dockAgents = dockAgents.map((agent) => ({ ...agent, earnedPoints: earnSample.earned }));
 
