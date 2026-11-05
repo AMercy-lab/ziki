@@ -102,6 +102,7 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
   });
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [selectedHistoryNote, setSelectedHistoryNote] = useState<SkillApprovalItem | null>(null);
 
   function showToast(msg: string) {
     setToastMessage(msg);
@@ -245,27 +246,21 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
 
                     {/* Decision */}
                     <td className="px-4 py-3.5 whitespace-nowrap text-right">
-                      <div className="inline-flex items-center gap-1.5 justify-end">
+                      <div className="inline-flex items-center gap-2 justify-end">
                         <button
                           type="button"
                           onClick={() => handleApprove(item)}
-                          className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 transition shadow-sm"
+                          className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700 transition shadow-xs"
                         >
                           Approve
                         </button>
                         <button
                           type="button"
                           onClick={() => handleReject(item)}
-                          className="rounded-lg border border-zk-border bg-zk-surface px-2.5 py-1 text-xs font-semibold text-zk-muted hover:text-zk-text hover:bg-zk-tint transition"
+                          className="rounded-lg border border-zk-border bg-zk-surface px-3 py-1 text-xs font-semibold text-zk-muted hover:text-zk-text hover:bg-zk-tint transition"
                         >
                           Reject
                         </button>
-                        <Link
-                          href="/skills"
-                          className="rounded-lg border border-zk-border bg-zk-surface px-2 py-1 text-xs font-semibold text-zk-text2 hover:text-zk-text hover:bg-zk-tint transition"
-                        >
-                          View
-                        </Link>
                       </div>
                     </td>
                   </tr>
@@ -293,10 +288,10 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
           <div className="rounded-[18px] border border-zk-border bg-zk-surface shadow-sm overflow-hidden w-full">
             <table className="table-fixed w-full text-left text-sm divide-y divide-zk-border">
               <colgroup>
-                <col className="w-[38%]" />
+                <col className="w-[44%]" />
                 <col className="w-[22%]" />
                 <col className="w-[18%]" />
-                <col className="w-[22%]" />
+                <col className="w-[16%]" />
               </colgroup>
               <thead className="bg-zk-tint text-xs font-semibold uppercase tracking-wide text-zk-muted">
                 <tr>
@@ -347,18 +342,19 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
                     </td>
 
                     {/* Outcome Note */}
-                    <td className="px-4 py-3.5 text-right">
+                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
                       {item.status === "approved" ? (
                         <span className="text-xs text-emerald-600 font-medium">
                           ✓ Published
                         </span>
                       ) : (
-                        <span
-                          className="text-xs text-amber-700 truncate block max-w-full font-medium"
-                          title={item.rejectionReason ?? "Changes requested"}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedHistoryNote(item)}
+                          className="rounded-lg border border-zk-border bg-zk-surface px-3 py-1 text-xs font-semibold text-zk-text2 hover:text-zk-text hover:bg-zk-tint transition shadow-xs"
                         >
-                          {item.rejectionReason || "Changes requested"}
-                        </span>
+                          View
+                        </button>
                       )}
                     </td>
                   </tr>
@@ -368,6 +364,50 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
           </div>
         )}
       </section>
+
+      {/* Reviewer Note Detail Modal */}
+      {selectedHistoryNote && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+          onClick={() => setSelectedHistoryNote(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-zk-border bg-zk-surface p-6 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-zk-text">Reviewer Feedback</h3>
+              <button
+                type="button"
+                onClick={() => setSelectedHistoryNote(null)}
+                className="text-zk-muted hover:text-zk-text text-sm font-bold p-1 rounded-lg hover:bg-zk-tint"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <div>
+              <p className="text-xs text-zk-muted mb-1.5 font-medium">
+                Skill: <span className="text-zk-text font-semibold">{selectedHistoryNote.title}</span>
+              </p>
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300 font-medium leading-relaxed">
+                {selectedHistoryNote.rejectionReason || "Changes requested: Please provide additional automated unit test assertions."}
+              </div>
+            </div>
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedHistoryNote(null)}
+                className="rounded-xl bg-zk-accent px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition shadow-sm"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
