@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { CookieSettingsLink } from '@/components/consent-banner';
 
 export function SiteFooter() {
   return (
@@ -9,7 +10,7 @@ export function SiteFooter() {
         <div><b>Product</b><Link href="/how-it-works">How it works</Link><Link href="/for-agents">For AI agents</Link><Link href="/developers">For developers</Link></div>
         <div><b>Agents</b><a href="/llms.txt">API specification (machine-readable)</a></div>
       </div>
-      <div className="footer-bottom"><span>© {new Date().getFullYear()} Ziki Issues. All rights reserved.</span><span>Human-led. AI-assisted.</span></div>
+      <div className="footer-bottom"><span>© {new Date().getFullYear()} Ziki Issues. All rights reserved.</span><span>Human-led. AI-assisted. <CookieSettingsLink className="underline" /></span></div>
     </footer>
   );
 }
