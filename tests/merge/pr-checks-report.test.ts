@@ -77,7 +77,8 @@ beforeEach(() => {
 
 describe("pullRequestChecksSummary (#pr-checks)", () => {
   it("reads a set of checks the way the gate's `checks` words do", () => {
-    expect(pullRequestChecksSummary([])).toBe("none");
+    // Empty check detail is unknown, not none: absence of evidence is not evidence of absence.
+    expect(pullRequestChecksSummary([])).toBe("unknown");
     expect(pullRequestChecksSummary([check("Build", "passed")])).toBe("passing");
     expect(pullRequestChecksSummary([check("Build", "passed"), check("Lint", "failed")])).toBe("failing");
     expect(pullRequestChecksSummary([check("Build", "pending")])).toBe("pending");
@@ -88,8 +89,19 @@ describe("pullRequestChecksSummary (#pr-checks)", () => {
     // Skipped and neutral checks hold nothing up.
     expect(pullRequestChecksSummary([check("Build", "skipped"), check("Lint", "neutral")])).toBe("passing");
     // An unreadable check is not a pass.
-    expect(pullRequestChecksSummary([check("Build", "unavailable")])).toBe("passing");
-    expect(pullRequestChecksSummary([check("Build", "unavailable"), check("Lint", "passed")])).toBe("passing");
+    expect(pullRequestChecksSummary([check("Build", "unavailable")])).toBe("unknown");
+    expect(pullRequestChecksSummary([check("Build", "unavailable"), check("Lint", "passed")])).toBe("unknown");
+  });
+
+  it("fails closed for merge eligibility when checks are unavailable", () => {
+    // Unavailable-only: cannot determine pass/fail.
+    expect(pullRequestChecksSummary([check("Build", "unavailable"), check("Lint", "unavailable")])).toBe("unknown");
+    // Failed + unavailable: failure outranks unavailable.
+    expect(pullRequestChecksSummary([check("Build", "failed"), check("Lint", "unavailable")])).toBe("failing");
+    // Pending + unavailable: pending outranks unavailable.
+    expect(pullRequestChecksSummary([check("Build", "pending"), check("Lint", "unavailable")])).toBe("pending");
+    // Mixed passed + unavailable: NOT passing.
+    expect(pullRequestChecksSummary([check("Build", "passed"), check("Lint", "unavailable"), check("E2E", "passed")])).toBe("unknown");
   });
 });
 
@@ -195,6 +207,22 @@ describe("reportPullRequestStatus with checkRuns (#pr-checks)", () => {
       checkRuns: [check("Build", "passed")],
     }));
     expect(result).toMatchObject({ status: 400, body: { error: "checks_mismatch" } });
+  });
+
+  it("empty checkRuns derives unknown, not none, and contradicts an explicit none summary", async () => {
+    const result = await reportPullRequestStatus(checker(), scope, "bug1", baseBody({
+      checks: "none",
+      checkRuns: [],
+    }));
+    expect(result).toMatchObject({ status: 400, body: { error: "checks_mismatch" } });
+  });
+
+  it("empty checkRuns alone stores unknown, which cannot satisfy the gate", async () => {
+    const result = await reportPullRequestStatus(checker(), scope, "bug1", baseBody({
+      checks: undefined,
+      checkRuns: [],
+    }));
+    expect(result).toMatchObject({ status: 201, body: { report: { checks: "unknown" } } });
   });
 
   it("still takes a report with no per-check detail, exactly as before", async () => {

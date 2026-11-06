@@ -666,7 +666,7 @@ export const TOOLS: readonly ToolDef[] = [
       inDefaultBranch: z.boolean().optional().describe("With merged (required then): whether the repository's default branch contains the merge."),
       headSha: z.string().trim().regex(/^[0-9a-f]{7,64}$/i, "Send a hexadecimal commit SHA.").optional().describe("Its head commit now."),
       mergeCommitSha: z.string().trim().regex(/^[0-9a-f]{7,64}$/i, "Send a hexadecimal commit SHA.").optional().describe("With merged: its merge commit."),
-      checks: z.enum(["passing", "failing", "pending", "none"]).optional().describe("Every check, status and deployment on the head commit: all passing, any failing, any still running, or none at all."),
+      checks: z.enum(["passing", "failing", "pending", "none", "unknown"]).optional().describe("Every check, status and deployment on the head commit: all passing, any failing, any still running, none at all, or unknown when any check could not be read."),
       checkRuns: z
         .array(
           z.object({

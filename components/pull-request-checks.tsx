@@ -124,7 +124,13 @@ export function pullRequestChecksUrl(pullRequestUrl: string): string {
 }
 
 function countBy(rows: readonly PullRequestCheckRow[]) {
-  const count = (status: string) => rows.filter((row) => row.status === status).length;
+  // Normalize unknown statuses to unavailable before counting, so unrecognized
+  // states like "timed_out" are treated as unavailable, not as passed.
+  const normalized = rows.map((row) => {
+    const known = ["passed", "failed", "cancelled", "pending", "skipped", "neutral", "unavailable"];
+    return { ...row, status: known.includes(row.status) ? row.status : "unavailable" };
+  });
+  const count = (status: string) => normalized.filter((row) => row.status === status).length;
   return {
     total: rows.length,
     failed: count("failed"),
@@ -163,6 +169,7 @@ function summarise(rows: readonly PullRequestCheckRow[], checks: string | null):
   }
   if (pending) return { text: `${pending} of ${total} ${total === 1 ? "check is" : "checks are"} still running`, tone: "warn" };
   if (unavailable === total) return { text: "Checks can't be read", tone: "muted" };
+  if (unavailable) return { text: `${unavailable} of ${total} ${total === 1 ? "check" : "checks"} can't be read`, tone: "warn" };
   return { text: total === 1 ? "The check passed" : `All ${total} checks passed`, tone: "ok" };
 }
 

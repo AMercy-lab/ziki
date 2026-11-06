@@ -131,10 +131,36 @@ describe("the pull request Checks card (#pr-checks)", () => {
     expect(screen.queryByText(/checks passed/i)).not.toBeInTheDocument();
   });
 
+  it("never displays 'All checks passed' when any check is unavailable", () => {
+    render(<PullRequestChecks
+      pullRequestUrl={PR}
+      report={report({ checks: "unknown", checkRuns: [check("Build", "passed"), check("E2E", "unavailable")] })}
+    />);
+
+    expect(screen.getByTestId("pr-checks-summary")).toHaveTextContent("1 of 2 checks can't be read");
+    expect(screen.getByTestId("pr-checks-summary")).toHaveAttribute("data-tone", "warn");
+    expect(screen.queryByText(/All 2 checks passed/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/The check passed/i)).not.toBeInTheDocument();
+  });
+
   it("shows a state this build does not know as unavailable", () => {
     render(<PullRequestChecks pullRequestUrl={PR} report={report({ checks: null, checkRuns: [check("Build", "timed_out")] })} />);
     expect(screen.getByText("Unavailable")).toBeInTheDocument();
     expect(screen.queryByText("Passed")).not.toBeInTheDocument();
+  });
+
+  it("never shows passing summary when any row has an unrecognized status", () => {
+    render(<PullRequestChecks
+      pullRequestUrl={PR}
+      report={report({
+        checks: "unknown",
+        checkRuns: [check("Build", "passed"), check("E2E", "timed_out")],
+      })}
+    />);
+
+    expect(screen.getByTestId("pr-checks-summary")).toHaveTextContent("can't be read");
+    expect(screen.queryByText(/All 2 checks passed/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/The check passed/i)).not.toBeInTheDocument();
   });
 
   it("says the pull request is gone when it is a 404", () => {

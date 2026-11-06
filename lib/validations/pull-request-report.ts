@@ -14,7 +14,7 @@ const sha = z
 const branch = z.string().trim().min(1).max(255);
 
 export const PULL_REQUEST_STATES = ["open", "closed", "merged", "not_found"] as const;
-export const PULL_REQUEST_CHECKS = ["passing", "failing", "pending", "none"] as const;
+export const PULL_REQUEST_CHECKS = ["passing", "failing", "pending", "none", "unknown"] as const;
 
 /**
  * The state of one check on the pull request's head commit (#pr-checks). Every
@@ -72,14 +72,20 @@ export const checkRunsSchema = z
 /**
  * What a set of checks amounts to in the words `checks` uses. A failed check is
  * `failing`; so is a cancelled one, because it never proved the commit and will
- * not finish without a re-run. Then anything still running is `pending`, no
- * checks at all is `none`, and everything else `passing`. Skipped and neutral
- * checks do not hold a merge up, so they leave the summary as they find it.
+ * not finish without a re-run. Then anything still running is `pending`, any
+ * check the agent could not read is `unknown`, no checks at all is `none`, and
+ * everything else `passing`. Skipped and neutral checks do not hold a merge up,
+ * so they leave the summary as they find it.
+ *
+ * Empty check detail (no checks listed) is `unknown`, not `none`: the absence
+ * of evidence is not evidence of absence. Only an explicit `checks: "none"`
+ * without checkRuns confirms that no checks are configured.
  */
 export function pullRequestChecksSummary(checkRuns: readonly { status: PullRequestCheckStatus }[]): PullRequestChecks {
-  if (!checkRuns.length) return "none";
+  if (!checkRuns.length) return "unknown";
   if (checkRuns.some((check) => check.status === "failed" || check.status === "cancelled")) return "failing";
   if (checkRuns.some((check) => check.status === "pending")) return "pending";
+  if (checkRuns.some((check) => check.status === "unavailable")) return "unknown";
   return "passing";
 }
 
