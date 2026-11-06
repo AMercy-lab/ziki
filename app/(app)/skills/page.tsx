@@ -8,11 +8,11 @@ export const metadata = {
 };
 
 export default async function SkillsPage() {
-  const skills = await getSkills();
+  const { skills, error } = await getSkills();
 
   return (
     <div className="mx-auto max-w-7xl">
-      <SkillsDirectory skills={skills} />
+      <SkillsDirectory skills={skills} loadError={error ?? undefined} />
     </div>
   );
 }
