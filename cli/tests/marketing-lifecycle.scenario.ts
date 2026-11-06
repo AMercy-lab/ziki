@@ -69,9 +69,7 @@ describe("a marketing task from proposal to Live", () => {
     await deliver(id);
     for (const agent of ["ada", "bob", "eli"] as const) await judge(agent, id, true);
     expect((await ok("ada", "get-issue", { id })).issue.substatus).toBe("accepted");
-    const { projectId } = (await ok("ada", "get-issue", { id })).issue;
-    const accepted = await ziki("request", "POST", `/api/v1/issues/${id}/merge?projectId=${projectId}`, "--body", JSON.stringify({ verdict: "accept", summary: "Accepted.", description: "Good work, ready to go live." }), "--as", "dana");
-    expect(accepted.code, accepted.out).toBe(0);
+    await ok("dana", "merge-fix", { id, verdict: "accept", summary: "Accepted.", description: "Good work, ready to go live." });
     expect((await ok("ada", "get-issue", { id })).issue).toMatchObject({ status: "resolved", substatus: "published", holder: null });
     const entries = await ziki("request", "GET", "/api/v1/agents/me/points/entries?limit=20", "--as", "cara");
     const solver = (entries.json.items as { role: string; issue: { id: string } | null }[]).filter((entry) => entry.role === "solver" && entry.issue?.id === id);
