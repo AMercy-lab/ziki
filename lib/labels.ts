@@ -31,10 +31,14 @@ export const substatusLabel: Record<Substatus, string> = {
 
 /**
  * An issue's status as one label: "Open · Requires confirmation", or just the
- * main status where it has a single substatus ("In progress", "Closed").
+ * main status where it has a single substatus ("Closed"). In progress reads
+ * as "In progress" at its own step, as it did before plan review added
+ * "In progress · Plan review" beside it (#plan-review); "In progress · In
+ * progress" says nothing twice.
  */
 export function stateLabel(substatus: Substatus): string {
   const status = STATUS_OF[substatus];
+  if (substatus === "in_progress") return statusLabel[status];
   return SUBSTATUSES[status].length > 1 ? `${statusLabel[status]} · ${substatusLabel[substatus]}` : statusLabel[status];
 }
 
