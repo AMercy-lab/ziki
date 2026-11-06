@@ -1,0 +1,583 @@
+import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
+import { bugInTenant } from "@/lib/tenant-context";
+import { expireUnreadCounts } from "@/lib/cache-tags";
+import {
+  ASKABLE_STATUSES,
+  ELIGIBLE_AGENT_LEVELS,
+  type createSupportThreadSchema,
+} from "@/lib/validations/support-thread";
+import { z } from "zod";
+
+export type SupportThreadResult<T = object> = ({ ok: true } & T) | { ok: false; error: string };
+
+type Db = typeof prisma | Prisma.TransactionClient;
+
+/**
+ * Creates or updates notifications for support threads and invalidates recipient badges.
+ */
+export async function notifySupportThread(
+  db: Db,
+  {
+    tenantId,
+    bugId,
+    threadId,
+    recipientUserIds,
+    title,
+  }: {
+    tenantId: string;
+    bugId: string;
+    threadId: string;
+    recipientUserIds: string[];
+    title: string;
+  },
+): Promise<void> {
+  const uniqueUserIds = [...new Set(recipientUserIds.filter(Boolean))];
+  if (uniqueUserIds.length === 0) return;
+
+  await db.notification.createMany({
+    data: uniqueUserIds.map((userId) => ({
+      userId,
+      tenantId,
+      bugId,
+      kind: "support_thread",
+      title,
+      url: `/inbox?tab=requests&thread=${threadId}`,
+    })),
+  });
+  expireUnreadCounts(uniqueUserIds);
+}
+
+/**
+ * Counts how many non-revoked manager/merger agents the user owns in the tenant.
+ */
+export async function countUserEligibleAgents(userId: string, tenantId: string): Promise<number> {
+  return prisma.agent.count({
+    where: {
+      tenantId,
+      ownerUserId: userId,
+      revokedAt: null,
+      level: { in: [...ELIGIBLE_AGENT_LEVELS] },
+    },
+  });
+}
+
+/**
+ * Gets non-revoked manager/merger agents the user owns in the tenant.
+ */
+export async function getUserEligibleAgents(userId: string, tenantId: string) {
+  return prisma.agent.findMany({
+    where: {
+      tenantId,
+      ownerUserId: userId,
+      revokedAt: null,
+      level: { in: [...ELIGIBLE_AGENT_LEVELS] },
+    },
+    select: { id: true, name: true, username: true, level: true },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+/**
+ * Number of open requests the user could take (0 if they own no eligible agent).
+ */
+export async function countOpenRequestsForUser(userId: string, tenantId: string): Promise<number> {
+  const eligibleCount = await countUserEligibleAgents(userId, tenantId);
+  if (eligibleCount === 0) return 0;
+  return prisma.supportThread.count({
+    where: {
+      tenantId,
+      status: "open",
+      requesterUserId: { not: userId },
+    },
+  });
+}
+
+/**
+ * Returns the Prisma `where` clause for threads visible to the user in this tenant.
+ */
+export async function supportThreadVisibilityWhere(
+  userId: string,
+  tenantId: string,
+): Promise<Prisma.SupportThreadWhereInput> {
+  const eligibleCount = await countUserEligibleAgents(userId, tenantId);
+  if (eligibleCount === 0) {
+    return {
+      tenantId,
+      requesterUserId: userId,
+    };
+  }
+
+  return {
+    tenantId,
+    OR: [
+      { requesterUserId: userId },
+      { status: "open" },
+      { assigneeAgent: { ownerUserId: userId } },
+    ],
+  };
+}
+
+/**
+ * Creates a support thread on an issue. If an active thread already exists
+ * for this (bug, requester), returns the existing thread.
+ */
+export async function createSupportThread(
+  user: { id: string; name?: string | null },
+  tenantId: string,
+  issueId: string,
+  body: string,
+): Promise<SupportThreadResult<{ threadId: string; existing: boolean }>> {
+  const bug = await prisma.bug.findFirst({
+    where: { id: issueId, ...bugInTenant(tenantId), isDeleted: false },
+    select: { id: true, number: true, title: true, status: true, tenantId: true },
+  });
+  if (!bug) return { ok: false, error: "Issue not found." };
+  if (!ASKABLE_STATUSES.includes(bug.status as (typeof ASKABLE_STATUSES)[number])) {
+    return { ok: false, error: "You can only ask about fixes that are in progress, done, or in merge." };
+  }
+
+  const lockKey = `support-thread:${bug.id}:${user.id}`;
+
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+
+    const existing = await tx.supportThread.findFirst({
+      where: {
+        bugId: bug.id,
+        requesterUserId: user.id,
+        tenantId,
+        status: { in: ["open", "taken"] },
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      return { ok: true, threadId: existing.id, existing: true };
+    }
+
+    const thread = await tx.supportThread.create({
+      data: {
+        tenantId,
+        bugId: bug.id,
+        requesterUserId: user.id,
+        status: "open",
+        lastMessageAt: new Date(),
+        messages: {
+          create: {
+            authorUserId: user.id,
+            body,
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    const eligibleAgents = await tx.agent.findMany({
+      where: {
+        tenantId,
+        revokedAt: null,
+        level: { in: [...ELIGIBLE_AGENT_LEVELS] },
+        ownerUserId: { not: user.id },
+      },
+      select: { id: true },
+    });
+
+    if (eligibleAgents.length > 0) {
+      await tx.agentInboxItem.createMany({
+        data: eligibleAgents.map((agent) => ({
+          agentId: agent.id,
+          kind: "request",
+          eventType: "request.created",
+          eventId: null,
+          bugId: bug.id,
+          payload: {
+            threadId: thread.id,
+            bugId: bug.id,
+            issue: { number: bug.number, title: bug.title },
+            from: { type: "user", id: user.id, name: user.name ?? null },
+            body,
+          },
+        })),
+      });
+    }
+
+    return { ok: true, threadId: thread.id, existing: false };
+  });
+}
+
+/**
+ * Requester adds a message while open or taken. If taken, notifies assignee agent.
+ */
+export async function addRequesterMessage(
+  user: { id: string; name?: string | null },
+  tenantId: string,
+  threadId: string,
+  body: string,
+): Promise<SupportThreadResult> {
+  const thread = await prisma.supportThread.findFirst({
+    where: { id: threadId, tenantId },
+    include: { bug: { select: { number: true, title: true } } },
+  });
+  if (!thread) return { ok: false, error: "Request not found." };
+  if (thread.requesterUserId !== user.id) {
+    return { ok: false, error: "Only the requester can add follow-up messages." };
+  }
+  if (thread.status === "resolved") {
+    return { ok: false, error: "This request has already been resolved." };
+  }
+
+  const now = new Date();
+  await prisma.$transaction(async (tx) => {
+    await tx.threadMessage.create({
+      data: {
+        threadId: thread.id,
+        authorUserId: user.id,
+        authorAgentId: null,
+        body,
+        createdAt: now,
+      },
+    });
+    await tx.supportThread.update({
+      where: { id: thread.id },
+      data: { lastMessageAt: now },
+    });
+
+    if (thread.status === "taken" && thread.assigneeAgentId) {
+      await tx.agentInboxItem.create({
+        data: {
+          agentId: thread.assigneeAgentId,
+          kind: "request",
+          eventType: "request.message",
+          eventId: null,
+          bugId: thread.bugId,
+          payload: {
+            threadId: thread.id,
+            bugId: thread.bugId,
+            issue: { number: thread.bug.number, title: thread.bug.title },
+            from: { type: "user", id: user.id, name: user.name ?? null },
+            body,
+          },
+          createdAt: now,
+        },
+      });
+
+      const assigneeAgent = await tx.agent.findUnique({
+        where: { id: thread.assigneeAgentId },
+        select: { ownerUserId: true },
+      });
+      if (assigneeAgent && assigneeAgent.ownerUserId !== user.id) {
+        await notifySupportThread(tx, {
+          tenantId,
+          bugId: thread.bugId,
+          threadId: thread.id,
+          recipientUserIds: [assigneeAgent.ownerUserId],
+          title: `New message on #${thread.bug.number}: ${thread.bug.title}`,
+        });
+      }
+    }
+  });
+
+  return { ok: true };
+}
+
+/**
+ * Human owner of an eligible manager/merger agent takes an open thread.
+ */
+export async function takeSupportThread(
+  user: { id: string },
+  tenantId: string,
+  threadId: string,
+  agentId: string,
+): Promise<SupportThreadResult> {
+  const agent = await prisma.agent.findFirst({
+    where: {
+      id: agentId,
+      tenantId,
+      ownerUserId: user.id,
+      revokedAt: null,
+      level: { in: [...ELIGIBLE_AGENT_LEVELS] },
+    },
+    select: { id: true, name: true },
+  });
+  if (!agent) {
+    return { ok: false, error: "You must choose an active manager or merger agent you own." };
+  }
+
+  const thread = await prisma.supportThread.findFirst({
+    where: { id: threadId, tenantId },
+    include: { bug: { select: { number: true, title: true } } },
+  });
+  if (!thread) return { ok: false, error: "Request not found." };
+  if (thread.requesterUserId === user.id) {
+    return { ok: false, error: "You cannot take your own request." };
+  }
+
+  const now = new Date();
+  const updated = await prisma.supportThread.updateMany({
+    where: { id: threadId, tenantId, status: "open" },
+    data: {
+      status: "taken",
+      assigneeAgentId: agent.id,
+      takenAt: now,
+      lastMessageAt: now,
+    },
+  });
+
+  if (updated.count !== 1) {
+    return { ok: false, error: "Someone already took this request." };
+  }
+
+  await notifySupportThread(prisma, {
+    tenantId,
+    bugId: thread.bugId,
+    threadId: thread.id,
+    recipientUserIds: [thread.requesterUserId],
+    title: `${agent.name} took your request on #${thread.bug.number}`,
+  });
+
+  return { ok: true };
+}
+
+/**
+ * Human owner answers as the assigned agent.
+ */
+export async function replySupportThread(
+  user: { id: string },
+  tenantId: string,
+  threadId: string,
+  body: string,
+): Promise<SupportThreadResult> {
+  const thread = await prisma.supportThread.findFirst({
+    where: { id: threadId, tenantId },
+    include: {
+      bug: { select: { number: true, title: true } },
+      assigneeAgent: { select: { id: true, name: true, ownerUserId: true } },
+    },
+  });
+  if (!thread) return { ok: false, error: "Request not found." };
+  if (thread.status !== "taken") return { ok: false, error: "Can only reply to taken requests." };
+  if (!thread.assigneeAgent || thread.assigneeAgent.ownerUserId !== user.id) {
+    return { ok: false, error: "Only the owner of the assigned agent can reply." };
+  }
+
+  const now = new Date();
+  await prisma.$transaction(async (tx) => {
+    await tx.threadMessage.create({
+      data: {
+        threadId: thread.id,
+        authorUserId: user.id,
+        authorAgentId: thread.assigneeAgentId,
+        body,
+        createdAt: now,
+      },
+    });
+    await tx.supportThread.update({
+      where: { id: thread.id },
+      data: { lastMessageAt: now },
+    });
+    await notifySupportThread(tx, {
+      tenantId,
+      bugId: thread.bugId,
+      threadId: thread.id,
+      recipientUserIds: [thread.requesterUserId],
+      title: `${thread.assigneeAgent!.name} replied to your request on #${thread.bug.number}`,
+    });
+  });
+
+  return { ok: true };
+}
+
+/**
+ * Assignee owner releases thread back to open.
+ */
+export async function releaseSupportThread(
+  user: { id: string },
+  tenantId: string,
+  threadId: string,
+): Promise<SupportThreadResult> {
+  const thread = await prisma.supportThread.findFirst({
+    where: { id: threadId, tenantId },
+    include: {
+      bug: { select: { number: true, title: true } },
+      assigneeAgent: { select: { id: true, name: true, ownerUserId: true } },
+      requester: { select: { id: true, name: true } },
+    },
+  });
+  if (!thread) return { ok: false, error: "Request not found." };
+  if (thread.status !== "taken") return { ok: false, error: "Can only release taken requests." };
+  if (!thread.assigneeAgent || thread.assigneeAgent.ownerUserId !== user.id) {
+    return { ok: false, error: "Only the owner of the assigned agent can release this request." };
+  }
+
+  const now = new Date();
+  await prisma.$transaction(async (tx) => {
+    await tx.supportThread.update({
+      where: { id: thread.id },
+      data: {
+        status: "open",
+        assigneeAgentId: null,
+        lastMessageAt: now,
+      },
+    });
+
+    const eligibleAgents = await tx.agent.findMany({
+      where: {
+        tenantId,
+        revokedAt: null,
+        level: { in: [...ELIGIBLE_AGENT_LEVELS] },
+        ownerUserId: { not: thread.requesterUserId },
+      },
+      select: { id: true },
+    });
+
+    if (eligibleAgents.length > 0) {
+      await tx.agentInboxItem.createMany({
+        data: eligibleAgents.map((agent) => ({
+          agentId: agent.id,
+          kind: "request",
+          eventType: "request.released",
+          eventId: null,
+          bugId: thread.bugId,
+          payload: {
+            threadId: thread.id,
+            bugId: thread.bugId,
+            issue: { number: thread.bug.number, title: thread.bug.title },
+            from: { type: "user", id: thread.requester.id, name: thread.requester.name },
+          },
+          createdAt: now,
+        })),
+      });
+    }
+  });
+
+  return { ok: true };
+}
+
+/**
+ * Requester or assignee's owner manually marks thread resolved.
+ */
+export async function resolveSupportThread(
+  user: { id: string },
+  tenantId: string,
+  threadId: string,
+): Promise<SupportThreadResult> {
+  const thread = await prisma.supportThread.findFirst({
+    where: { id: threadId, tenantId },
+    include: {
+      bug: { select: { number: true, title: true } },
+      assigneeAgent: { select: { id: true, name: true, ownerUserId: true } },
+    },
+  });
+  if (!thread) return { ok: false, error: "Request not found." };
+  if (thread.status === "resolved") return { ok: true };
+
+  const isRequester = thread.requesterUserId === user.id;
+  const isAssigneeOwner = thread.assigneeAgent?.ownerUserId === user.id;
+  if (!isRequester && !isAssigneeOwner) {
+    return { ok: false, error: "Only the requester or the assigned agent's owner can resolve this request." };
+  }
+
+  const otherUserId = isRequester ? thread.assigneeAgent?.ownerUserId : thread.requesterUserId;
+  const now = new Date();
+
+  await prisma.$transaction(async (tx) => {
+    await tx.supportThread.update({
+      where: { id: thread.id },
+      data: {
+        status: "resolved",
+        resolvedAt: now,
+        resolvedReason: "manual",
+      },
+    });
+
+    if (otherUserId) {
+      await notifySupportThread(tx, {
+        tenantId,
+        bugId: thread.bugId,
+        threadId: thread.id,
+        recipientUserIds: [otherUserId],
+        title: `Request on #${thread.bug.number} marked resolved`,
+      });
+    }
+  });
+
+  return { ok: true };
+}
+
+/**
+ * Auto-closes open/taken support threads when an issue goes Live or is Closed.
+ * Runs inside the caller's transaction. Never throws on 0 matching threads.
+ */
+export async function closeSupportThreadsForIssue(
+  tx: Prisma.TransactionClient,
+  { bugId, reason }: { bugId: string; reason: "fix_live" | "issue_closed" },
+): Promise<void> {
+  try {
+    const threads = await tx.supportThread.findMany({
+      where: {
+        bugId,
+        status: { in: ["open", "taken"] },
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        requesterUserId: true,
+        assigneeAgent: { select: { ownerUserId: true } },
+        bug: { select: { number: true, title: true } },
+      },
+    });
+    if (threads.length === 0) return;
+
+    const now = new Date();
+    await tx.supportThread.updateMany({
+      where: {
+        bugId,
+        status: { in: ["open", "taken"] },
+      },
+      data: {
+        status: "resolved",
+        resolvedAt: now,
+        resolvedReason: reason,
+      },
+    });
+
+    const notifications: {
+      userId: string;
+      tenantId: string;
+      bugId: string;
+      kind: string;
+      title: string;
+      url: string;
+    }[] = [];
+    const notifyUserIds: string[] = [];
+
+    const reasonText = reason === "fix_live" ? "fix is now live" : "issue was closed";
+    for (const t of threads) {
+      const title = `Request on #${t.bug.number} resolved (${reasonText})`;
+      const url = `/inbox?tab=requests&thread=${t.id}`;
+      const recipients = new Set<string>();
+      if (t.requesterUserId) recipients.add(t.requesterUserId);
+      if (t.assigneeAgent?.ownerUserId) recipients.add(t.assigneeAgent.ownerUserId);
+
+      for (const uid of recipients) {
+        notifications.push({
+          userId: uid,
+          tenantId: t.tenantId,
+          bugId,
+          kind: "support_thread",
+          title,
+          url,
+        });
+        notifyUserIds.push(uid);
+      }
+    }
+
+    if (notifications.length > 0) {
+      await tx.notification.createMany({ data: notifications });
+      expireUnreadCounts(notifyUserIds);
+    }
+  } catch (error) {
+    console.error("[closeSupportThreadsForIssue] failed", error);
+  }
+}
+

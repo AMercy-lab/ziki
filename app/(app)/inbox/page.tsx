@@ -3,13 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
 import { currentTenantIdFor, notificationInTenant } from "@/lib/tenant-context";
 import { countPendingEscalations } from "@/lib/agent-questions";
+import { countOpenRequestsForUser } from "@/lib/support-threads";
 import { NotificationsView } from "./notifications-view";
 import { EscalationsView } from "./escalations-view";
 import { MessagesView } from "./messages-view";
+import { RequestsView } from "./requests-view";
 
 export const metadata = { title: "Inbox" };
 
-type Params = { tab?: string; scope?: string | string[]; page?: string | string[]; status?: string; agent?: string };
+type Params = { tab?: string; scope?: string | string[]; page?: string | string[]; status?: string; agent?: string; thread?: string };
 
 /**
  * The Inbox (#inbox): your notifications, the escalations where agents stop
@@ -18,16 +20,25 @@ type Params = { tab?: string; scope?: string | string[]; page?: string | string[
 export default async function InboxPage({ searchParams }: { searchParams?: Promise<Params> }) {
   const user = await requireUser();
   const params = (await searchParams) ?? {};
-  const tab = params.tab === "escalations" ? "escalations" : params.tab === "messages" ? "messages" : "notifications";
+  const tab =
+    params.tab === "escalations"
+      ? "escalations"
+      : params.tab === "messages"
+        ? "messages"
+        : params.tab === "requests"
+          ? "requests"
+          : "notifications";
   const tenantId = await currentTenantIdFor(user.id);
-  const [unread, waiting] = await Promise.all([
+  const [unread, waiting, openRequestsCount] = await Promise.all([
     prisma.notification.count({ where: { userId: user.id, readAt: null, ...notificationInTenant(tenantId, false) } }),
     tenantId ? countPendingEscalations(user.id, tenantId).catch(() => 0) : Promise.resolve(0),
+    tenantId ? countOpenRequestsForUser(user.id, tenantId).catch(() => 0) : Promise.resolve(0),
   ]);
   const tabs = [
     { value: "notifications", label: "Notifications", href: "/inbox", count: unread },
     { value: "escalations", label: "Escalations", href: "/inbox?tab=escalations", count: waiting },
     { value: "messages", label: "Messages", href: "/inbox?tab=messages", count: 0 },
+    { value: "requests", label: "Requests", href: "/inbox?tab=requests", count: openRequestsCount },
   ] as const;
 
   return (
@@ -55,6 +66,8 @@ export default async function InboxPage({ searchParams }: { searchParams?: Promi
       </nav>
       {tab === "messages" ? (
         <MessagesView agent={params.agent} />
+      ) : tab === "requests" ? (
+        <RequestsView thread={params.thread} />
       ) : tab === "escalations" ? (
         <EscalationsView searchParams={Promise.resolve({ status: params.status })} />
       ) : (

@@ -25,6 +25,7 @@ import {
   type VotedCloseReason,
 } from "@/lib/close-reasons";
 import { moveTo } from "@/lib/issue-substatus";
+import { closeSupportThreadsForIssue } from "@/lib/support-threads";
 
 /**
  * Closing an issue (#close-superseded, #close-reasons). Any agent that
@@ -286,6 +287,7 @@ async function closeInTransaction(
       ...(fresh.isBoosted ? { isBoosted: false, boostedAt: null } : {}),
     },
   });
+  await closeSupportThreadsForIssue(tx, { bugId: bug.id, reason: "issue_closed" });
   await tx.bugActivity.create({
     data: {
       bugId: bug.id,
