@@ -81,6 +81,24 @@ export const findProjectIssue = cache(async (orgParam: string, projectParam: str
     if (other) return { kind: "elsewhere", issueId: other.id };
   }
 
+  if ("userId" in resolved) {
+    const accessible = await prisma.bug.findFirst({
+      where: {
+        number, isDeleted: false,
+        project: {
+          ...inUrl,
+          archivedAt: null,
+          OR: [
+            { visibility: "public" },
+            { memberships: { some: { userId: resolved.userId } } },
+          ],
+        },
+        organisation: { archivedAt: null },
+      }, select,
+    });
+    if (accessible) return { kind: "found", issue: toIssue(accessible) };
+  }
+
   // Never replace a link into an inaccessible workspace with a same-numbered
   // issue from the active workspace. Only project moves within the named org.
   return row && row.project.organisation.slug === orgSlug ? { kind: "moved", issue: toIssue(row) } : null;

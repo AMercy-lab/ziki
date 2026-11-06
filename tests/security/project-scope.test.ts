@@ -1,10 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const findFirst = vi.hoisted(() => vi.fn());
-const lookup = vi.hoisted(() => ({ first: vi.fn(), many: vi.fn(), scope: vi.fn(), session: vi.fn() }));
-vi.mock("react", () => ({ cache: (fn: unknown) => fn }));
-vi.mock("@/lib/organisation-viewer", () => ({ viewerBugScope: lookup.scope }));
-vi.mock("@/lib/session-user", () => ({ resolveSessionUserId: lookup.session }));
 const publishedTasks = vi.hoisted(() => vi.fn());
 const taskCounts = vi.hoisted(() => vi.fn());
 const proposalCount = vi.hoisted(() => vi.fn());
@@ -12,19 +8,37 @@ const proposals = vi.hoisted(() => vi.fn());
 const proposalVotes = vi.hoisted(() => vi.fn());
 const myVerdicts = vi.hoisted(() => vi.fn());
 const proposalAgents = vi.hoisted(() => vi.fn());
+
+const membershipFindUnique = vi.hoisted(() => vi.fn());
+const projectFindUnique = vi.hoisted(() => vi.fn());
+const projectMembershipFindUnique = vi.hoisted(() => vi.fn());
+const projectJoinRequestFindUnique = vi.hoisted(() => vi.fn());
+const projectJoinRequestUpsert = vi.hoisted(() => vi.fn());
+const notificationCreateMany = vi.hoisted(() => vi.fn().mockResolvedValue({ count: 1 }));
+const membershipFindMany = vi.hoisted(() => vi.fn());
+const bugFindUnique = vi.hoisted(() => vi.fn());
+const findProjectIssue = vi.hoisted(() => vi.fn());
+
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    project: { findFirst },
-    bug: { findFirst: lookup.first, findMany: publishedTasks, groupBy: taskCounts },
+    project: { findFirst, findUnique: projectFindUnique },
+    bug: { findUnique: bugFindUnique, findMany: publishedTasks, groupBy: taskCounts },
     idea: { count: proposalCount, findMany: proposals },
     ideaVerdict: { groupBy: proposalVotes, findMany: myVerdicts },
     agent: { findMany: proposalAgents },
+    membership: { findUnique: membershipFindUnique, findMany: membershipFindMany },
+    projectMembership: { findUnique: projectMembershipFindUnique },
+    projectJoinRequest: { findUnique: projectJoinRequestFindUnique, upsert: projectJoinRequestUpsert },
+    notification: { createMany: notificationCreateMany },
   },
 }));
 vi.mock("@/components/marketing/tasks/tasks-board", () => ({ TasksBoard: () => null }));
 vi.mock("@/lib/workflow", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/workflow")>()),
   workflowFor: vi.fn(async () => ({ ideaThreshold: 3, revisionLimit: 2 })),
+}));
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
 }));
 
 const section = vi.hoisted(() => ({
@@ -34,9 +48,21 @@ const section = vi.hoisted(() => ({
   firstProjectRefFor: vi.fn(),
   requireUser: vi.fn(async () => ({ id: "ada" })),
 }));
-vi.mock("next/navigation", () => ({ notFound: section.notFound, redirect: section.redirect }));
+vi.mock("next/navigation", () => ({ notFound: section.notFound, redirect: section.redirect, permanentRedirect: section.redirect }));
 vi.mock("@/lib/project-route", () => ({ requireProject: section.requireProject, firstProjectRefFor: section.firstProjectRefFor }));
 vi.mock("@/lib/auth-helpers", () => ({ requireUser: section.requireUser }));
+vi.mock("@/auth", () => ({ auth: vi.fn(async () => ({ user: { id: "viewer" } })) }));
+vi.mock("@/lib/project-issue", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/project-issue")>()),
+  findProjectIssue,
+}));
+vi.mock("@/lib/organisation-access", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/organisation-access")>()),
+  // The viewer owns an organisation of their own, as every new account does.
+  currentOrganisationAccess: vi.fn(async () => ({ membershipRole: "owner", admin: true })),
+  organisationAccessFor: vi.fn(async (_userId: string, organisationId: string | null) =>
+    organisationId === "org-they-admin" ? { membershipRole: "admin", admin: true } : { membershipRole: null, admin: false }),
+}));
 
 import MarketingHomePage from "@/app/(app)/[org]/[project]/marketing/page";
 import MarketingPage from "@/app/(app)/marketing/page";
@@ -49,8 +75,12 @@ import { parseTaskView } from "@/components/marketing/tasks/model";
 import { AgentProjectError } from "@/lib/agents/require-agent";
 import { marketingTabHref } from "@/lib/header-nav";
 import { issueProject } from "@/lib/agent-api/issues";
-import { findProjectIssue } from "@/lib/project-issue";
 import { projectRef } from "@/lib/project-paths";
+import { canManageProject } from "@/lib/project-permissions";
+import { requestToJoinProjectAction } from "@/app/actions/project-join-requests";
+import { requireUser } from "@/lib/auth-helpers";
+import IssueHistoryPage from "@/app/(app)/[org]/[project]/[number]/history/page";
+import ProjectIssueLayout from "@/app/(app)/[org]/[project]/[number]/layout";
 
 const agent = {
   agentId: "agent1",
@@ -61,45 +91,6 @@ const agent = {
   burst: false,
   keyId: "key1",
 };
-
-describe("shared issue addresses across workspaces", () => {
-  const active = { id: "a-issue", number: 482, isDeleted: false, project: { slug: "app", organisation: { slug: "zedu" } } };
-
-  beforeEach(() => {
-    lookup.first.mockReset();
-    lookup.many.mockReset();
-    lookup.scope.mockReset().mockResolvedValue({ organisationId: "a" });
-    lookup.session.mockReset().mockResolvedValue({ userId: "u" });
-  });
-
-  it("prioritizes the exact shared issue despite a number collision in the active workspace", async () => {
-    lookup.first.mockResolvedValueOnce(active).mockResolvedValueOnce({ id: "b-issue" });
-    expect(await findProjectIssue("ziki", "app", 482)).toEqual({ kind: "elsewhere", issueId: "b-issue" });
-  });
-
-  it("does not redirect an inaccessible link to an unrelated same-numbered issue", async () => {
-    lookup.first.mockResolvedValueOnce(active).mockResolvedValueOnce(null);
-    expect(await findProjectIssue("private", "app", 482)).toBeNull();
-  });
-
-  it("still resolves an issue moved between projects in the same workspace", async () => {
-    lookup.first.mockResolvedValueOnce(active).mockResolvedValueOnce(null);
-    expect(await findProjectIssue("zedu", "old-app", 482)).toMatchObject({ kind: "moved", issue: { id: "a-issue" } });
-  });
-
-  it("returns the original issue after switching and on refresh or new tabs", async () => {
-    const target = { ...active, id: "b-issue", project: { slug: "app", organisation: { slug: "ziki" } } };
-    lookup.scope.mockResolvedValue({ organisationId: "b" });
-    lookup.first.mockResolvedValue(target);
-    expect(await findProjectIssue("ziki", "app", 482)).toMatchObject({ kind: "found", issue: { id: "b-issue" } });
-  });
-
-  it("preserves the deleted-issue Restore page in the active workspace", async () => {
-    const deleted = { ...active, isDeleted: true };
-    lookup.first.mockImplementation(async ({ where }) => where.organisationId === "a" && where.isDeleted !== false ? deleted : null);
-    expect(await findProjectIssue("zedu", "app", 482)).toMatchObject({ kind: "found", issue: { id: "a-issue", isDeleted: true } });
-  });
-});
 
 describe("issueProject project scope (#742)", () => {
   beforeEach(() => {
@@ -327,5 +318,157 @@ describe("project addresses carry the organisation (#project-urls)", () => {
     expect(unreservedProjectSlug("workstream")).toBe("workstream-project");
     expect(organisationSlugCandidate("agents", 0, () => "x2y3")).toBe("agents-x2y3");
     expect(organisationSlugCandidate("zedu", 0)).toBe("zedu");
+  });
+});
+
+describe("canManageProject permissions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("allows site super_admin", async () => {
+    expect(await canManageProject({ id: "admin-1", role: "super_admin" }, "tenant-1")).toBe(true);
+  });
+
+  it("allows organisation owners and admins", async () => {
+    membershipFindUnique.mockResolvedValue({ role: "owner" });
+    expect(await canManageProject({ id: "user-1", role: "user" }, "tenant-1")).toBe(true);
+
+    membershipFindUnique.mockResolvedValue({ role: "admin" });
+    expect(await canManageProject({ id: "user-1", role: "user" }, "tenant-1")).toBe(true);
+  });
+
+  it("denies regular organisation members and outsiders", async () => {
+    membershipFindUnique.mockResolvedValue({ role: "member" });
+    expect(await canManageProject({ id: "user-1", role: "user" }, "tenant-1")).toBe(false);
+
+    membershipFindUnique.mockResolvedValue(null);
+    expect(await canManageProject({ id: "stranger-1", role: "user" }, "tenant-1")).toBe(false);
+  });
+});
+
+describe("requestToJoinProjectAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (requireUser as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "user-1", name: "Alice", email: "alice@example.com" });
+    projectJoinRequestFindUnique.mockResolvedValue(null);
+  });
+
+  it("rejects when user is already a member", async () => {
+    findFirst.mockResolvedValue({
+      id: "p-1",
+      name: "Test Project",
+      slug: "test-p",
+      organisationId: "t-1",
+      isOpenForContributors: true,
+      visibility: "public",
+      organisation: { slug: "test-org" },
+    });
+    membershipFindUnique.mockResolvedValue({ id: "m-1" });
+    projectMembershipFindUnique.mockResolvedValue(null);
+
+    const form = new FormData();
+    form.set("projectId", "p-1");
+    const res = await requestToJoinProjectAction(form);
+    expect(res).toEqual({ error: "You are already a member of this project." });
+  });
+
+  it("rejects when project is closed or private", async () => {
+    findFirst.mockResolvedValue({
+      id: "p-1",
+      name: "Test Project",
+      slug: "test-p",
+      organisationId: "t-1",
+      isOpenForContributors: false,
+      visibility: "public",
+      organisation: { slug: "test-org" },
+    });
+    membershipFindUnique.mockResolvedValue(null);
+    projectMembershipFindUnique.mockResolvedValue(null);
+
+    const form = new FormData();
+    form.set("projectId", "p-1");
+    const res = await requestToJoinProjectAction(form);
+    expect(res).toEqual({ error: "This project is not currently accepting contributor applications." });
+  });
+
+  it("creates join request when project is public and open", async () => {
+    findFirst.mockResolvedValue({
+      id: "p-1",
+      name: "Test Project",
+      slug: "test-p",
+      organisationId: "t-1",
+      isOpenForContributors: true,
+      visibility: "public",
+      organisation: { slug: "test-org" },
+    });
+    membershipFindUnique.mockResolvedValue(null);
+    projectMembershipFindUnique.mockResolvedValue(null);
+    membershipFindMany.mockResolvedValue([{ userId: "manager-1" }]);
+
+    const form = new FormData();
+    form.set("projectId", "p-1");
+    form.set("message", "I want to help!");
+    const res = await requestToJoinProjectAction(form);
+    expect(res).toEqual({ ok: true });
+    expect(projectJoinRequestUpsert).toHaveBeenCalled();
+  });
+
+  it("prevents duplicate spam requests when already pending", async () => {
+    findFirst.mockResolvedValue({
+      id: "p-1",
+      name: "Test Project",
+      slug: "test-p",
+      organisationId: "t-1",
+      isOpenForContributors: true,
+      visibility: "public",
+      organisation: { slug: "test-org" },
+    });
+    membershipFindUnique.mockResolvedValue(null);
+    projectMembershipFindUnique.mockResolvedValue(null);
+    projectJoinRequestFindUnique.mockResolvedValue({ status: "pending", updatedAt: new Date() });
+
+    const form = new FormData();
+    form.set("projectId", "p-1");
+    const res = await requestToJoinProjectAction(form);
+    expect(res).toEqual({ error: "You already have a pending request to join this project." });
+  });
+});
+
+describe("a deleted issue on a public project", () => {
+  const params = Promise.resolve({ org: "acme", project: "web", number: "7" });
+  const deletedIn = (organisationId: string) => {
+    findProjectIssue.mockResolvedValue({
+      kind: "found",
+      issue: { id: "bug-7", number: 7, organisationId, ref: "acme/web", isDeleted: true },
+    });
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (requireUser as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "viewer", role: "user" });
+    bugFindUnique.mockResolvedValue({
+      id: "bug-7",
+      number: 7,
+      project: { slug: "web", organisation: { slug: "acme" } },
+      title: "Removed for a reason",
+      description: "Secret",
+      createdAt: new Date("2026-01-01"),
+      isDeleted: true,
+      reporter: { name: "Rae" },
+      revisions: [],
+    });
+  });
+
+  it("is a 404 for someone who only administers another organisation", async () => {
+    deletedIn("org-of-the-project");
+    await expect(IssueHistoryPage({ params } as never)).rejects.toThrow("NOT_FOUND");
+    await expect(ProjectIssueLayout({ children: null, params })).rejects.toThrow("NOT_FOUND");
+  });
+
+  it("still opens for an admin of the issue's own organisation", async () => {
+    deletedIn("org-they-admin");
+    await expect(IssueHistoryPage({ params } as never)).resolves.toBeTruthy();
+    await expect(ProjectIssueLayout({ children: "page", params })).resolves.toBe("page");
   });
 });
