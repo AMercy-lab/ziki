@@ -13,6 +13,11 @@ vi.mock("@/lib/organisation-context", async (importOriginal) => ({
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/notify", () => ({ notifyLater: vi.fn() }));
+// Tidying an idea with Claude is a network call: as with no API key, it leaves the text as typed.
+vi.mock("@/lib/idea-structuring", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/idea-structuring")>()),
+  structureIdea: vi.fn().mockResolvedValue(null),
+}));
 vi.mock("@/lib/session-user", () => ({ resolveSessionUserId: vi.fn() }));
 vi.mock("@/lib/auth-helpers", () => ({ requireUser: vi.fn() }));
 vi.mock("@/lib/organisation-access", () => ({
