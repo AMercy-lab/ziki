@@ -40,7 +40,7 @@ export function OrgTabs({ pendingJoinCount = 0 }: { pendingJoinCount?: number })
               <Link
                 href={href}
                 aria-current={on ? "page" : undefined}
-                className={`inline-flex min-h-9 cursor-pointer items-center whitespace-nowrap rounded-full px-3.5 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue ${
+                className={`inline-flex min-h-9 items-center whitespace-nowrap rounded-full px-3.5 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue ${
                   on
                     ? "bg-zk-surface font-bold text-zk-text shadow-[0_1px_3px_rgba(21,18,31,0.12)]"
                     : "font-medium text-zk-text2 hover:text-zk-text"

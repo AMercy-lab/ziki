@@ -15,7 +15,6 @@ import { createMissionSchema, createTestMissions } from "@/lib/missions";
 import {
   nextProjectSlug,
   projectLinksSchema,
-  projectNameSchema,
   projectSettingsSchema,
   projectSlugBase,
   parseRewardConfigFromFormData,
@@ -83,18 +82,26 @@ export async function updateProjectAction(
   if (!tenantId) return { error: NO_TENANT_MESSAGE };
   if (!(await isTenantAdmin(user, tenantId))) return { error: "Only workspace owners and admins can change project settings." };
 
+  const visibilityRaw = (formData.get("visibility") as string | null)?.trim();
+  const visibility = visibilityRaw === "public" ? "public" : "private";
+  const isOpenForContributors = visibility === "public" && (formData.get("isOpenForContributors") === "true" || formData.get("isOpenForContributors") === "on");
+  const contributorGuidelines = (formData.get("contributorGuidelines") as string | null)?.trim() || null;
+
   const parsed = projectSettingsSchema.safeParse({
     name: formData.get("name"),
     goal: formData.get("goal"),
     repoUrl: formData.get("repoUrl"),
     stagingUrl: formData.get("stagingUrl"),
     siteUrl: formData.get("siteUrl") ?? "",
+    visibility,
+    isOpenForContributors,
+    contributorGuidelines,
   });
   if (!parsed.success) return fromZodError(parsed.error, "Check the project settings.");
   const slug = String(formData.get("slug") ?? "").trim();
   const project = await prisma.project.findFirst({
     where: { tenantId, slug },
-    select: { id: true, name: true, goal: true, repoUrl: true, stagingUrl: true, siteUrl: true, rewardConfig: true },
+    select: { id: true, name: true, goal: true, repoUrl: true, stagingUrl: true, siteUrl: true, visibility: true, isOpenForContributors: true, contributorGuidelines: true, rewardConfig: true },
   });
   if (!project) return { error: "Project not found." };
 
@@ -103,7 +110,7 @@ export async function updateProjectAction(
   const rewardConfig = rawReward ? parseProjectRewardConfig(rawReward, platformBase) : undefined;
 
   const changes: Record<string, { from: unknown; to: unknown }> = {};
-  for (const field of ["name", "goal", "repoUrl", "stagingUrl", "siteUrl"] as const) {
+  for (const field of ["name", "goal", "repoUrl", "stagingUrl", "siteUrl", "visibility", "isOpenForContributors", "contributorGuidelines"] as const) {
     if (project[field] !== parsed.data[field]) {
       changes[field] = { from: project[field], to: parsed.data[field] };
     }
@@ -235,18 +242,22 @@ export async function createProjectAction(
     return { error: "Only organization owners and admins can create projects." };
   }
 
+  const visibilityRaw = (formData.get("visibility") as string | null)?.trim();
+  const visibility: "public" | "private" = visibilityRaw === "public" ? "public" : "private";
+  const isOpenForContributors = visibility === "public" && (formData.get("isOpenForContributors") === "true" || formData.get("isOpenForContributors") === "on");
+  const contributorGuidelines = (formData.get("contributorGuidelines") as string | null)?.trim() || null;
+
   const parsed = projectSettingsSchema.safeParse({
     name: formData.get("name"),
     goal: formData.get("goal") ?? "",
     repoUrl: formData.get("repoUrl") ?? "",
     stagingUrl: formData.get("stagingUrl") ?? "",
     siteUrl: formData.get("siteUrl") ?? "",
+    visibility,
+    isOpenForContributors,
+    contributorGuidelines,
   });
   if (!parsed.success) return fromZodError(parsed.error, "Check the project settings.");
-
-  const visibilityRaw = (formData.get("visibility") as string | null)?.trim();
-  const visibility: "public" | "private" = visibilityRaw === "public" ? "public" : "private";
-  const isOpenForContributors = visibility === "public" && (formData.get("isOpenForContributors") === "true" || formData.get("isOpenForContributors") === "on");
 
   const existing = await prisma.project.findMany({
     where: { tenantId },
@@ -273,6 +284,7 @@ export async function createProjectAction(
         stagingUrl: parsed.data.stagingUrl,
         visibility,
         isOpenForContributors,
+        contributorGuidelines: parsed.data.contributorGuidelines,
         rewardConfig: rewardConfig ?? undefined,
         workflow: { create: {} },
       },

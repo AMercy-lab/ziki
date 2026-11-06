@@ -284,10 +284,10 @@ export default async function OrgInvitesPage() {
               const who = joinedSummary(link.joinedNames, link.useCount);
               const statusClass =
                 link.state === "open"
-                  ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-semibold"
+                  ? "bg-zk-tint text-zk-accent ring-1 ring-zk-border"
                   : link.state === "revoked"
-                    ? "border border-zk-bad-bd bg-zk-bad-bg text-zk-bad-fg font-semibold"
-                    : "border border-zk-border bg-zk-chip text-zk-text2 font-semibold";
+                    ? "bg-zk-bad-bg text-zk-bad-fg"
+                    : "bg-zk-chip text-zk-text2";
               const name = link.label || "Invite link";
               return (
                 <li key={link.id} className="flex flex-wrap items-start gap-3 py-3">

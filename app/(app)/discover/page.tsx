@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { Prisma } from "@prisma/client";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { optionalUser } from "@/lib/auth-helpers";
@@ -46,7 +47,7 @@ export default async function DiscoverPage(props: DiscoverPageProps) {
   }
 
   // 2. Query public projects
-  const where: any = {
+  const where: Prisma.ProjectWhereInput = {
     visibility: "public",
     archivedAt: null,
     tenant: { archivedAt: null },

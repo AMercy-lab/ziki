@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { bugInTenant, currentTenantIdFor } from "@/lib/tenant-context";
+import { bugInTenant } from "@/lib/tenant-context";
 import { getIssueTypes } from "@/lib/lookups";
 import { auth } from "@/auth";
 import { requireUser } from "@/lib/auth-helpers";
@@ -56,11 +56,26 @@ export async function GET(request: NextRequest, { params: routeParams }: { param
     request.nextUrl.searchParams.entries(),
   );
 
-  const tenantId = await currentTenantIdFor(user.id);
-  // The slug's project, only inside the viewer's workspace; anything else exports nothing.
   const { org, project: slug } = await routeParams;
-  const routeProject = tenantId ? await prisma.project.findFirst({ where: { tenantId, slug: decodeURIComponent(slug), archivedAt: null, tenant: { slug: decodeURIComponent(org) } }, select: { id: true } }) : null;
+  const routeProject = await prisma.project.findFirst({
+    where: {
+      slug: decodeURIComponent(slug),
+      archivedAt: null,
+      tenant: { slug: decodeURIComponent(org), archivedAt: null },
+      ...(user.role !== "super_admin"
+        ? {
+            OR: [
+              { visibility: "public" },
+              { memberships: { some: { userId: user.id } } },
+              { tenant: { memberships: { some: { userId: user.id } } } },
+            ],
+          }
+        : {}),
+    },
+    select: { id: true, tenantId: true },
+  });
   if (!routeProject) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const tenantId = routeProject.tenantId;
   const projectId = routeProject.id;
   const [tagTypes, milestones, areas] = await Promise.all([
     getIssueTypes(tenantId),

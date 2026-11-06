@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { revalidateIssue } from "@/lib/revalidate-issue";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { bugInTenant, commentInTenant, currentTenantIdFor } from "@/lib/tenant-context";
+import { bugInTenant, currentTenantIdFor } from "@/lib/tenant-context";
 import { currentTenantAccess } from "@/lib/tenant-access";
 import { attachmentIdsInMarkdown, linkAttachments } from "@/lib/attachment-link";
 import { requireUser } from "@/lib/auth-helpers";
@@ -39,10 +39,10 @@ import { IssueApiError } from "@/lib/agent-api/errors";
 
 export type CommentActionResult = { error?: string; ok?: boolean };
 
-async function loadComment(commentId: unknown, tenantId: string | null) {
+async function loadComment(commentId: unknown, user: { id: string; role?: string | null }) {
   if (typeof commentId !== "string" || commentId.trim().length === 0) return null;
-  return prisma.comment.findUnique({
-    where: { id: commentId, ...commentInTenant(tenantId) },
+  const comment = await prisma.comment.findUnique({
+    where: { id: commentId },
     select: {
       id: true,
       bugId: true,
@@ -50,9 +50,23 @@ async function loadComment(commentId: unknown, tenantId: string | null) {
       body: true,
       deletedAt: true,
       author: { select: { name: true } },
-      bug: { select: { isDeleted: true, title: true, tenantId: true } },
+      bug: { select: { isDeleted: true, title: true, tenantId: true, projectId: true } },
     },
   });
+  if (!comment) return null;
+  if (user.role === "super_admin") return comment;
+  const canAccess = Boolean(
+    await prisma.projectMembership.findFirst({
+      where: { projectId: comment.bug.projectId, userId: user.id },
+      select: { id: true },
+    }) ||
+    await prisma.membership.findFirst({
+      where: { tenantId: comment.bug.tenantId, userId: user.id },
+      select: { id: true },
+    })
+  );
+  if (!canAccess) return null;
+  return comment;
 }
 
 /** Edit a comment's body. Authors only; mentions are re-verified (#150). */
@@ -70,7 +84,7 @@ export async function updateCommentAction(
     return { error: RATE_LIMIT_MESSAGE };
   }
 
-  const comment = await loadComment(commentId, await currentTenantIdFor(user.id));
+  const comment = await loadComment(commentId, user);
   if (!comment) return { error: COMMENT_ERRORS.notFound };
   if (comment.bug.isDeleted) return { error: COMMENT_ERRORS.issueDeleted };
   if (comment.deletedAt) return { error: COMMENT_ERRORS.deleted };
@@ -180,12 +194,17 @@ export async function deleteCommentAction(
   commentId: string,
 ): Promise<CommentActionResult> {
   const user = await requireUser();
-  const comment = await loadComment(commentId, await currentTenantIdFor(user.id));
+  const comment = await loadComment(commentId, user);
   if (!comment) return { error: COMMENT_ERRORS.notFound };
   if (comment.bug.isDeleted) return { error: COMMENT_ERRORS.issueDeleted };
   if (comment.deletedAt) return { error: COMMENT_ERRORS.deleted };
-  const access = await currentTenantAccess(user.id, user.role);
-  if (!canDeleteComment(user.id, user.role, comment, access.admin)) {
+  const isOrgAdmin = user.role === "super_admin" || Boolean(
+    await prisma.membership.findFirst({
+      where: { tenantId: comment.bug.tenantId, userId: user.id, role: { in: ["owner", "admin"] } },
+      select: { id: true },
+    })
+  );
+  if (!canDeleteComment(user.id, user.role, comment, isOrgAdmin)) {
     return { error: COMMENT_ERRORS.cannotDelete };
   }
 

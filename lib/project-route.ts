@@ -1,4 +1,5 @@
 import { cache } from "react";
+import type { Prisma } from "@prisma/client";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -77,7 +78,7 @@ export const requireProject = cache(async (orgParam: string, projectParam: strin
   });
   const directProjectIds = userProjectMemberships.map((m) => m.projectId);
 
-  const where: any = {
+  const where: Prisma.ProjectWhereInput = {
     slug,
     archivedAt: null,
     tenant: { slug: orgSlug, archivedAt: null },

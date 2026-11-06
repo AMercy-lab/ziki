@@ -56,6 +56,29 @@ export const findProjectIssue = cache(async (orgParam: string, projectParam: str
   if (isReservedProjectSlug(orgSlug)) return null;
   const inUrl = { slug: projectSlug, tenant: { slug: orgSlug } };
   const scope = await viewerBugScope();
+  const resolved = await resolveSessionUserId();
+  const userId = "userId" in resolved ? resolved.userId : undefined;
+
+  if (userId) {
+    const inUrlRow = await prisma.bug.findFirst({
+      where: {
+        number,
+        project: {
+          ...inUrl,
+          archivedAt: null,
+          tenant: { archivedAt: null },
+          OR: [
+            { visibility: "public" },
+            { memberships: { some: { userId } } },
+            { tenant: { memberships: { some: { userId } } } },
+          ],
+        },
+      },
+      select,
+    });
+    if (inUrlRow) return { kind: "found", issue: toIssue(inUrlRow) };
+  }
+
   if (!("tenantId" in scope)) {
     const rows = await prisma.bug.findMany({ where: { number, project: inUrl }, select, take: 2 });
     return rows.length === 1 ? { kind: "found", issue: toIssue(rows[0]) } : null;
@@ -64,15 +87,14 @@ export const findProjectIssue = cache(async (orgParam: string, projectParam: str
   const row = await prisma.bug.findFirst({ where: { number, ...scope }, select });
   if (row && row.project.slug === projectSlug && row.project.tenant.slug === orgSlug) return { kind: "found", issue: toIssue(row) };
 
-  const resolved = await resolveSessionUserId();
-  if ("userId" in resolved) {
+  if (userId) {
     const other = await prisma.bug.findFirst({
       where: {
         number,
         isDeleted: false,
         project: inUrl,
         ...(typeof scope.tenantId === "string" ? { tenantId: { not: scope.tenantId } } : {}),
-        tenant: { memberships: { some: { userId: resolved.userId } } },
+        tenant: { memberships: { some: { userId } } },
       },
       select: { id: true },
     });

@@ -32,6 +32,7 @@ export default async function ProjectSettingsPage({
     where: { tenantId, slug },
     select: {
       id: true, slug: true, name: true, goal: true, repoUrl: true, stagingUrl: true, siteUrl: true,
+      visibility: true, isOpenForContributors: true, contributorGuidelines: true,
       githubInstallationId: true, rewardConfig: true, workflow: true, tenant: { select: { slug: true } },
     },
   });

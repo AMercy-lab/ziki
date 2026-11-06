@@ -1,3 +1,4 @@
+import { requireProject } from "@/lib/project-route";
 import Link from "next/link";
 import { ideaPath, issuesPath, projectRef, refOf } from "@/lib/project-paths";
 import Image from "next/image";
@@ -99,6 +100,8 @@ import { PROD_CONFIRMATIONS_NEEDED } from "@/lib/live-confirm";
 import { LiveFlow } from "@/components/live-flow";
 import { latestPullRequestReport } from "@/lib/agent-api/pull-request-report";
 import { parseGitHubRepoUrl } from "@/lib/github/pull-request-url";
+import { DecisionCard } from "@/components/decision-card";
+import { decisionFor } from "@/lib/your-decision";
 import { agentInstructionsFor } from "@/lib/agent-instructions";
 import { countedJudgements } from "@/lib/agent-api/tested-status";
 import { DeliveredBanner, type DeliveredBannerProps } from "@/components/delivered-banner";
@@ -301,10 +304,11 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     );
   }
 
-  const user = await requireUser();
+  const projectContext = await requireProject(org, projectSlug);
+  const { user, tenantId, isOrgMember, isOrgAdmin } = projectContext;
   const access = await currentTenantAccess(user.id, user.role);
-  const canTriage = access.admin;
-  const canDelete = canDeleteTicket(user.role, access.membershipRole);
+  const canTriage = isOrgAdmin;
+  const canDelete = isOrgAdmin || (isOrgMember && canDeleteTicket(user.role, access.membershipRole));
   if (!lookup) notFound();
   if (lookup.kind === "elsewhere") {
     // A link into another of the viewer's tenants should not dead-end (#519):
@@ -333,7 +337,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   // missing used to reject this whole Promise and blank the page.
   let loadedBug = await prisma.bug
     .findUnique({
-      where: { id, ...bugInTenant(await currentTenantIdFor(userId)) },
+      where: { id, tenantId },
       include: {
         type: { select: { id: true, name: true, isActive: true } },
         reporter: { select: { name: true, email: true, role: true, image: true } },
@@ -412,7 +416,6 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     notFound();
   }
 
-  const tenantId = await currentTenantIdFor(userId);
   // These tables arrived after the issue row. A missing one must not blank the page.
   const [redesignProposals, membership] = tenantId ? await Promise.all([
     loadOptional("redesigns", [], () =>
@@ -975,6 +978,16 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   const stale = bug.isDeleted ? null : (await loadOptional("stale hold", null, () => staleHold(bug.id)))?.kind ?? null;
   const abandonCheck = bug.isDeleted || bug.status !== "in_progress" ? null : await loadOptional("sense check", null, () => senseCheck(bug.id));
   const closeSuggestions = await loadOptional<CloseSuggestionsData | null>("close suggestions", null, () => closeSuggestionsFor(bug.id));
+  // A decision other members made about the viewer's own issue (#your-decisions).
+  const yourDecision = closeSuggestions
+    ? decisionFor({
+        issue: bug,
+        viewerId: user.id,
+        suggestions: closeSuggestions.entries,
+        threshold: closeSuggestions.threshold,
+        decidedAt: bug.closedAt,
+      })
+    : null;
   // The judgements as the Delivered rule counts them (independent, weighted, on
   // the delivered pull request), so the bar says what will actually move it.
   const judgementCount = bug.status === "done" && !bug.isDeleted
@@ -1345,6 +1358,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
           />
 
           <NextStepBar step={liveFix ? liveNextStep(liveFix.check, liveFix.repo) : nextStep} agentInstructions={agentInstructions} />
+          {yourDecision ? <DecisionCard issueId={bug.id} decision={yourDecision} /> : null}
 
           {deliveredBanner ? <DeliveredBanner {...deliveredBanner} /> : null}
 

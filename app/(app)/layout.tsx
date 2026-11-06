@@ -31,13 +31,13 @@ import { isEarnPath } from "@/lib/earn/paths";
 import { withdrawInfo } from "@/lib/earn/draft";
 import { earnAgentWhere, earnWorkspace } from "@/lib/earn/earner";
 
-const getTenantProjects = cache(async (tenantId: string) => {
+async function getTenantProjects(tenantId: string) {
   return prisma.project.findMany({
     where: { tenantId, archivedAt: null },
     select: { id: true, name: true, slug: true, tenantId: true },
     orderBy: { name: "asc" },
   });
-});
+}
 
 export default async function AppLayout({
   children,
@@ -285,7 +285,7 @@ export default async function AppLayout({
         </main>
       </div>
       {/* The agents dock keeps the page's foot clear of its floor line itself, as tall as what stands on it, and draws nothing (no spacer either) where it doesn't help. */}
-      <AgentsDock agents={dockAgents} defaultProjectSlug={defaultProjectSlug} version={appVersionLabel()} earn={earnSample !== null} memberCount={memberCount} />
+      <AgentsDock agents={dockAgents} earn={earnSample !== null} memberCount={memberCount} />
       <FocusMainOnNavigate />
       {welcomeNotice ? <EarnWelcomeToast /> : paidTasks.length > 0 ? <EarnPaidCelebration paid={paidTasks} agentName={earnAgentName} /> : null}
       <KeyboardShortcuts

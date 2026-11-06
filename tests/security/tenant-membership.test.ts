@@ -6,6 +6,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * is refused, and an issue in another tenant is "not found".
  */
 
+const membershipFindUnique = vi.hoisted(() => vi.fn());
+const membershipFindFirst = vi.hoisted(() => vi.fn());
+const projectMembershipFindUnique = vi.hoisted(() => vi.fn());
+const projectMembershipFindFirst = vi.hoisted(() => vi.fn());
+const bugFindUnique = vi.hoisted(() => vi.fn());
+const bugCreate = vi.hoisted(() => vi.fn());
+const ideaCreate = vi.hoisted(() => vi.fn());
+const projectFindFirst = vi.hoisted(() => vi.fn());
+const projectAreaFindFirst = vi.hoisted(() => vi.fn());
+const issueWatchUpsert = vi.hoisted(() => vi.fn().mockResolvedValue({ id: "iw-1" }));
+const userFindUnique = vi.hoisted(() => vi.fn());
+const userFindFirst = vi.hoisted(() => vi.fn());
+const userFindMany = vi.hoisted(() => vi.fn().mockResolvedValue([]));
+const $transaction = vi.hoisted(() => vi.fn());
+const $executeRaw = vi.hoisted(() => vi.fn());
+
 vi.mock("@/lib/tenant-context", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/tenant-context")>()),
   currentTenantIdFor: vi.fn(),
@@ -26,39 +42,28 @@ vi.mock("@/lib/tenant-access", () => ({
 }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    bug: { findUnique: vi.fn(), create: vi.fn() },
-    idea: { create: vi.fn() },
-    // #project-urls: the form names its project; only one in the reporter's tenant is used.
-    project: {
-      findFirst: vi.fn(async ({ where }: { where: { id: string; tenantId?: string } }) =>
-        where.id === "project-zedu" ? { id: "project-zedu", slug: "zedu", tenantId: "tenant-zedu" } : null),
-    },
-    projectArea: { findFirst: vi.fn() },
+    bug: { findUnique: bugFindUnique, create: bugCreate },
+    idea: { create: ideaCreate },
+    project: { findFirst: projectFindFirst },
+    projectArea: { findFirst: projectAreaFindFirst },
     membership: {
-      findUnique: vi.fn(async ({ where }: any) =>
-        where?.tenantId_userId?.tenantId === "tenant-zedu" && where?.tenantId_userId?.userId !== "stranger-1" ? { id: "m-1" } : null
-      ),
+      findFirst: membershipFindFirst,
+      findUnique: membershipFindUnique,
     },
-    projectMembership: { findUnique: vi.fn().mockResolvedValue(null) },
-    user: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
-    $transaction: vi.fn(),
-    $executeRaw: vi.fn(),
+    projectMembership: { findUnique: projectMembershipFindUnique, findFirst: projectMembershipFindFirst },
+    issueWatch: { upsert: issueWatchUpsert, updateMany: vi.fn(), createMany: vi.fn() },
+    user: { findUnique: userFindUnique, findFirst: userFindFirst, findMany: userFindMany },
+    $transaction,
+    $executeRaw,
   },
 }));
 
-import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
 import { currentTenantIdFor, NO_TENANT_MESSAGE } from "@/lib/tenant-context";
 import { canContributeToProject } from "@/lib/project-permissions";
 import { createBugAction, updateBugAction } from "@/app/actions/issues";
+import { setWatchingAction } from "@/app/actions/watch";
 
-const db = prisma as unknown as {
-  bug: { findUnique: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> };
-  idea: { create: ReturnType<typeof vi.fn> };
-  $transaction: ReturnType<typeof vi.fn>;
-  projectArea: { findFirst: ReturnType<typeof vi.fn> };
-  $executeRaw: ReturnType<typeof vi.fn>;
-};
 const tenantOf = currentTenantIdFor as unknown as ReturnType<typeof vi.fn>;
 
 function form(values: Record<string, string>) {
@@ -78,25 +83,34 @@ describe("issue actions are tenant-scoped (#425)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (requireUser as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "user-1", role: "user" });
-    db.$transaction.mockImplementation(async (run: (tx: unknown) => unknown) => run(prisma));
-    (prisma.membership.findUnique as any).mockImplementation(async ({ where }: any) =>
-      where?.tenantId_userId?.tenantId === "tenant-zedu" ? { id: "m-1" } : null
+    $transaction.mockImplementation(async (run: (tx: unknown) => unknown) => run({
+      idea: { create: ideaCreate },
+      projectArea: { findFirst: projectAreaFindFirst },
+      $executeRaw,
+    }));
+    projectFindFirst.mockImplementation(async ({ where }: { where: { id: string; tenantId?: string } }) =>
+      where.id === "project-zedu" ? { id: "project-zedu", slug: "zedu", tenantId: "tenant-zedu" } : null
     );
-    (prisma.projectMembership.findUnique as any).mockResolvedValue(null);
+    membershipFindUnique.mockImplementation(async ({ where }: { where?: { tenantId_userId?: { tenantId: string; userId: string } } }) =>
+      where?.tenantId_userId?.tenantId === "tenant-zedu" && where?.tenantId_userId?.userId !== "stranger-1" ? { id: "m-1" } : null
+    );
+    membershipFindFirst.mockResolvedValue(null);
+    projectMembershipFindUnique.mockResolvedValue(null);
+    projectMembershipFindFirst.mockResolvedValue(null);
   });
 
   it("refuses to file a report for someone with no membership", async () => {
     tenantOf.mockResolvedValue(null);
     expect(await createBugAction(report)).toEqual({ error: NO_TENANT_MESSAGE });
-    expect(db.idea.create).not.toHaveBeenCalled();
+    expect(ideaCreate).not.toHaveBeenCalled();
   });
 
   it("files the report, as an idea, into the reporter's tenant and project", async () => {
     tenantOf.mockResolvedValue("tenant-zedu");
-    db.idea.create.mockRejectedValue(new Error("stop after create"));
+    ideaCreate.mockRejectedValue(new Error("stop after create"));
     await createBugAction(report).catch(() => undefined);
-    expect(db.idea.create).toHaveBeenCalledTimes(1);
-    expect(db.idea.create.mock.calls[0][0].data).toMatchObject({
+    expect(ideaCreate).toHaveBeenCalledTimes(1);
+    expect(ideaCreate.mock.calls[0][0].data).toMatchObject({
       tenantId: "tenant-zedu",
       projectId: "project-zedu",
       beneficiaryUserId: "user-1",
@@ -106,13 +120,13 @@ describe("issue actions are tenant-scoped (#425)", () => {
   it("allows direct project members to file issues even without org membership", async () => {
     tenantOf.mockResolvedValue(null);
     (requireUser as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "external-1", role: "user" });
-    (prisma.projectMembership.findUnique as any).mockResolvedValue({ id: "pm-1" });
-    (prisma.membership.findUnique as any).mockResolvedValue(null);
-    db.idea.create.mockRejectedValue(new Error("stop after create"));
+    projectMembershipFindUnique.mockResolvedValue({ id: "pm-1" });
+    membershipFindUnique.mockResolvedValue(null);
+    ideaCreate.mockRejectedValue(new Error("stop after create"));
 
     await createBugAction(report).catch(() => undefined);
-    expect(db.idea.create).toHaveBeenCalledTimes(1);
-    expect(db.idea.create.mock.calls[0][0].data).toMatchObject({
+    expect(ideaCreate).toHaveBeenCalledTimes(1);
+    expect(ideaCreate.mock.calls[0][0].data).toMatchObject({
       tenantId: "tenant-zedu",
       projectId: "project-zedu",
     });
@@ -121,12 +135,12 @@ describe("issue actions are tenant-scoped (#425)", () => {
   it("refuses uninvited non-members from submitting issues", async () => {
     tenantOf.mockResolvedValue("tenant-personal");
     (requireUser as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "stranger-1", role: "user" });
-    (prisma.projectMembership.findUnique as any).mockResolvedValue(null);
-    (prisma.membership.findUnique as any).mockResolvedValue(null);
+    projectMembershipFindUnique.mockResolvedValue(null);
+    membershipFindUnique.mockResolvedValue(null);
 
     const result = await createBugAction(report);
     expect(result).toEqual({ error: "You must be a member of this project to submit issues." });
-    expect(db.idea.create).not.toHaveBeenCalled();
+    expect(ideaCreate).not.toHaveBeenCalled();
   });
 
   it("refuses a project that does not exist or is in another tenant", async () => {
@@ -138,12 +152,12 @@ describe("issue actions are tenant-scoped (#425)", () => {
       projectId: "project-acme",
     }));
     expect(result).toEqual({ error: NO_TENANT_MESSAGE });
-    expect(db.idea.create).not.toHaveBeenCalled();
+    expect(ideaCreate).not.toHaveBeenCalled();
   });
 
   it("rejects an area from another project before saving", async () => {
     tenantOf.mockResolvedValue("tenant-zedu");
-    db.projectArea.findFirst.mockResolvedValue(null);
+    projectAreaFindFirst.mockResolvedValue(null);
     const result = await createBugAction(form({
       title: "Login button does nothing",
       description: "Clicking Login on the sign-in page does nothing at all, on Chrome and Firefox.",
@@ -152,16 +166,41 @@ describe("issue actions are tenant-scoped (#425)", () => {
       areaId: "foreign-area",
     }));
     expect(result).toMatchObject({ error: expect.any(String), field: "areaId" });
-    expect(db.idea.create).not.toHaveBeenCalled();
+    expect(ideaCreate).not.toHaveBeenCalled();
   });
 
   it("treats an issue in another tenant as not found", async () => {
     tenantOf.mockResolvedValue("tenant-zedu");
-    db.bug.findUnique.mockResolvedValue(null);
+    bugFindUnique.mockResolvedValue(null);
     expect(await updateBugAction("bug-in-acme", form({ status: "resolved" }))).toEqual({
       error: expect.any(String),
     });
-    expect(db.bug.findUnique.mock.calls[0][0].where).toEqual({ id: "bug-in-acme", tenantId: "tenant-zedu" });
+    expect(bugFindUnique.mock.calls[0][0].where).toEqual({ id: "bug-in-acme", tenantId: "tenant-zedu" });
+  });
+
+  it("allows direct project members to watch issues and refuses non-members", async () => {
+    (requireUser as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "external-1", role: "user" });
+    bugFindUnique.mockResolvedValue({
+      id: "bug-1",
+      tenantId: "tenant-zedu",
+      projectId: "project-zedu",
+      isDeleted: false,
+      project: { visibility: "private" },
+    });
+    projectMembershipFindFirst.mockResolvedValue({ id: "pm-1" });
+    membershipFindFirst.mockResolvedValue(null);
+
+    const watchRes = await setWatchingAction("bug-1", true);
+    expect(watchRes).toEqual({ ok: true });
+    expect(issueWatchUpsert).toHaveBeenCalled();
+
+    // Now test refusal for non-member
+    (requireUser as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "stranger-1", role: "user" });
+    projectMembershipFindFirst.mockResolvedValue(null);
+    membershipFindFirst.mockResolvedValue(null);
+
+    const refuseRes = await setWatchingAction("bug-1", true);
+    expect(refuseRes).toEqual({ error: "Issue not found" });
   });
 });
 
@@ -176,21 +215,21 @@ describe("canContributeToProject permissions", () => {
   });
 
   it("allows direct project members", async () => {
-    (prisma.projectMembership.findUnique as any).mockResolvedValue({ id: "pm-1" });
+    projectMembershipFindUnique.mockResolvedValue({ id: "pm-1" });
     const allowed = await canContributeToProject({ id: "user-1", role: "user" }, "p-1", "t-1");
     expect(allowed).toBe(true);
   });
 
   it("allows organization members", async () => {
-    (prisma.projectMembership.findUnique as any).mockResolvedValue(null);
-    (prisma.membership.findUnique as any).mockResolvedValue({ id: "m-1" });
+    projectMembershipFindUnique.mockResolvedValue(null);
+    membershipFindUnique.mockResolvedValue({ id: "m-1" });
     const allowed = await canContributeToProject({ id: "user-1", role: "user" }, "p-1", "t-1");
     expect(allowed).toBe(true);
   });
 
   it("denies uninvited non-members", async () => {
-    (prisma.projectMembership.findUnique as any).mockResolvedValue(null);
-    (prisma.membership.findUnique as any).mockResolvedValue(null);
+    projectMembershipFindUnique.mockResolvedValue(null);
+    membershipFindUnique.mockResolvedValue(null);
     const allowed = await canContributeToProject({ id: "stranger-1", role: "user" }, "p-1", "t-1");
     expect(allowed).toBe(false);
   });

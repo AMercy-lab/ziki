@@ -81,7 +81,7 @@ export function ProjectJoinModal({
               Note to Maintainers (Optional)
             </label>
             <p className="mt-0.5 text-xs text-zk-muted">
-              Mention your skills, background, or what you'd like to work on.
+              Mention your skills, background, or what you would like to work on.
             </p>
             <textarea
               id="join-message"

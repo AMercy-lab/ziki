@@ -106,7 +106,17 @@ export function WorkspaceSwitcher({
         }
       : null) ??
     workspaces.find((workspace) => workspace.id === activeTenantId) ??
-    workspaces[0];
+    workspaces[0] ??
+    (externalProjects.length > 0
+      ? {
+          id: externalProjects[0].tenantId,
+          name: externalProjects[0].tenantName,
+          slug: externalProjects[0].tenantSlug,
+          projects: externalProjects
+            .filter((p) => p.tenantSlug === externalProjects[0].tenantSlug)
+            .map((p) => ({ id: p.id, name: p.name, slug: p.slug })),
+        }
+      : undefined);
 
   const isExternalSelected = Boolean(selected && !workspaces.some((w) => w.id === selected.id));
   const contributedProjects = isExternalSelected
@@ -173,12 +183,13 @@ export function WorkspaceSwitcher({
           onClick={() => setOpen((current) => !current)}
           className={`inline-flex max-w-full items-center gap-2 border font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-tint focus-visible:ring-offset-2 focus-visible:ring-offset-deep-ocean ${
             bar
-              ? "h-[30px] rounded-full border-transparent bg-transparent py-0 pl-1.5 pr-1.5 text-[13px] text-zk-text hover:bg-zk-chip"
+              ? "h-[30px] rounded-full border-transparent bg-transparent py-0 pl-1.5 pr-1.5 text-[13px] text-zk-text hover:bg-zk-chip max-sm:h-7 max-sm:px-2 max-sm:text-xs"
               : chrome
-                ? "h-8 rounded-lg border-surface-border bg-[#132347] py-1 pl-2 pr-1.5 text-xs text-porcelain hover:bg-[#1a2d57]"
-                : "h-8 rounded-lg border-slate-200 bg-card py-1 pl-2 pr-1.5 text-xs text-slate-900 hover:bg-slate-50"
-          }`}
+                ? "h-8 rounded-lg border-surface-border bg-[#132347] px-2 text-xs text-porcelain hover:bg-[#1a2d57]"
+                : "h-8 rounded-lg border-slate-200 bg-white px-2 text-xs text-slate-800 shadow-xs hover:bg-slate-50"
+          } ${fullWidth ? "w-full justify-between" : ""}`}
         >
+          <span className="sr-only">Active workspace, </span>
           <WorkspaceMark name={selected.name} size={bar ? "xs" : "sm"} />
           <span className="truncate">{selectedLabel}</span>
           <svg

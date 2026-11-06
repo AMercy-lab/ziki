@@ -252,7 +252,7 @@ export async function createBugAction(
   const tenantId = targetProject.tenantId;
 
   const isDirectProjectMember = Boolean(
-    await prisma.projectMembership?.findUnique?.({
+    await prisma.projectMembership.findUnique({
       where: { projectId_userId: { projectId, userId } },
       select: { id: true },
     })

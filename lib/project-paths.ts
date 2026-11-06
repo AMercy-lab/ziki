@@ -34,8 +34,7 @@ export function orgHomePath(orgSlug: string, query?: URLSearchParams | string): 
 const PROJECT_PAGES = new Set(["ideas", "issues", "notes", "org", "projects", "tasks", "workstream", "work"]);
 
 export function isProjectFirstPath(path: string): boolean {
-  const [first, second, third] = path.split("?")[0].split("/").filter(Boolean);
-  if (second === "projects" && third === "new") return false;
+  const [first, second] = path.split("?")[0].split("/").filter(Boolean);
   return Boolean(first && second && (PROJECT_PAGES.has(second) || /^[0-9]+$/.test(second)));
 }
 
