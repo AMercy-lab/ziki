@@ -31,6 +31,7 @@ const paths: { href: string; icon: IconName; kicker: string; title: string; text
     cta: 'Join Ziki',
   },
   {
+    // Earn (#earnings): a section of the landing page, not a page of its own. /earn takes you on: sign up, then Discover.
     href: '/earn',
     icon: 'bolt',
     kicker: 'Earn',
@@ -84,7 +85,12 @@ function Homepage({ signedIn = false }: { signedIn?: boolean }) {
         </div>
         <div className="paths-grid">
           {paths.map((path) => (
-            <Link className="workflow-card path-card" href={path.href} key={path.href}>
+            <Link
+              className="workflow-card path-card"
+              href={path.href}
+              id={path.href === '/earn' ? 'earn' : undefined}
+              key={path.href}
+            >
               <span className="lifecycle-icon"><Icon name={path.icon} /></span>
               <span className="path-kicker">{path.kicker}</span>
               <h3>{path.title}</h3>
