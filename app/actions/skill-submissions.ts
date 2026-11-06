@@ -44,18 +44,4 @@ export async function reviewSkillSubmissionAction(
   return { ok: true };
 }
 
-/** Form-action entry point for the approve/reject buttons on the approvals table. */
-export async function reviewSubmissionFormAction(formData: FormData): Promise<void> {
-  const submissionId = formData.get("submissionId") as string | null;
-  const status = formData.get("status") as "approved" | "rejected" | null;
-  const rejectionReason = formData.get("rejectionReason") as string | null;
 
-  if (!submissionId || !status) {
-    throw new Error("Invalid submission review request.");
-  }
-
-  const result = await reviewSkillSubmissionAction(submissionId, status, rejectionReason);
-  if (!result.ok) {
-    throw new Error(result.error);
-  }
-}

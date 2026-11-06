@@ -69,39 +69,7 @@ export const createSubmissionSchema = z.object({
   revisionOfId: z.string().optional().nullable(),
 });
 
-export async function GET() {
-  const user = await requireUser();
-  const isSuper = Boolean(user.isRealSuperAdmin || user.role === "super_admin");
 
-  const submissions = await prisma.skillSubmission.findMany({
-    where: isSuper ? undefined : { submittedById: user.id },
-    orderBy: [{ createdAt: "desc" }],
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      category: true,
-      categoryLabel: true,
-      summary: true,
-      tags: true,
-      prompt: true,
-      checklist: true,
-      sampleCommand: true,
-      documentationUrl: true,
-      status: true,
-      submittedById: true,
-      reviewedById: true,
-      reviewedAt: true,
-      rejectionReason: true,
-      createdAt: true,
-      updatedAt: true,
-      submittedBy: { select: { id: true, name: true, email: true, image: true } },
-      reviewedBy: { select: { id: true, name: true, email: true } },
-    },
-  });
-
-  return NextResponse.json({ submissions });
-}
 
 export async function POST(req: NextRequest) {
   const user = await requireUser();
@@ -233,9 +201,3 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ submission }, { status: 201 });
 }
 
-export async function PUT() {
-  return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
-}
-export async function DELETE() {
-  return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
-}

@@ -25,7 +25,7 @@ export default async function SkillApprovalsPage() {
       rejectionReason: true,
       reviewedAt: true,
       createdAt: true,
-      submittedBy: { select: { name: true, email: true, image: true } },
+      submittedBy: { select: { name: true, image: true } },
       reviewedBy: { select: { name: true } },
     },
   });
@@ -44,7 +44,6 @@ export default async function SkillApprovalsPage() {
     documentationUrl: sub.documentationUrl,
     status: sub.status as "pending" | "approved" | "rejected",
     authorName: sub.submittedBy?.name ?? "Contributor",
-    authorEmail: sub.submittedBy?.email ?? "",
     authorImage: sub.submittedBy?.image,
     reviewedByName: sub.reviewedBy?.name ?? undefined,
     rejectionReason: sub.rejectionReason,

@@ -19,7 +19,6 @@ export interface SkillApprovalItem {
   documentationUrl?: string | null;
   status: "pending" | "approved" | "rejected";
   authorName: string;
-  authorEmail?: string;
   authorImage?: string | null;
   reviewedByName?: string;
   rejectionReason?: string | null;
