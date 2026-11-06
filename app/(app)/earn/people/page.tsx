@@ -47,8 +47,8 @@ export default async function EarnPeoplePage() {
     contact: contact.contact ?? "",
     emailed: contact.sentAt ? dayLabel.format(contact.sentAt) : null,
     opened: contact.openedAt ? dayLabel.format(contact.openedAt) : null,
-    signedUp: null,
-    started: null,
+    signedUp: contact.signedUpAt ? dayLabel.format(contact.signedUpAt) : null,
+    started: contact.startedAt ? dayLabel.format(contact.startedAt) : null,
     followUp: followUpDraft(contact.name, `${site}/r/${contact.code}`, user.name ?? ""),
     quiet: isQuiet(contact),
   }));
@@ -103,7 +103,7 @@ export default async function EarnPeoplePage() {
         className={`rounded-[20px] border p-5 sm:p-6 ${started ? "border-zk-ok-fg/30 bg-zk-ok-bg/40" : "border-electric-blue/30 bg-zk-surface shadow-[0_8px_24px_rgba(46,111,239,0.08)]"}`}
       >
         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${started ? "bg-zk-ok-bg text-zk-ok-fg" : "bg-zk-tint text-zk-accent"}`}>
-          {started ? `+${formatZ(CONVERSION_BONUS)} unlocked` : `Closest to your ${formatZ(CONVERSION_BONUS)}`}
+          {started ? `+${formatZ(CONVERSION_BONUS)} on its way` : `Closest to your ${formatZ(CONVERSION_BONUS)}`}
         </span>
         <h2 id="closest" className="mt-3 text-2xl font-extrabold tracking-tight text-zk-text">{closest.name}</h2>
         <p className="text-sm text-zk-muted">{closest.contact}</p>
@@ -137,7 +137,7 @@ export default async function EarnPeoplePage() {
         <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-zk-border pt-4">
           <p className="min-w-60 flex-1 text-sm text-zk-text2">
             {started
-              ? `${closest.name} started a project. Your ${formatZ(CONVERSION_BONUS)} is in, and you can withdraw.`
+              ? `${closest.name} started a project. Ziki will check it and add your ${formatZ(CONVERSION_BONUS)}.`
               : closest.signedUp
                 ? `They signed up on ${closest.signedUp} but haven't started a project yet. A short, friendly follow-up from you is often all it takes.`
                 : closest.opened
@@ -145,7 +145,7 @@ export default async function EarnPeoplePage() {
                   : `You emailed them on ${closest.emailed}. Nobody has opened the link yet: give it a few days, then follow up.`}
           </p>
           {started ? (
-            <Link href="/earn/withdraw" className={agentsPrimaryBtn}>Go to Withdraw</Link>
+            <Link href="/earn/earnings" className={agentsPrimaryBtn}>See your earnings</Link>
           ) : (
             <>
               <Link href="/earn/marketing/3" className={agentsSecondaryBtn}>See your emails</Link>
