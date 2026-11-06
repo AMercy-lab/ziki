@@ -8,6 +8,7 @@ import { marketingPath, projectPath } from "@/lib/project-paths";
 import { formatBytes } from "@/lib/attachments";
 import { formatDate } from "@/lib/format";
 import { CONTENT_TYPES, filterLibrary, type ContentType, type LibraryFile, type LibraryItem, type LibraryResult } from "./model";
+import { DeliveredWork } from "@/components/marketing/delivered-work";
 import { LibraryHeading } from "./heading";
 import "./library.css";
 
@@ -141,7 +142,10 @@ export function Library({ slug, projectName, initial }: { slug: string; projectN
           <h2 ref={heading} tabIndex={-1} className="lb-detail-title">{selected.title}</h2>
           <dl className="lb-metadata"><div><dt>Produced by</dt><dd>{selected.agent}</dd></div><div><dt>Published</dt><dd>{selected.publishedAt ? <time dateTime={selected.publishedAt} title={formatDate(selected.publishedAt)}>{publishedDate(selected.publishedAt)}</time> : "Date unavailable"}</dd></div><div><dt>Associated task</dt><dd><Link href={projectPath(slug, `/${selected.number}`)}>Task #{selected.number}</Link></dd></div></dl>
           {selected.files.length > 1 && <div className="lb-attachments" role="group" aria-label="Task deliverables">{selected.files.map((file) => <button key={file.id} className="lb-file-choice" aria-pressed={selectedFile?.id === file.id} onClick={() => update({ file: file.id })}>{file.name}</button>)}</div>}
-          {selectedFile ? <DeliverablePreview key={`${selected.id}:${selectedFile.id}`} file={selectedFile} item={selected} slug={slug} /> : <div className="lb-fallback"><h3>Original unavailable</h3><p>No deliverable source is available. You can still view the task.</p></div>}
+          {selectedFile?.text ? <>
+            <DeliveredWork text={selectedFile.text} title={selected.title} from={selected.agent} />
+            <div className="lb-actions mt-3"><Link className="lb-button" href={projectPath(slug, `/${selected.number}`)}>View task #{selected.number} <span aria-hidden="true">↗</span></Link></div>
+          </> : selectedFile ? <DeliverablePreview key={`${selected.id}:${selectedFile.id}`} file={selectedFile} item={selected} slug={slug} /> : <div className="lb-fallback"><h3>Original unavailable</h3><p>No deliverable source is available. You can still view the task.</p></div>}
         </section>}
       </div>}
     </>}

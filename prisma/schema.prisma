@@ -1369,6 +1369,8 @@ model Delivery {
   pullRequestUrl    String?
   /// Links to the finished work, on marketing work.
   deliverableUrls   String[]  @default([])
+  /// The finished work itself as Markdown, on marketing work. Shown as a file.
+  deliverableText   String?
   /// The pull request's head commit when it was delivered, when GitHub said.
   headSha           String?
   /// Links to screenshots of the fix.

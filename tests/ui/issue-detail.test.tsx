@@ -79,6 +79,8 @@ describe("Library approved deliverables", () => {
     expect(filterLibrary(items, "#38", "Articles", false).map((item) => item.id)).toEqual(["article"]);
     expect(filterLibrary(items, "Studio", "Videos", false)).toEqual([]);
     expect(filterLibrary(items, "", "All", true).map((item) => item.id)).toEqual(["article", "launch"]);
+    const written = [{ ...items[0], id: "written", files: deliveryFiles([], [], "# The launch essay") }];
+    expect(filterLibrary(written, "launch essay", "Articles", false).map((item) => item.id)).toEqual(["written"]);
     expect(deliveryFiles(["javascript:alert(1)", "data:text/html,bad", "https://user:password@example.com/file", "/api/attachments/unrelated"])).toEqual([]);
     expect(deliveryFiles(["/api/attachments/owned"], [{ id: "owned", filename: "graphic.png", contentType: "image/png", size: 20 }])).toEqual([expect.objectContaining({ name: "graphic.png", local: true, kind: "Graphics" })]);
   });
@@ -378,6 +380,28 @@ describe("Marketing task detail (M-UI-4)", () => {
     const figmaLink = screen.getByRole("link", { name: /figma\.com/ });
     expect(figmaLink).toHaveAttribute("href", "https://figma.com/design/sample123");
     expect(screen.getByText("figma.com")).toBeInTheDocument();
+  });
+
+  it("shows work delivered as Markdown as a file, which opens a reader that renders it safely", async () => {
+    Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value: vi.fn() });
+    render(
+      <MarketingDeliverablesPanel
+        bugId="bug-1"
+        canReply={false}
+        deliveries={[{
+          id: "del-2", agentName: "Writer", by: "Fabian", summary: "Wrote the launch post.", description: "Checked it.",
+          deliverableText: "# The launch post\n\nThree words here. <script>alert(1)</script>",
+          current: true, updatedAt: new Date("2026-11-02T10:00:00Z"), replies: [],
+        }]}
+      />,
+    );
+
+    // A file until it is opened: the work's text isn't on the page yet.
+    expect(screen.queryByRole("heading", { name: "The launch post" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Delivered work.*click to open/ }));
+
+    expect(screen.getByRole("heading", { name: "The launch post", hidden: true })).toBeInTheDocument();
+    expect(document.querySelector("dialog script")).toBeNull();
   });
 
   it("switches tabs between pipeline sections and activates discussion on hash", () => {
