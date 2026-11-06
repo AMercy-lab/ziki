@@ -29,13 +29,13 @@ import { reportPullRequestStatus, storedCheckRuns } from "@/lib/agent-api/pull-r
 import { pullRequestReportSchema, pullRequestChecksSummary, type PullRequestCheckStatus } from "@/lib/validations/pull-request-report";
 
 const PR = "https://github.com/emerjent/ziki/pull/552";
-const scope = { tenantId: "t1", projectId: "p1" };
+const scope = { organisationId: "t1", projectId: "p1" };
 const checker = (ownerId = "erin"): AgentContext =>
-  ({ agentId: `agent-${ownerId}`, name: `${ownerId}'s agent`, ownerId, tenantId: "t1", level: "working", burst: false, keyId: "k" });
+  ({ agentId: `agent-${ownerId}`, name: `${ownerId}'s agent`, ownerId, organisationId: "t1", level: "working", burst: false, keyId: "k" });
 
 function bug(over: Record<string, unknown> = {}) {
   return {
-    id: "bug1", tenantId: "t1", projectId: "p1", status: "merge", substatus: "ready_to_merge",
+    id: "bug1", organisationId: "t1", projectId: "p1", status: "merge", substatus: "ready_to_merge",
     pullRequestUrl: PR, pullRequestHeadSha: "aaa1111",
     beneficiaryUserId: "ada", reporterId: "ada", assigneeId: null, createdByAgent: null,
     claims: [],
