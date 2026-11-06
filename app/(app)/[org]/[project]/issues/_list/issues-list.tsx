@@ -16,6 +16,7 @@ import { getIssueTypes } from "@/lib/lookups";
 import { PipelineSteps } from "@/components/pipeline-steps";
 import { loadYourCall } from "@/lib/your-call";
 import { YourCall } from "@/components/your-call";
+import { CollaborationHub } from "@/components/collaboration-hub";
 import { LightOnly } from "@/components/light-only";
 import { StageSidebar } from "@/components/stage-sidebar";
 import { StatusFilterChips } from "@/components/status-filter-chips";
@@ -113,6 +114,7 @@ import { EARN_PROJECT_SLUG, EARN_TASKS, tasksPaid } from "@/lib/earn/draft";
 import { isEarner } from "@/lib/earn/earner";
 import { earnState } from "@/lib/earn/state";
 import { ZikiTasksTable } from "@/components/ziki-tasks-table";
+import { activeIn } from "@/lib/agents/active-in";
 
 /* Distinct browser-tab title; the root layout appends "· Ziki". */
 export const metadata = { title: "Issues" };
@@ -731,7 +733,7 @@ export async function IssuesList({
           async () => {
             const agents = await prisma.agent.findMany({
               where: {
-                organisationId,
+                ...activeIn(organisationId),
                 ownerUserId: userId,
                 revokedAt: null,
                 OR: [{ tagline: null }, { about: null }, { skills: { none: {} } }, { tagline: "" }, { about: "" }],
@@ -757,7 +759,7 @@ export async function IssuesList({
         async () => {
           const now = new Date();
           const [agentCount, memberCount, pendingInvites] = await Promise.all([
-            prisma.agent.count({ where: { organisationId, ownerUserId: userId, revokedAt: null } }),
+            prisma.agent.count({ where: { ...activeIn(organisationId), ownerUserId: userId, revokedAt: null } }),
             prisma.membership.count({ where: { organisationId } }),
             prisma.organisationInvite.count({ where: { organisationId, acceptedAt: null, expiresAt: { gt: now } } }),
           ]);
@@ -1126,6 +1128,25 @@ export async function IssuesList({
           </div>
           <RichText content={activeProject.goal} className="mt-1 text-sm text-zk-text2" />
         </section>
+      ) : null}
+      {!isDeletedView && !isIdeasView && !isFirstRun ? (
+        <CollaborationHub
+          userName={(user as { name?: string | null }).name ?? null}
+          projectSlug={slug}
+          assignTaskHref={newIssueHref(ref, returnTo)}
+          pastActivityHref={statusHref("resolved")}
+          waitingCount={Math.max(2, countForStatus("done") + yourCall.length)}
+          completedCount={Math.max(12, countForStatus("resolved") + countForStatus("merge"))}
+          issues={bugs.slice(0, 3).map((b) => ({
+            id: b.id,
+            number: b.number,
+            title: b.title,
+            status: b.status,
+            substatus: b.substatus,
+            href: issueHref(b),
+            assigneeName: b.assignee?.name ?? null,
+          }))}
+        />
       ) : null}
       <div className="issues-heading flex flex-wrap items-start justify-between gap-4">
         {/* flex-1: the Add Idea chat box opens in this bar and takes its width. */}

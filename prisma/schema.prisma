@@ -81,8 +81,8 @@ enum ActivityType {
   duplicate_changed
 }
 
-/// A person's role inside a organisation (#423). Everyone who existed when the
-/// agent platform landed is a member of Zedu; a organisation's creator is its owner.
+/// A person's role inside an organisation (#423). Everyone who existed when the
+/// agent platform landed is a member of Zedu; an organisation's creator is its owner.
 enum MembershipRole {
   owner
   admin
@@ -92,7 +92,7 @@ enum MembershipRole {
 /// What an agent may do (#427). Each level includes the ones before it.
 /// What an agent may do. A ladder: every agent is `working`; `manager` adds
 /// accepting fixes and assigning work; `merger` adds executing Git merges.
-/// Both higher classes are granted by a organisation admin.
+/// Both higher classes are granted by an organisation admin.
 enum AgentLevel {
   working
   manager
@@ -276,6 +276,7 @@ model User {
   memberships               Membership[]
   agents                    Agent[]
   agentPairingsApproved     AgentPairing[]
+  agentPreferences          AgentPreference[]
   beneficiaryBugs           Bug[]                   @relation("BugBeneficiary")
   claims                    IssueClaim[]
   dispatchedClaims          IssueClaim[]            @relation("ClaimDispatcher")
@@ -721,7 +722,7 @@ model RateLimitHit {
 
 // ---------------------------------------------------------------------------
 // Agent platform (#422, #423). People and their agents work the same issues
-// inside a organisation. This block is owned by #423: later platform issues add
+// inside an organisation. This block is owned by #423: later platform issues add
 // files, not columns.
 // ---------------------------------------------------------------------------
 
@@ -747,7 +748,8 @@ model Organisation {
   issueTypes         IssueType[]
   milestones         Milestone[]
   memberships        Membership[]
-  agents             Agent[]
+  agentActivations   AgentActivation[]
+  agentApiKeys       AgentApiKey[]
   skillTags          SkillTag[]
   bugs               Bug[]
   ideas              Idea[]
@@ -781,7 +783,7 @@ model Project {
   stagingUrl            String?
   /// GitHub App installation used to merge accepted fixes (#452). Never a token.
   githubInstallationId  String?
-  /// Set when a organisation owner archives the project (#573). Archived projects
+  /// Set when an organisation owner archives the project (#573). Archived projects
   /// are hidden from the switcher and cannot be selected.
   archivedAt            DateTime?
   /// Deprecated (#595): the delivery window now lives on ProjectWorkflow.
@@ -804,9 +806,6 @@ model Project {
   ideas                 Idea[]
   areas                 ProjectArea[]
   redesigns             RedesignProposal[]
-  apiKeys               AgentApiKey[]
-  pairings              AgentPairing[]
-  defaultAgents         Agent[]               @relation("DefaultProjectAgent")
   testMissions          TestMission[]
   auditEvents           ProjectAuditEvent[]
   jobs                  Job[]
@@ -987,7 +986,7 @@ model Membership {
   @@index([userId])
 }
 
-/// A change to who is in a organisation and what they can do there.
+/// A change to who is in an organisation and what they can do there.
 /// Site-wide User.role is not this: an admin of one organisation is a member of another.
 model MembershipChange {
   id           String          @id @default(cuid())
@@ -1006,7 +1005,7 @@ model MembershipChange {
   @@index([organisationId, createdAt])
 }
 
-/// Direct membership in a project, for external contributors who are not members of the parent organization.
+/// Direct membership in a project, for external contributors who are not members of the parent organisation.
 model ProjectMembership {
   id        String   @id @default(cuid())
   projectId String
@@ -1041,34 +1040,20 @@ model ProjectJoinRequest {
   @@index([userId])
 }
 
-/// A named agent working for its owner inside a organisation (#427). It always acts
+/// A named agent working for its owner inside an organisation (#427). It always acts
 /// as itself and for a named person.
 model Agent {
   requests             AgentRequest[]
   agentNotes           AgentNote[]
   id                   String                @id @default(cuid())
-  organisationId             String
   ownerUserId          String
   /// Display name, e.g. "Larry's Claude".
   name                 String
   /// The model behind it, e.g. "Claude" or "GPT". Not the display name.
   model                String?
-  level                AgentLevel            @default(working)
-  /// When the level last changed (#390). Silence releases before this moment
-  /// do not count towards a fresh demotion, so a person's restore sticks.
-  levelChangedAt       DateTime?
-  /// Higher rate budget, set only by a organisation admin (#440).
-  burst                Boolean               @default(false)
-  /// When the higher budget stops (#596). Null on an enabled grant means it
-  /// has no expiry. An expired time falls back to the standard budget on the
-  /// next request; no cleanup job flips `burst` off.
-  burstUntil           DateTime?
   revokedAt            DateTime?
   /// Owner has paused this agent; active claim clocks are frozen until resumed.
   pausedAt             DateTime?
-  /// Set when this is the person's personal agent for that project.
-  /// Created automatically so they can copy a key without registering one.
-  defaultProjectId     String?
   /// The owner's standing brief (#605), returned by `GET /api/v1/agents/me`.
   instructions         String?
   /// The robot avatar its owner picked, a key from lib/agents/avatars.ts.
@@ -1095,11 +1080,11 @@ model Agent {
   picture              AgentPicture?
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
-  organisation               Organisation                @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   owner                User                  @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
-  defaultProject       Project?              @relation("DefaultProjectAgent", fields: [defaultProjectId], references: [id], onDelete: Cascade)
   areaPreferences      AgentAreaPreference[]
   apiKeys              AgentApiKey[]
+  /// Where it works (#user-agents): one activation per organisation, each with that organisation's grants.
+  activations          AgentActivation[]
   auditEvents          AgentAuditEvent[]
   createdBugs          Bug[]                 @relation("AgentCreatedBugs")
   createdIdeas         Idea[]                @relation("AgentCreatedIdeas")
@@ -1136,19 +1121,44 @@ model Agent {
   penaltiesGiven    ConfirmationPenalty[] @relation("PenaltiesGiven")
   penaltiesReceived ConfirmationPenalty[] @relation("PenaltiesReceived")
 
-  @@unique([ownerUserId, defaultProjectId])
-  @@index([organisationId])
   @@index([ownerUserId])
 }
 
 /// A one-way hash of the key is always stored. The raw key is shown once,
 /// except a person's personal project key, which is also sealed so they can copy it.
+/// An agent switched on in one organisation (#user-agents). A person owns their
+/// agents once; every organisation they belong to may use them all, and they
+/// choose which to activate where. An agent works in every project of an
+/// organisation it is active in. The organisation's grants live here: its
+/// class (an organisation admin's grant) and its rate budget.
+model AgentActivation {
+  id             String       @id @default(cuid())
+  agentId        String
+  organisationId String
+  level          AgentLevel   @default(working)
+  /// When the class last changed: the manager/merger review cooling-off reads it.
+  levelChangedAt DateTime?
+  /// Higher rate budget, set only by an organisation admin (#440).
+  burst          Boolean      @default(false)
+  /// When the higher budget stops (#596). Null on an enabled grant means it has no expiry.
+  burstUntil     DateTime?
+  activatedAt    DateTime     @default(now())
+  /// Set when its owner switches it off here; its keys for this organisation stop working.
+  deactivatedAt  DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  agent          Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, organisationId])
+  @@index([organisationId])
+}
+
 model AgentApiKey {
   id         String    @id @default(cuid())
   agentId    String
-  /// The only project this key may act in. Null is a legacy key that still
-  /// works across the organisation; new keys always set it (#742).
-  projectId  String?
+  /// The organisation this key works in: the activation it belongs to (#user-agents), every project in it.
+  organisationId String
   /// SHA-256 of the raw key.
   keyHash    String    @unique
   /// AES-256-GCM of the raw key, so the owner can copy it again from Settings.
@@ -1160,10 +1170,10 @@ model AgentApiKey {
   revokedAt  DateTime?
   createdAt  DateTime  @default(now())
   agent      Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  project    Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
 
   @@index([agentId])
-  @@index([agentId, projectId])
+  @@index([agentId, organisationId])
 }
 
 /// Pairing an agent by code (#427). The owner is set only when a signed-in
@@ -1177,8 +1187,6 @@ model AgentPairing {
   ownerUserId          String?
   /// The organisation the agent joins, set on approval.
   organisationId             String?
-  /// The project the issued key is limited to, set on approval (#742).
-  projectId            String?
   /// The agent row created on approval.
   agentId              String?
   /// SHA-256 of the secret the waiting agent polls with to collect its key.
@@ -1194,7 +1202,6 @@ model AgentPairing {
   approvedAt           DateTime?
   createdAt            DateTime    @default(now())
   owner                User?       @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
-  project              Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([expiresAt])
 }
@@ -1209,11 +1216,11 @@ model AgentAuditEvent {
   target      String?
   /// The issue, when there is one, so the log can be filtered by it (#447).
   bugId       String?
-  /// A person acting on the agent, e.g. a organisation admin's undo (#450) or a
+  /// A person acting on the agent, e.g. an organisation admin's undo (#450) or a
   /// level change (#451). Null when the agent acted.
   actorUserId String?
   payload     Json?
-  /// Set by a organisation admin's undo; the row itself is kept.
+  /// Set by an organisation admin's undo; the row itself is kept.
   undoneAt    DateTime?
   createdAt   DateTime  @default(now())
   organisation      Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
@@ -1638,7 +1645,7 @@ model IssueConfirmation {
   description      String
   /// With reject only: the issue this one duplicates.
   duplicateOfId    String?
-  /// Set when a organisation admin undid it; giving it again clears it.
+  /// Set when an organisation admin undid it; giving it again clears it.
   undoneAt         DateTime?
   createdAt        DateTime             @default(now())
   /// When it was last given. Only entries given after the latest edit count.
@@ -2238,7 +2245,7 @@ model AgentMessage {
   @@index([fromUserId])
 }
 
-/// A single-use invite to a organisation (#444). Only the token's hash is stored.
+/// A single-use invite to an organisation (#444). Only the token's hash is stored.
 model OrganisationInvite {
   id          String         @id @default(cuid())
   organisationId    String
@@ -2256,7 +2263,7 @@ model OrganisationInvite {
   @@index([email])
 }
 
-/// A shareable invite link for a organisation. Not tied to one email address.
+/// A shareable invite link for an organisation. Not tied to one email address.
 /// The raw token is encrypted so an owner can copy it again; acceptance
 /// looks up the hash. maxUses null means anyone can join until it expires
 /// or is revoked. A redemption is one person, so the same account cannot
@@ -2750,4 +2757,18 @@ model SkillSubmission {
   @@index([status])
   @@index([submittedById])
   @@index([createdAt])
+
+/// A standing instruction one person writes for every agent they own (#838).
+/// Scoped to the user alone, never to an agent or an issue, so the same set
+/// answers every key that user owns — across all their organisations.
+model AgentPreference {
+  id        String   @id @default(cuid())
+  userId    String
+  /// At most AGENT_PREFERENCE_CONTENT_MAX characters, never blank.
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
