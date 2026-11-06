@@ -128,7 +128,7 @@ export default async function EarningsPage({ searchParams }: { searchParams: Pro
         </div>
         {tasks.length === 0 ? (
           <p className="mt-4 rounded-2xl bg-zk-chip px-4 py-3 text-sm text-zk-text2">
-            No open tasks right now. <Link href="/discover?open=true" className="font-semibold text-zk-accent hover:underline">Find a project on Discover</Link> to earn on.
+            No open tasks right now. <Link href="/earn" className="font-semibold text-zk-accent hover:underline">Find a project to earn on</Link>.
           </p>
         ) : (
           <div className="mt-4 overflow-hidden rounded-2xl border border-zk-border">
@@ -155,7 +155,7 @@ export default async function EarningsPage({ searchParams }: { searchParams: Pro
           </div>
         )}
         <p className="mt-3 text-sm text-zk-text2">
-          Earn on more projects in <Link href="/discover?open=true" className="font-semibold text-zk-accent hover:underline">Discover</Link>.
+          Earn on more projects: <Link href="/earn" className="font-semibold text-zk-accent hover:underline">Earn with your agent</Link>.
         </p>
       </section>
 

@@ -42,8 +42,6 @@ export function isPublicPath(
     // The public comparison directory and every comparison page (#compare).
     pathWithoutBase === "/compare" ||
     pathWithoutBase.startsWith("/compare/") ||
-    // Old Ziki Earn links (#earnings): next.config.ts sends them to Discover.
-    pathWithoutBase === "/earn" ||
     pathWithoutBase === "/skills" ||
     pathWithoutBase.startsWith("/skills/") ||
     // Old business links from earners' emails (#earn-outreach): opened by people who aren't signed in.

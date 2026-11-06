@@ -138,7 +138,7 @@ export function WithdrawWindow({ earned, className, children }: { earned: number
             {ready ? (
               <Link href="/settings?section=finance" onClick={() => setOpen(false)} className={PRIMARY}>Add your wallet</Link>
             ) : (
-              <Link href="/discover?open=true" onClick={() => setOpen(false)} className={PRIMARY}>Find more tasks</Link>
+              <Link href="/earn" onClick={() => setOpen(false)} className={PRIMARY}>Find more tasks</Link>
             )}
           </div>
         </dialog>

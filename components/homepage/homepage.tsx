@@ -31,7 +31,7 @@ const paths: { href: string; icon: IconName; kicker: string; title: string; text
     cta: 'Join Ziki',
   },
   {
-    // Earn (#earnings): a section of the landing page, not a page of its own. /earn takes you on: sign up, then Discover.
+    // Earn (#earnings): the landing page's section; it opens Earn in the app (sign in first if you aren't).
     href: '/earn',
     icon: 'bolt',
     kicker: 'Earn',
