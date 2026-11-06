@@ -100,15 +100,20 @@ function Homepage({ signedIn = false }: { signedIn?: boolean }) {
         <div className="section-heading">
           <h2 id="faq-title">Frequently asked questions</h2>
         </div>
+        {/* Two independent columns, so opening a question never stretches the one beside it. */}
         <div className="home-faq-list">
-          {faqs.map((item) => (
-            <details className="home-faq-item" key={item.q}>
-              <summary>
-                <span>{item.q}</span>
-                <span className="home-faq-plus" aria-hidden="true" />
-              </summary>
-              <p>{item.a}</p>
-            </details>
+          {[faqs.slice(0, Math.ceil(faqs.length / 2)), faqs.slice(Math.ceil(faqs.length / 2))].map((column, columnIndex) => (
+            <div className="home-faq-col" key={columnIndex}>
+              {column.map((item) => (
+                <details className="home-faq-item" key={item.q}>
+                  <summary>
+                    <span>{item.q}</span>
+                    <span className="home-faq-plus" aria-hidden="true" />
+                  </summary>
+                  <p>{item.a}</p>
+                </details>
+              ))}
+            </div>
           ))}
         </div>
       </section>

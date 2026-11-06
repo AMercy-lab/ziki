@@ -528,9 +528,10 @@
    turns into a cross when it opens. No boxes. */
 .ziki-homepage .home-faq { padding-bottom: 48px; padding-top: 80px; }
 .ziki-homepage .home-faq .section-heading { margin-bottom: 40px; }
-.ziki-homepage .home-faq-list { column-gap: 48px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0 auto; max-width: 1040px; }
+.ziki-homepage .home-faq-list { align-items: start; column-gap: 48px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0 auto; max-width: 1040px; }
+.ziki-homepage .home-faq-col { display: flex; flex-direction: column; }
 .ziki-homepage .home-faq-item { border-top: 1px solid var(--line); }
-.ziki-homepage .home-faq-item:nth-last-child(-n+2) { border-bottom: 1px solid var(--line); }
+.ziki-homepage .home-faq-item:last-child { border-bottom: 1px solid var(--line); }
 .ziki-homepage .home-faq-item summary { align-items: center; cursor: pointer; display: flex; font-size: 16px; font-weight: 500; gap: 16px; justify-content: space-between; letter-spacing: -.01em; list-style: none; padding: 20px 0; transition: color .2s ease; }
 .ziki-homepage .home-faq-item summary:hover { color: var(--green); }
 .ziki-homepage .home-faq-item summary::-webkit-details-marker { display: none; }
@@ -542,8 +543,7 @@
 .ziki-homepage .home-faq-item p { color: var(--muted); font-size: 15px; line-height: 1.65; margin: 0; padding: 0 28px 22px 0; }
 @media (max-width: 760px) {
   .ziki-homepage .home-faq-list { grid-template-columns: 1fr; }
-  .ziki-homepage .home-faq-item:nth-last-child(-n+2) { border-bottom: 0; }
-  .ziki-homepage .home-faq-item:last-child { border-bottom: 1px solid var(--line); }
+  .ziki-homepage .home-faq-col:first-child .home-faq-item:last-child { border-bottom: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .ziki-homepage .home-faq-plus { transition: none; } }
 
