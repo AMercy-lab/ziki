@@ -357,16 +357,24 @@ export function AppHeader({
             squeezed. */}
         <div className={`ml-auto flex min-w-0 items-center justify-end gap-2 max-sm:gap-1 lg:shrink-0 flex-wrap`}>
           {earned !== null ? (
-            // Earnings (#earnings): what you've earned, in reach from every page; it opens the Earnings page.
-            <Link
-              href="/earnings"
-              aria-label={`${formatZ(earned)} earned. Open Earnings and Withdraw`}
-              aria-current={isNavItemActive(pathname, "/earnings") ? "page" : undefined}
-              className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-zk-border bg-zk-surface py-1 pl-3.5 pr-1 text-sm font-bold tabular-nums text-zk-text hover:bg-zk-chip ${linkFocus}`}
-            >
-              {formatZ(earned)}
-              <span className="rounded-full bg-electric-blue-strong px-3 py-1.5 text-xs font-bold text-white max-sm:hidden">Withdraw</span>
-            </Link>
+            // Earnings (#earnings), on every page: the amount opens Your earnings, Withdraw opens Withdraw. Two pages.
+            <div className="inline-flex h-10 shrink-0 items-center gap-1 rounded-full border border-zk-border bg-zk-surface p-1">
+              <Link
+                href="/earnings"
+                aria-label={`${formatZ(earned)} earned. Open Your earnings`}
+                aria-current={isNavItemActive(pathname, "/earnings") ? "page" : undefined}
+                className={`rounded-full px-2.5 py-1 text-sm font-bold tabular-nums text-zk-text hover:bg-zk-chip ${linkFocus}`}
+              >
+                {formatZ(earned)}
+              </Link>
+              <Link
+                href="/withdraw"
+                aria-current={isNavItemActive(pathname, "/withdraw") ? "page" : undefined}
+                className={`rounded-full bg-electric-blue-strong px-3 py-1.5 text-xs font-bold text-white hover:bg-[#2552af] max-sm:hidden ${linkFocus}`}
+              >
+                Withdraw
+              </Link>
+            </div>
           ) : null}
 
           <div ref={accountRef} className="relative">

@@ -1109,6 +1109,16 @@ export async function IssuesList({
           {/* The issue tabs' filter, beside the search: a standard Filter button and menu. */}
           {!isIdeasView && filterGroups.length > 0 ? <ToolbarFilterMenu groups={filterGroups} summary={filterSummary} /> : null}
           {finishedWatched > 0 ? <UnwatchFinishedButton count={finishedWatched} /> : null}
+          {/* Earnings (#earnings): the way to earn, from the page everyone lands on. It opens Discover's open projects. */}
+          {isIdeasView && !isDeletedView ? (
+            <Link
+              href="/discover?open=true"
+              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-zk-ok-fg/30 bg-zk-ok-bg px-3.5 text-[13px] font-bold text-zk-ok-fg hover:border-zk-ok-fg/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
+              Earn with your agent
+            </Link>
+          ) : null}
           <IssuesToolsToggle
             active={Boolean(searchText || selectedTags.length > 0 || selectedMilestone)}
           />

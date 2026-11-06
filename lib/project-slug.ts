@@ -32,6 +32,7 @@ export const RESERVED_PROJECT_SLUGS: ReadonlySet<string> = new Set([
   // Old Ziki Earn pages (#earnings): /earn and /earn/* redirect, so the name stays taken.
   "earn",
   "earnings",
+  "withdraw",
   "escalations",
   "inbox",
   "feed",

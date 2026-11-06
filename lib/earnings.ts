@@ -13,8 +13,51 @@ import { issueHref } from "@/lib/issue-ref";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
-/** Withdrawals open once someone has earned this much: the goal the Earnings page counts towards. */
+/** Withdrawals open once someone has earned this much. */
 export const WITHDRAW_THRESHOLD = 30;
+
+/** The weekly goal until a person sets their own. */
+export const DEFAULT_WEEKLY_GOAL = 50;
+/** The largest weekly goal a person can set. */
+export const MAX_WEEKLY_GOAL = 100_000;
+
+/** The start of this week: Monday 00:00 UTC, the same for everyone. */
+export function startOfWeek(now = new Date()): Date {
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7));
+  return start;
+}
+
+/** Days left in this week, today included. */
+export function daysLeftInWeek(now = new Date()): number {
+  return 7 - ((now.getUTCDay() + 6) % 7);
+}
+
+/**
+ * Where a person stands on their own weekly goal (#earnings): what is still to earn, what that needs per day for
+ * the days left, and whether they are on pace (where they should be by today, if the goal were spread evenly).
+ */
+export function weeklyGoalState(earnedThisWeek: number, goal: number, now = new Date()) {
+  const daysLeft = daysLeftInWeek(now);
+  const left = Math.max(0, goal - earnedThisWeek);
+  const shouldBe = (goal * (7 - daysLeft + 1)) / 7;
+  return {
+    left,
+    perDay: left / daysLeft,
+    daysLeft,
+    shouldBe: Math.min(goal, shouldBe),
+    reached: earnedThisWeek >= goal,
+    onPace: earnedThisWeek >= shouldBe,
+  };
+}
+
+/** Reads the weekly goal a person typed: a positive amount of dollars, at most two decimals. Null when it isn't one. */
+export function parseWeeklyGoal(raw: unknown): number | null {
+  const text = typeof raw === "string" ? raw.trim().replace(/^\$/, "").replace(/,/g, "") : "";
+  if (!/^\d+(\.\d{1,2})?$/.test(text)) return null;
+  const value = Number(text);
+  return value > 0 && value <= MAX_WEEKLY_GOAL ? value : null;
+}
 
 /** Everything a person has earned, across every organisation. */
 export async function totalEarned(db: Db, userId: string): Promise<number> {
@@ -74,9 +117,12 @@ export type EarningsActivity = { id: string; who: string; did: string; ref: stri
  * most in the projects the person is in (the fastest way to the goal), and the latest payments.
  */
 export async function earningsSummary(db: Db, userId: string) {
-  const [total, checking, byRole, solvedCount, latest, memberships, projectMemberships] = await Promise.all([
+  const weekStart = startOfWeek();
+  const [total, checking, week, goalRow, byRole, solvedCount, latest, memberships, projectMemberships] = await Promise.all([
     totalEarned(db, userId),
     beingChecked(db, userId),
+    db.pointEntry.aggregate({ where: { userId, createdAt: { gte: weekStart } }, _sum: { points: true } }),
+    db.user.findUnique({ where: { id: userId }, select: { weeklyEarningsGoal: true } }),
     db.pointEntry.groupBy({ by: ["role"], where: { userId }, _sum: { points: true } }),
     db.pointEntry.count({ where: { userId, role: "solver", points: { gt: 0 } } }),
     db.pointEntry.findMany({
@@ -123,6 +169,8 @@ export async function earningsSummary(db: Db, userId: string) {
   return {
     total,
     checking,
+    earnedThisWeek: pointsNumber(week._sum.points),
+    weeklyGoal: goalRow?.weeklyEarningsGoal == null ? DEFAULT_WEEKLY_GOAL : pointsNumber(goalRow.weeklyEarningsGoal),
     solvedCount,
     sources,
     tasks: open.map((bug): EarningsTask => ({

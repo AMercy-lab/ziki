@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
  */
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
-import { beingChecked, totalEarned } from "@/lib/earnings";
+import { beingChecked, parseWeeklyGoal, totalEarned, weeklyGoalState } from "@/lib/earnings";
 import { confirmTask, grantWelcome, isNewEarnAccount, paidCount, rejectTask, doneTasks, startTask, submitTask, taskStateFor } from "@/lib/earn/progress";
 
 type TaskRow = { userId: string; taskKey: string; status: string; proof?: string | null; note?: string | null };
@@ -171,5 +171,20 @@ describe("earnings across every project (#earnings)", () => {
       { heldPayout: null },
     ]);
     expect(await beingChecked({ bug: { findMany } } as never, "earner")).toBe(3.5);
+  });
+});
+
+/** Your own weekly goal (#earnings): what is left, what that needs per day, and only real amounts accepted. */
+describe("weekly earnings goal (#earnings)", () => {
+  it("works out what is left and what that needs per day for the days left", () => {
+    // Thursday: Thursday to Sunday is 4 days left.
+    const state = weeklyGoalState(20, 100, new Date("2026-11-05T10:00:00Z"));
+    expect(state).toMatchObject({ left: 80, daysLeft: 4, perDay: 20, reached: false });
+  });
+
+  it("accepts a positive dollar amount and refuses anything else", () => {
+    expect(parseWeeklyGoal("1,000")).toBe(1000);
+    expect(parseWeeklyGoal("$75.50")).toBe(75.5);
+    for (const bad of ["0", "-5", "abc", "1.234", "", null]) expect(parseWeeklyGoal(bad)).toBeNull();
   });
 });

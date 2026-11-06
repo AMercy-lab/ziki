@@ -3,7 +3,8 @@ import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { formatZ } from "@/lib/points/rules";
 import { LocalTime } from "@/components/local-time";
-import { WITHDRAW_THRESHOLD, earningsSummary } from "@/lib/earnings";
+import { earningsSummary, weeklyGoalState } from "@/lib/earnings";
+import { ChangeGoal } from "./goal-form";
 
 export const metadata = { title: "Your earnings" };
 export const dynamic = "force-dynamic";
@@ -17,26 +18,32 @@ const PAID = "bg-zk-ok-fg";
 const CHECKING = "bg-[repeating-linear-gradient(45deg,#f2c14e_0,#f2c14e_6px,#f7d98a_6px,#f7d98a_12px)]";
 
 /**
- * Your earnings (#earnings): what you and your agents earned on every project you work on, and the quickest way to
- * the goal, withdrawing at $30. The header's $ opens it from any page. Everything comes off the ledger; "being
- * checked" is money won on live work, paid once enough people report it deployed. Payouts go to the wallet in
- * Settings → Finance; taking money out isn't built yet.
+ * Your earnings (#earnings): what you and your agents earned on every project you work on, your own goal for the
+ * week, and the quickest way to it. The header's $ opens it from any page. Everything comes off the ledger;
+ * "being checked" is money won on live work, paid once enough people report it deployed. Taking money out is its
+ * own page, Withdraw.
  */
 export default async function EarningsPage() {
   const user = await requireUser();
-  const { total, checking, solvedCount, sources, tasks, activity } = await earningsSummary(prisma, user.id);
-  const earned = Math.max(0, total);
-  const ready = earned >= WITHDRAW_THRESHOLD;
-  const left = Math.max(0, WITHDRAW_THRESHOLD - earned);
-  const pct = (value: number) => `${Math.min(100, (Math.max(0, value) / WITHDRAW_THRESHOLD) * 100)}%`;
+  const { total, checking, earnedThisWeek, weeklyGoal, solvedCount, sources, tasks, activity } = await earningsSummary(prisma, user.id);
+  const week = Math.max(0, earnedThisWeek);
+  const goal = weeklyGoalState(week, weeklyGoal);
+  const pct = (value: number) => `${Math.min(100, (Math.max(0, value) / weeklyGoal) * 100)}%`;
   const sourcesTotal = sources.reduce((sum, source) => sum + source.amount, 0);
+  const status = goal.reached
+    ? { text: "Goal reached", tone: "bg-zk-ok-bg text-zk-ok-fg" }
+    : goal.onPace
+      ? { text: `On pace · ${goal.daysLeft} ${goal.daysLeft === 1 ? "day" : "days"} left`, tone: "bg-zk-ok-bg text-zk-ok-fg" }
+      : { text: `Behind pace · ${goal.daysLeft} ${goal.daysLeft === 1 ? "day" : "days"} left`, tone: "bg-zk-warn-bg text-zk-warn-fg" };
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">Your earnings</h1>
-          <p className="mt-1 text-sm text-zk-text2">What you and your agents earned on every project you work on, and the quickest way to your goal.</p>
+          <p className="mt-1 text-sm text-zk-text2">
+            What you and your agents earned on every project you work on: <b className="text-zk-text">{formatZ(total)}</b> in all.
+          </p>
         </div>
         <Link href="/leaderboard" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-zk-border bg-zk-surface px-5 text-sm font-bold text-zk-text hover:bg-zk-chip">
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4ZM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" /></svg>
@@ -45,38 +52,40 @@ export default async function EarningsPage() {
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
-        {/* The goal: withdrawing at $30. */}
+        {/* Your own goal for the week. */}
         <section aria-labelledby="goal" className={`${card} bg-[linear-gradient(160deg,var(--color-zk-surface)_60%,var(--color-zk-tint))]`}>
           <div className="flex items-start justify-between gap-3">
-            <h2 id="goal" className={label}>Your goal: withdraw</h2>
-            <Link href="/settings?section=finance" className="text-sm font-semibold text-zk-accent hover:underline">Wallet</Link>
+            <h2 id="goal" className={label}>Your goal this week</h2>
+            <ChangeGoal goal={weeklyGoal} />
           </div>
           <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
             <p className="text-4xl font-extrabold tracking-tight tabular-nums text-zk-text sm:text-[44px]">
-              {formatZ(earned)} <span className="text-base font-medium text-zk-muted">of {formatZ(WITHDRAW_THRESHOLD)}</span>
+              {formatZ(week)} <span className="text-base font-medium text-zk-muted">of {formatZ(weeklyGoal)}</span>
             </p>
-            <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${ready ? "bg-zk-ok-bg text-zk-ok-fg" : "bg-zk-warn-bg text-zk-warn-fg"}`}>
-              {ready ? "Ready to withdraw" : `${formatZ(left)} to go`}
-            </span>
+            <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${status.tone}`}>{status.text}</span>
           </div>
-          <div
-            role="img"
-            aria-label={`${formatZ(earned)} paid and ${formatZ(checking)} being checked, of ${formatZ(WITHDRAW_THRESHOLD)}`}
-            className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-zk-seg"
-          >
-            <span className={`h-full ${PAID}`} style={{ width: pct(earned) }} />
-            <span className={`h-full ${CHECKING}`} style={{ width: pct(Math.min(checking, left)) }} />
+          <div className="relative mt-4">
+            <div
+              role="img"
+              aria-label={`${formatZ(week)} paid and ${formatZ(checking)} being checked, of ${formatZ(weeklyGoal)} this week`}
+              className="flex h-2.5 overflow-hidden rounded-full bg-zk-seg"
+            >
+              <span className={`h-full ${PAID}`} style={{ width: pct(week) }} />
+              <span className={`h-full ${CHECKING}`} style={{ width: pct(Math.min(checking, goal.left)) }} />
+            </div>
+            {/* Where you should be by today. */}
+            <span aria-hidden="true" className="absolute -top-1 h-[18px] w-0.5 rounded-full bg-zk-text" style={{ left: pct(goal.shouldBe) }} />
           </div>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zk-text2">
             <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className={`h-2 w-2 rounded-full ${PAID}`} />Paid</span>
             <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-2 w-2 rounded-full bg-[#f2c14e]" />Being checked</span>
+            <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-0.5 rounded-full bg-zk-text" />Where you should be today</span>
           </div>
           <dl className="mt-5 grid grid-cols-3 gap-3 border-t border-zk-divider pt-4">
-            <div><dt className="text-xs text-zk-muted">Still to earn</dt><dd className="mt-0.5 font-mono text-base font-bold tabular-nums text-zk-text">{formatZ(left)}</dd></div>
+            <div><dt className="text-xs text-zk-muted">Still to earn</dt><dd className="mt-0.5 font-mono text-base font-bold tabular-nums text-zk-text">{formatZ(goal.left)}</dd></div>
+            <div><dt className="text-xs text-zk-muted">Needed per day</dt><dd className="mt-0.5 font-mono text-base font-bold tabular-nums text-zk-text">{formatZ(goal.perDay)}</dd></div>
             <div><dt className="text-xs text-zk-muted">Being checked</dt><dd className="mt-0.5 font-mono text-base font-bold tabular-nums text-zk-warn-fg">+{formatZ(checking)}</dd></div>
-            <div><dt className="text-xs text-zk-muted">Withdraw opens at</dt><dd className="mt-0.5 font-mono text-base font-bold tabular-nums text-zk-text">{formatZ(WITHDRAW_THRESHOLD)}</dd></div>
           </dl>
-          {ready ? <p className="mt-3 text-xs text-zk-text2">Payouts are coming soon: we&apos;ll tell you when you can take it out.</p> : null}
         </section>
 
         {/* Where it came from. */}
