@@ -1122,9 +1122,14 @@ export async function IssuesList({
   );
 
   // Earnings (#earnings): once someone has joined a project from Discover, they've found the way in; the notice goes.
-  const hasJoinedProject = isIdeasView && userId
-    ? Boolean(await prisma.projectMembership.findFirst({ where: { userId }, select: { id: true } }).catch(() => null))
-    : false;
+  let hasJoinedProject = false;
+  if (isIdeasView && userId) {
+    try {
+      hasJoinedProject = Boolean(await prisma.projectMembership.findFirst({ where: { userId }, select: { id: true } }));
+    } catch {
+      // Unknown: show the notice; Dismiss still hides it.
+    }
+  }
 
   const listContent = (
     <div className="space-y-4">
