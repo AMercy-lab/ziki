@@ -155,9 +155,9 @@ export type PointRole = "solver" | "reporter" | "reviewer" | "triager" | "submis
 /** Paid to the planning agent's owner once, when the owner approves its plan on a complex issue (#plan-review). */
 export const PLAN_POINTS = 1;
 
-/** Idempotency key for a plan's points: once per claim, so a resubmission never pays twice and a new award can. */
-export function planSourceKey(bugId: string, claimId: string): string {
-  return `plan:${bugId}:${claimId}`;
+/** Idempotency key for a plan's points: once per issue and person, however many awards, plans or claims they go through. */
+export function planSourceKey(bugId: string, userId: string): string {
+  return `plan:${bugId}:${userId}`;
 }
 
 /** Paid for a person's first importance mark on an issue, and their first bid vote on an issue (#vote-points). */

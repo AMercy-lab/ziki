@@ -7,6 +7,7 @@ import { reviewerConflict, ReviewerNotIndependentError, type ReviewedBug } from 
 import { hasLevel } from "@/lib/agents/levels";
 import type { AgentContext } from "@/lib/agents/require-agent";
 import { IssueApiError } from "@/lib/agent-api/errors";
+import { approvedPlanSummary } from "@/lib/agent-api/plan";
 import { publish } from "@/lib/agent-api/events";
 import { isConfirmed } from "@/lib/agent-api/confirmations";
 import { countedMergeVerdicts, deliveredClaim, MANAGER_VERDICT_WEIGHT } from "@/lib/agent-api/merge-verdicts";
@@ -1236,6 +1237,8 @@ export async function listMergeReviews(scope: { organisationId: string; projectI
     substatus: bug.substatus,
     pullRequestUrl: bug.pullRequestUrl,
     headSha: bug.pullRequestHeadSha,
+    // #plan-review rule 12: on a complex issue, the approved plan the delivery is reviewed against.
+    plan: await approvedPlanSummary(bug.id),
     reviews: await mergeReviewEntries(bug),
   };
 }

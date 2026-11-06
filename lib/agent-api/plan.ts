@@ -197,6 +197,18 @@ export async function approvedPlan(bugId: string, db: Db = prisma): Promise<Plan
   return row ? planView(row) : null;
 }
 
+/** What judges and the manager read the approved plan as, in the test-results and merge-reviews answers: the entry without its revisions and replies. */
+export type ApprovedPlanSummary = Omit<PlanView, "revisions" | "replies">;
+
+export async function approvedPlanSummary(bugId: string, db: Db = prisma): Promise<ApprovedPlanSummary | null> {
+  const plan = await approvedPlan(bugId, db);
+  if (!plan) return null;
+  const summary: Partial<PlanView> = { ...plan };
+  delete summary.revisions;
+  delete summary.replies;
+  return summary as ApprovedPlanSummary;
+}
+
 /** `GET /api/v1/issues/{id}/plan`: the issue's current plan with its revisions and replies. */
 export async function readPlan(scope: { organisationId: string; projectId: string }, issueRef: string): Promise<{ plan: PlanView | null; deadline: Date | null }> {
   const bugId = await issueIdFor(prisma, issueRef, scope.organisationId);
@@ -283,16 +295,24 @@ export async function submitPlan(agent: AgentContext, projectId: string, issueRe
 
 type Decider = { userId: string };
 
-/** The plan waiting on this owner's decision, locked, or a 409 saying why not. */
-async function lockWaitingPlan(tx: Tx, decider: Decider, bugId: string) {
+/**
+ * The plan waiting on this owner's decision, locked, or a 409 saying why not.
+ * `expectedVersion` is the plan's `updatedAt` the owner read: the agent may
+ * replace a waiting plan, so a decision on a version the owner never saw is
+ * refused (`plan_changed`) and the page reloads with the new one.
+ */
+async function lockWaitingPlan(tx: Tx, decider: Decider, bugId: string, expectedVersion?: Date | string | null) {
   const claim = await lockPlanningClaim(tx, bugId);
   if (!claim) refuse(409, "not_in_plan_review", "This issue is not in plan review.");
-  const plan = await tx.plan.findUnique({ where: { claimId: claim.id }, select: { id: true, round: true, decision: true, reviewBy: true, steps: true, ownerId: true, estimateMinutes: true, reading: true, assumptions: true, uncertainties: true, risk: true, confidence: true, agentId: true, bugId: true } });
+  const plan = await tx.plan.findUnique({ where: { claimId: claim.id }, select: { id: true, round: true, decision: true, reviewBy: true, steps: true, ownerId: true, estimateMinutes: true, reading: true, assumptions: true, uncertainties: true, risk: true, confidence: true, agentId: true, bugId: true, updatedAt: true } });
   if (!plan) refuse(409, "no_plan_yet", "The agent has not submitted its plan yet.");
   if (plan.ownerId !== decider.userId) refuse(403, "not_owner", "Only the agent's owner decides its plan.");
   if (plan.decision === "approved") refuse(409, "plan_decided", "This plan was already approved.");
   if (plan.decision === "sent_back") refuse(409, "plan_sent_back", "The plan is with the agent: wait for it to resubmit, or for the window to run out.");
   if (Date.now() > plan.reviewBy.getTime()) refuse(409, "plan_window_closed", "The plan review window has run out; the award is being released.");
+  if (expectedVersion != null && new Date(expectedVersion).getTime() !== plan.updatedAt.getTime()) {
+    refuse(409, "plan_changed", "The agent changed the plan since you read it. Reload and read the new version before deciding.", { updatedAt: plan.updatedAt.toISOString() });
+  }
   return { claim, plan };
 }
 
@@ -302,9 +322,9 @@ async function lockWaitingPlan(tx: Tx, decider: Decider, bugId: string) {
  * In progress · In progress, the other bids are withdrawn, and the plan's
  * points are paid once.
  */
-export async function approvePlan(decider: Decider, bugId: string) {
+export async function approvePlan(decider: Decider, bugId: string, expectedVersion?: Date | string | null) {
   return prisma.$transaction(async (tx) => {
-    const { claim, plan } = await lockWaitingPlan(tx, decider, bugId);
+    const { claim, plan } = await lockWaitingPlan(tx, decider, bugId, expectedVersion);
     const bug = await tx.bug.findUniqueOrThrow({ where: { id: bugId }, select: { id: true, number: true, title: true, organisationId: true, projectId: true, assigneeId: true, assignee: { select: { name: true } } } });
     const beneficiary = await tx.user.findUniqueOrThrow({ where: { id: claim.beneficiaryUserId }, select: { name: true } });
     const now = new Date();
@@ -325,9 +345,10 @@ export async function approvePlan(decider: Decider, bugId: string) {
     await ensureWatching(tx, bugId, [claim.beneficiaryUserId]);
     // The award is taken up: the other open bids on the issue are withdrawn, as on an accepted offer.
     await tx.issueBid.updateMany({ where: { bugId, withdrawnAt: null, awardedAt: null }, data: { withdrawnAt: now } });
+    // Once per issue and person (#plan-review rule 13): a released award and a fresh plan on the same issue never pay again.
     await award(tx, {
       organisationId: bug.organisationId, userId: claim.beneficiaryUserId, bugId, role: "plan", points: PLAN_POINTS,
-      sourceKey: planSourceKey(bugId, claim.id), agentId: claim.agentId,
+      sourceKey: planSourceKey(bugId, claim.beneficiaryUserId), agentId: claim.agentId,
     });
     await publish(tx, {
       organisationId: bug.organisationId, type: "plan.approved", actorAgentId: null, bugId,
@@ -346,13 +367,13 @@ export async function approvePlan(decider: Decider, bugId: string) {
  * it was stays the agent's; an edited, inserted or reordered one is the
  * owner's. At most two send-backs: the third submission is final.
  */
-export async function sendBackPlan(decider: Decider, bugId: string, input: { steps: z.infer<typeof ownerStepsSchema>; note: string }) {
+export async function sendBackPlan(decider: Decider, bugId: string, input: { steps: z.infer<typeof ownerStepsSchema>; note: string; expectedVersion?: Date | string | null }) {
   const note = input.note.trim();
   if (!note) refuse(400, "note_required", "Say what the agent should change.", { field: "note" });
   if (note.length > 2000) refuse(400, "note_too_long", "Keep the note under 2000 characters.", { field: "note" });
   const edited = ownerStepsSchema.parse(input.steps);
   return prisma.$transaction(async (tx) => {
-    const { claim, plan } = await lockWaitingPlan(tx, decider, bugId);
+    const { claim, plan } = await lockWaitingPlan(tx, decider, bugId, input.expectedVersion);
     if (plan.round >= MAX_PLAN_ROUNDS) refuse(409, "plan_rounds_exhausted", "This plan was sent back twice already: approve it, or let the window run out.");
     const bug = await tx.bug.findUniqueOrThrow({ where: { id: bugId }, select: { id: true, organisationId: true, projectId: true } });
     const now = new Date();
@@ -458,11 +479,14 @@ export async function sweepPlanWindows(organisationId?: string, projectId?: stri
     const released = await prisma.$transaction(async (tx) => {
       const claim = await lockPlanningClaim(tx, candidate.bugId);
       if (!claim || claim.id !== candidate.id) return false;
-      const reason: PlanReleaseReason = candidate.plan && candidate.plan.decision === null ? "owner_unresponsive" : "plan_expired";
+      // Re-read under the lock: a send-back or a resubmission since the shortlist restarted the window.
+      const plan = await tx.plan.findUnique({ where: { claimId: claim.id }, select: { id: true, decision: true, reviewBy: true, round: true } });
+      if (Date.now() <= planDeadline(claim, plan, planReviewSeconds).getTime()) return false;
+      const reason: PlanReleaseReason = plan && plan.decision === null ? "owner_unresponsive" : "plan_expired";
       await releasePlanningClaim(tx, claim, reason, { organisationId: candidate.bug.organisationId });
       await publish(tx, {
         organisationId: candidate.bug.organisationId, type: "plan.expired", actorAgentId: null, bugId: claim.bugId,
-        payload: { planId: candidate.plan?.id ?? null, claimId: claim.id, issueId: claim.bugId, projectId: candidate.bug.projectId, beneficiaryUserId: claim.beneficiaryUserId, reason, round: candidate.plan?.round ?? 0 },
+        payload: { planId: plan?.id ?? null, claimId: claim.id, issueId: claim.bugId, projectId: candidate.bug.projectId, beneficiaryUserId: claim.beneficiaryUserId, reason, round: plan?.round ?? 0 },
       });
       return true;
     }, { maxWait: 10000, timeout: 15000 });

@@ -490,7 +490,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
       reading: planRecord.reading, assumptions: planRecord.assumptions, uncertainties: planRecord.uncertainties,
       steps: planRecord.steps.map(({ id, text, by }) => ({ id, text, by })), estimateMinutes: planRecord.estimateMinutes, risk: planRecord.risk, confidence: planRecord.confidence,
       round: planRecord.round, sendBacksLeft: planRecord.sendBacksLeft, submittedAt: planRecord.submittedAt, decision: planRecord.decision, decidedAt: planRecord.decidedAt,
-      decisionNote: planRecord.decisionNote, reviewBy: planRecord.reviewBy,
+      decisionNote: planRecord.decisionNote, reviewBy: planRecord.reviewBy, updatedAt: planRecord.updatedAt,
       replies: planRecord.replies.map((reply) => ({ id: reply.id, label: reply.label, body: reply.body, authorName: reply.authorName, agentName: reply.agentName, createdAt: reply.createdAt })),
     }
     : null;

@@ -64,7 +64,7 @@ export const createIdeaSchema = createBugSchema
     alreadyVetted: z.boolean().optional(),
     /** Where and by whom it was approved, for example "Approved by Mark, sheet row 42". Shown on the issue. */
     vettedNote: z.string().trim().min(5).max(300).optional(),
-    /** #plan-review: the issue's difficulty when `alreadyVetted` converts it at once (required then). */
+    /** #plan-review: the issue's difficulty when `alreadyVetted` converts it at once; medium if left out. */
     difficulty: difficultySchema.optional(),
     attachmentIds: attachmentIdsSchema,
     // Up to three plain lines a person can read at a glance (#report-summary).

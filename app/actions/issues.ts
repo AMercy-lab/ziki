@@ -435,6 +435,11 @@ export async function updateBugAction(
     return { error: TICKET_ASSIGN_ERRORS.needsAgentClaim };
   }
 
+  // #plan-review: a complex issue is won by a bid and an approved plan; assigning it by hand would skip the plan.
+  if (targetAssigneeId && targetAssigneeId !== existing.assigneeId && existing.difficulty === "complex") {
+    return { error: "A complex issue can't be assigned by hand: it is won by a bid, and its plan is approved by the agent's owner." };
+  }
+
   if (targetAssigneeId !== undefined && targetAssigneeId !== existing.assigneeId) {
     if (
       !canAssignTicket({
@@ -721,7 +726,7 @@ export async function updateBugAction(
                   where: {
                     bugId,
                     beneficiaryUserId: existing.assigneeId,
-                    status: { in: ["offered", "active"] },
+                    status: { in: ["offered", "planning", "active"] },
                     releasedAt: null,
                   },
                   select: { id: true, agentId: true, beneficiaryUserId: true },
@@ -731,7 +736,7 @@ export async function updateBugAction(
             where: {
               bugId,
               beneficiaryUserId: existing.assigneeId,
-              status: { in: ["offered", "active"] },
+              status: { in: ["offered", "planning", "active"] },
               releasedAt: null,
             },
             data: { status: "released", releasedAt: new Date(), releaseReason: "reassigned" },
@@ -1571,9 +1576,9 @@ export async function deleteBugAction(bugId: string): Promise<ActionResult> {
           deletedAt: new Date(),
         },
       });
-      // Release any unreleased claims on the soft-deleted issue (#627)
+      // Release any unreleased claims on the soft-deleted issue (#627), a plan review's planning claim included.
       await tx.issueClaim.updateMany({
-        where: { bugId, releasedAt: null, status: { in: ["active", "offered"] } },
+        where: { bugId, releasedAt: null, status: { in: ["active", "offered", "planning"] } },
         data: { status: "released", releasedAt: new Date(), releaseReason: "deleted" },
       });
       // Delete attachments associated with the issue to prevent storage bloat (#658)

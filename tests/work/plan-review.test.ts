@@ -61,7 +61,7 @@ const input = {
 
 const steps = (by: ("agent" | "owner")[] = ["agent", "agent", "agent"]) => input.steps.map((text, index) => ({ id: `s${index + 1}`, text, by: by[index], at: "" }));
 const storedPlan = (overrides: Record<string, unknown> = {}) => ({
-  id: "plan1", round: 1, decision: null, reviewBy: new Date(Date.now() + HOUR), steps: steps(), ownerId: "bob",
+  id: "plan1", round: 1, decision: null, reviewBy: new Date(Date.now() + HOUR), steps: steps(), ownerId: "bob", updatedAt: new Date("2026-11-05T10:00:00Z"),
   estimateMinutes: 240, reading: input.reading, assumptions: input.assumptions, uncertainties: input.uncertainties, risk: "medium", confidence: "high", agentId: "agent-bob", bugId: "bug1",
   ...overrides,
 });
@@ -139,11 +139,22 @@ describe("approvePlan", () => {
     expect(db.plan.update).toHaveBeenCalledWith({ where: { id: "plan1" }, data: expect.objectContaining({ decision: "approved", pointsPaidAt: expect.any(Date) }) });
     expect(db.issueBid.updateMany).toHaveBeenCalledWith({ where: { bugId: "bug1", withdrawnAt: null, awardedAt: null }, data: { withdrawnAt: expect.any(Date) } });
     expect(db.pointEntry.createMany).toHaveBeenCalledWith({
-      data: [expect.objectContaining({ userId: "bob", bugId: "bug1", role: "plan", points: PLAN_POINTS, sourceKey: "plan:bug1:claim1", agentId: "agent-bob" })],
+      // Keyed per issue and person: a released award and a fresh plan on the same issue never pay again.
+      data: [expect.objectContaining({ userId: "bob", bugId: "bug1", role: "plan", points: PLAN_POINTS, sourceKey: "plan:bug1:bob", agentId: "agent-bob" })],
       skipDuplicates: true,
     });
     expect(publish).toHaveBeenCalledWith(db, expect.objectContaining({ type: "plan.approved" }));
     expect(publish).toHaveBeenCalledWith(db, expect.objectContaining({ type: "claim.accepted", payload: expect.objectContaining({ via: "plan_approved" }) }));
+  });
+
+  it("refuses a decision on a plan the agent changed since the owner read it", async () => {
+    db.plan.findUnique.mockResolvedValue(storedPlan({ updatedAt: new Date("2026-11-05T10:05:00Z") }));
+    await expect(approvePlan({ userId: "bob" }, "bug1", "2026-11-05T10:00:00.000Z")).rejects.toMatchObject({ status: 409, body: { error: "plan_changed", updatedAt: "2026-11-05T10:05:00.000Z" } });
+    await expect(sendBackPlan({ userId: "bob" }, "bug1", { steps: [{ id: "s1", text: "Measure" }], note: "Again.", expectedVersion: "2026-11-05T10:00:00.000Z" })).rejects.toMatchObject({ status: 409, body: { error: "plan_changed" } });
+    expect(db.issueClaim.update).not.toHaveBeenCalled();
+    expect(db.plan.update).not.toHaveBeenCalled();
+    // The version the owner read matches: the decision goes through.
+    await expect(approvePlan({ userId: "bob" }, "bug1", "2026-11-05T10:05:00.000Z")).resolves.toMatchObject({ planId: "plan1" });
   });
 
   it("refuses anyone but the owner, a plan not yet written, and one already decided", async () => {
@@ -225,7 +236,9 @@ describe("the plan window", () => {
       { ...lapsed, id: "claim2", bugId: "bug2", plan: null },
       { ...claim, id: "claim3", bugId: "bug3", bug: { projectId: "p1", organisationId: "t1" }, plan: null },
     ]);
-    db.issueClaim.findFirst.mockImplementation(async ({ where }: { where: { bugId: string } }) => ({ ...claim, id: where.bugId === "bug1" ? "claim1" : "claim2", bugId: where.bugId }));
+    db.issueClaim.findFirst.mockImplementation(async ({ where }: { where: { bugId: string } }) => ({ ...lapsed, id: where.bugId === "bug1" ? "claim1" : "claim2", bugId: where.bugId }));
+    // Re-read under the lock: claim1's plan still waits on the owner, claim2 never got one.
+    db.plan.findUnique.mockImplementation(async ({ where }: { where: { claimId: string } }) => (where.claimId === "claim1" ? { id: "plan1", decision: null, reviewBy: new Date(Date.now() - 1000), round: 1 } : null));
     await expect(sweepPlanWindows()).resolves.toEqual({ expired: 2 });
     expect(db.issueClaim.update).toHaveBeenCalledWith({ where: { id: "claim1" }, data: expect.objectContaining({ releaseReason: "owner_unresponsive" }) });
     expect(db.issueClaim.update).toHaveBeenCalledWith({ where: { id: "claim2" }, data: expect.objectContaining({ releaseReason: "plan_expired" }) });
@@ -233,5 +246,14 @@ describe("the plan window", () => {
     // A lapsed window never withdraws the bid (a refusal does); the awarded row is simply spent, as after an expired offer.
     expect(db.issueBid.updateMany).not.toHaveBeenCalled();
     expect(publish).toHaveBeenCalledWith(db, expect.objectContaining({ type: "plan.expired", payload: expect.objectContaining({ reason: "owner_unresponsive", claimId: "claim1" }) }));
+  });
+
+  it("leaves an award alone when a send-back restarted its window after the shortlist was read", async () => {
+    const lapsed = { ...claim, offeredAt: new Date(Date.now() - 3 * HOUR), createdAt: new Date(Date.now() - 3 * HOUR), bug: { projectId: "p1", organisationId: "t1" } };
+    db.issueClaim.findMany.mockResolvedValue([{ ...lapsed, plan: { id: "plan1", decision: null, reviewBy: new Date(Date.now() - 1000), round: 1 } }]);
+    db.issueClaim.findFirst.mockResolvedValue(lapsed);
+    db.plan.findUnique.mockResolvedValue({ id: "plan1", decision: "sent_back", reviewBy: new Date(Date.now() + HOUR), round: 1 });
+    await expect(sweepPlanWindows()).resolves.toEqual({ expired: 0 });
+    expect(db.issueClaim.update).not.toHaveBeenCalled();
   });
 });

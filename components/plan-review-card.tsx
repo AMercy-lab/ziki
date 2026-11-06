@@ -30,6 +30,8 @@ export type PlanCardView = {
   decidedAt: Date | string | null;
   decisionNote: string | null;
   reviewBy: Date | string;
+  /** The version the owner decides on: a plan the agent replaced since is refused. */
+  updatedAt: Date | string;
   replies: EntryReplyView[];
 };
 
@@ -107,6 +109,25 @@ function OwnerReview({ bugId, plan }: { bugId: string; plan: PlanCardView }) {
   const insertAt = (index: number) => setSteps((list) => [...list.slice(0, index), { text: "", key: `new-${Date.now()}-${index}` }, ...list.slice(index)]);
   const error = (approveResult && !approveResult.ok && approveResult.error) || (sendBackResult && !sendBackResult.ok && sendBackResult.error) || null;
   const canSendBack = plan.sendBacksLeft > 0;
+  const version = new Date(plan.updatedAt).toISOString();
+
+  // The final round: the plan was sent back twice already, so the steps can't change again; approve it or let the window run out.
+  if (!canSendBack) {
+    return (
+      <div className="flex flex-col gap-3">
+        <StepList steps={plan.steps} />
+        <p className="m-0 text-xs text-zk-muted">This plan was sent back twice already: approve it as it is, or let the window run out.</p>
+        <form action={approve}>
+          <input type="hidden" name="bugId" value={bugId} />
+          <input type="hidden" name="planVersion" value={version} />
+          <button type="submit" disabled={approving} className={`${buttonBase} bg-electric-blue-strong text-white hover:opacity-90`} data-testid="approve-plan">
+            {approving ? "Approving…" : "Approve"}
+          </button>
+        </form>
+        {error ? <p className="m-0 text-xs text-zk-bad-fg" role="alert">{error}</p> : null}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -141,6 +162,7 @@ function OwnerReview({ bugId, plan }: { bugId: string; plan: PlanCardView }) {
       <div className="flex flex-wrap items-center gap-2">
         <form action={approve}>
           <input type="hidden" name="bugId" value={bugId} />
+          <input type="hidden" name="planVersion" value={version} />
           <button type="submit" disabled={approving || sending} className={`${buttonBase} bg-electric-blue-strong text-white hover:opacity-90`} data-testid="approve-plan">
             {approving ? "Approving…" : "Approve"}
           </button>
@@ -161,6 +183,7 @@ function OwnerReview({ bugId, plan }: { bugId: string; plan: PlanCardView }) {
       {sendingBack && canSendBack ? (
         <form id={`${formId}-sendback`} action={sendBack} className="flex flex-col gap-2 rounded-xl border border-zk-divider p-3">
           <input type="hidden" name="bugId" value={bugId} />
+          <input type="hidden" name="planVersion" value={version} />
           <input type="hidden" name="steps" value={JSON.stringify(steps.map(({ id, text }) => (id ? { id, text } : { text })))} />
           <label htmlFor={`${formId}-note`} className="text-xs font-bold uppercase tracking-[0.08em] text-zk-muted">What should change</label>
           <textarea id={`${formId}-note`} name="note" value={note} onChange={(event) => setNote(event.target.value)} required rows={3} maxLength={2000} className={inputClass} placeholder="Tell the agent what to change and why." />
@@ -233,7 +256,8 @@ export function PlanReviewCard({
           ) : null}
           <section aria-label="The plan">
             <h4 className="m-0 mb-1.5 text-xs font-bold uppercase tracking-[0.08em] text-zk-muted">The plan</h4>
-            {waiting && isOwner ? <OwnerReview bugId={bugId} plan={plan} /> : <StepList steps={plan.steps} />}
+            {/* Keyed on the version: a plan the agent replaced resets the owner's edits to the new steps. */}
+            {waiting && isOwner ? <OwnerReview key={new Date(plan.updatedAt).toISOString()} bugId={bugId} plan={plan} /> : <StepList steps={plan.steps} />}
           </section>
           {live ? <AuthoritySplit agentName={plan.agentName} /> : null}
           <p className="m-0 text-xs text-zk-muted">

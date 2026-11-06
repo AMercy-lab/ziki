@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { IssueApiError } from "@/lib/agent-api/errors";
 import { approvePlan, ownerStepsSchema, sendBackPlan } from "@/lib/agent-api/plan";
 import { revalidateIssue } from "@/lib/revalidate-issue";
-import { bugInOrganisation, currentOrganisationIdFor } from "@/lib/organisation-context";
 
 export type PlanReviewResult = { ok: true } | { ok: false; error: string };
 
@@ -17,9 +16,15 @@ export type PlanReviewResult = { ok: true } | { ok: false; error: string };
  */
 async function ownedIssue(bugId: string) {
   const user = await requireUser();
-  const organisationId = await currentOrganisationIdFor(user.id);
-  const bug = await prisma.bug.findFirst({ where: { id: bugId, ...bugInOrganisation(organisationId), isDeleted: false }, select: { id: true } });
+  // By id, whatever organisation the viewer has selected: `plan.ownerId` is the gate (approvePlan, sendBackPlan).
+  const bug = await prisma.bug.findFirst({ where: { id: bugId, isDeleted: false }, select: { id: true } });
   return bug ? { user, bug } : null;
+}
+
+/** The plan version the owner read, from the form, so a plan the agent changed since is refused (`plan_changed`). */
+function planVersion(formData: FormData): string | null {
+  const value = String(formData.get("planVersion") ?? "").trim();
+  return value && !Number.isNaN(new Date(value).getTime()) ? value : null;
 }
 
 export async function approvePlanAction(_previous: PlanReviewResult | undefined, formData: FormData): Promise<PlanReviewResult> {
@@ -27,7 +32,7 @@ export async function approvePlanAction(_previous: PlanReviewResult | undefined,
   const found = bugId ? await ownedIssue(bugId) : null;
   if (!found) return { ok: false, error: "That issue no longer exists." };
   try {
-    await approvePlan({ userId: found.user.id }, found.bug.id);
+    await approvePlan({ userId: found.user.id }, found.bug.id, planVersion(formData));
     revalidateIssue();
     return { ok: true };
   } catch (error) {
@@ -51,7 +56,7 @@ export async function sendBackPlanAction(_previous: PlanReviewResult | undefined
   const parsed = ownerStepsSchema.safeParse(steps);
   if (!parsed.success) return { ok: false, error: "Each step needs some text, and a plan needs at least one step." };
   try {
-    await sendBackPlan({ userId: found.user.id }, found.bug.id, { steps: parsed.data, note });
+    await sendBackPlan({ userId: found.user.id }, found.bug.id, { steps: parsed.data, note, expectedVersion: planVersion(formData) });
     revalidateIssue();
     return { ok: true };
   } catch (error) {

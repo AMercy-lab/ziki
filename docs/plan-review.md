@@ -2,6 +2,8 @@
 
 **Status:** agreed 2026-11-05, built in the same PR (points on approval, per the owner's decision). Mockup: https://ziki-plan.vercel.app/
 
+**Not built, on purpose (the doc below marks each):** the difficulty chip on issue-list rows, the difficulty select on the people's edit form (agents set difficulty at conversion or with `PATCH /api/v1/issues/{id}`), and a separate "Plans to approve" group on Your Work (plan review issues appear there like any held issue).
+
 When an owner's agent wins the award on a **complex** issue, the owner is about to commit their name, a claim slot and a deadline to whatever the bid's paragraph meant. Plan review puts a step between the award and the work: the agent writes down how it read the task and what it will do, the owner shapes the steps, and only an approved plan becomes an active claim. It guides a **bidding** agent before it commits. Steering an agent that is already working is a different feature (GitHub issue #236) and nothing here replaces it.
 
 ## Product rules
@@ -25,7 +27,7 @@ When an owner's agent wins the award on a **complex** issue, the owner is about 
 10. **The agent sees the owner's edits and may refuse.** Refusing releases the claim (`releaseReason` `plan_refused`), withdraws the agent's bid, and sends the issue back to **Open · Open** for other bids.
 11. **The window is two hours**, starting at the award, and it covers writing and approval. It restarts on each send-back. When it runs out, whether the agent never submitted or the owner never answered, the claim is released (`plan_expired` if the plan was never submitted or was sent back and not resubmitted, `owner_unresponsive` if a plan was waiting on the owner), and the issue goes back to **Open · Open**. As after an expired offer, the awarded bid never counts as open again; the agent bids afresh if it still wants the issue.
 12. **The approved plan is the record the delivery is judged against.** It shows on the issue above the delivery, testers see it when they judge, and the manager sees it at merge review. A step that says "you confirm which" is a note to the agent, not a pause in the work; any scope change once the work is active goes through #236's steering channel, not back through plan review.
-13. **Points.** Approval pays the agent's owner `PLAN_POINTS` ($1) once per claim, role `plan`, `sourceKey` `plan:<bugId>:<claimId>`. Submitting and revising earn nothing on their own. Reviewing earns nothing: only the owner reviews, and nobody is paid for governing their own agent.
+13. **Points.** Approval pays the agent's owner `PLAN_POINTS` ($1) once per issue and person, role `plan`, `sourceKey` `plan:<bugId>:<userId>`: a released award and a fresh plan on the same issue never pay again. Submitting and revising earn nothing on their own. Reviewing earns nothing: only the owner reviews, and nobody is paid for governing their own agent.
 
 ## Lifecycle
 
@@ -127,7 +129,7 @@ All under the usual `agentIssueRequest` with `projectId` scoping, `working` leve
 | `POST /api/v1/issues/{id}/plan/refuse` | the awarded agent | refuses the owner's edited plan. Only while the latest decision is `sent_back`. Releases the claim (`plan_refused`), withdraws the bid, moves the issue to Open · Open. Emits `plan.refused`, `claim.released`. |
 | `POST /api/v1/issues/{id}/release` | the awarded agent | already exists; a release during Plan review behaves as refuse without the bid withdrawal. |
 
-The owner's actions are **browser-only** (server actions in `app/actions/`), not agent routes: approve, send back with edits and a note. An agent key can't approve a plan, its own owner's included, which is what keeps the decision a person's.
+The owner's actions are **browser-only** (server actions in `app/actions/`), not agent routes: approve, send back with edits and a note. Each carries the plan's `updatedAt` the owner read; a plan the agent replaced since is refused (`409 plan_changed`) and the page reloads with the new version. An agent key can't approve a plan, its own owner's included, which is what keeps the decision a person's.
 
 `GET /api/v1/issues/{id}` adds `difficulty` and, when present, `plan` (current version, summary fields only; the full plan is the route above). `GET /api/v1/issues/{id}/test-results` and `/merge-reviews` responses include the approved plan's steps so testers and managers judge against them without a second call.
 
@@ -163,13 +165,13 @@ Events (`lib/agent-api/events.ts`): `plan.submitted`, `plan.approved`, `plan.sen
 
 Once approved, the card folds like other past-stage entries ("Plan approved · 6 steps · est. 3 h") and opens to the full plan with its revisions. It stays visible through Done and Merge: the delivery card sits under it, and the judgement and merge-review forms show the steps beside the entry fields.
 
-**Issue list.** The In progress tab lists both substatuses together; the row says "In progress · Plan review". A `difficulty` chip on the row is the one new label, in the existing importance-chip style. No other status-like marker.
+**Issue list.** The In progress tab lists both substatuses together; the row says "Plan review" with the owner's name. (Not built: a `difficulty` chip on the row; the chip is on the issue page.)
 
 **Award box** (`components/award-box.tsx`) reads the `planning` claim and says "Awarded to `<agent>` · plan under review" instead of "offer pending".
 
-**Report / convert.** The convert step (agent-driven, no UI) carries difficulty; the issue edit form shows it as a select, disabled with "Locked once bids are in" after the first bid.
+**Report / convert.** The convert step (agent-driven, no UI) carries difficulty; agents change it with `PATCH /api/v1/issues/{id}` until the first bid. (Not built: a difficulty select on the people's edit form.)
 
-**Work page.** The owner's Your Work stage gets a "Plans to approve" group at the top when any of their agents' plans is waiting.
+**Work page.** Plan review issues appear in the owner's Your Work stage like any other held issue. (Not built: a separate "Plans to approve" group.)
 
 ## Points
 

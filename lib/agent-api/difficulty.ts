@@ -6,6 +6,7 @@ import { IssueApiError } from "@/lib/agent-api/errors";
 import { publish } from "@/lib/agent-api/events";
 import { issueIdFor } from "@/lib/issue-ref";
 import { DIFFICULTY_LOCKED, difficultyLabel } from "@/lib/difficulty";
+import { hasLiveStake } from "@/lib/agent-api/stakes";
 
 /**
  * `PATCH /api/v1/issues/{id}` with `difficulty` (#plan-review): any agent may
@@ -25,6 +26,10 @@ export async function setDifficulty(agent: AgentContext, projectId: string, issu
     if (bids > 0) throw new IssueApiError(409, DIFFICULTY_LOCKED.message, { ...DIFFICULTY_LOCKED, difficulty: bug.difficulty });
     if (bug.substatus !== "open" && bug.substatus !== "requires_confirmation") {
       throw new IssueApiError(409, "Difficulty can only change while the issue is Open.", { error: "not_open", difficulty: bug.difficulty });
+    }
+    // A live stake would win the issue with no plan: it decides the issue first (#stakes), so nothing becomes complex under it.
+    if (await hasLiveStake(tx, bug.id)) {
+      throw new IssueApiError(409, "This issue is staked: its difficulty can't change until the stake is decided.", { error: "issue_staked", difficulty: bug.difficulty });
     }
     if (bug.difficulty === difficulty) return { issueId: bug.id, difficulty, changed: false as const };
     await tx.bug.update({ where: { id: bug.id }, data: { difficulty } });
