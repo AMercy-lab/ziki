@@ -8,7 +8,7 @@ import { requireEarnAgent } from "@/lib/earn/state";
 
 export type EarnActionResult = { error?: string; message?: string };
 
-/** Starts one task by hand (its number is in the form), when it didn't start on its own. */
+/** Starts one task by hand (its number comes with the form); the others stay open. */
 export async function startEarnTaskAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   // A task cannot be started until the person's agent is connected.

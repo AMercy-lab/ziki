@@ -198,7 +198,7 @@ export default async function AppLayout({
           organizationAdmin={tenantId !== null && isOrganizationAdmin(membershipRole, user.role)}
           earned={earnSample ? earnSample.earned : null}
           inEarnWorkspace={inEarnWorkspace}
-          withdraw={earnSample ? withdrawInfo(earnSample.stage, earnSample.earned) : null}
+          withdraw={earnSample ? withdrawInfo(earnSample.stage, earnSample.earned, earnSample.done) : null}
           version={appVersionLabel()}
           memberCount={memberCount}
           agentCount={dockAgents.length}

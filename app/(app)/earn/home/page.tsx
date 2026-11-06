@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { EARN_TASKS, WITHDRAW_THRESHOLD, stageTasks } from "@/lib/earn/draft";
 import { earnState } from "@/lib/earn/state";
-import { taskStateFor } from "@/lib/earn/progress";
+import { taskProgress, taskStateFor } from "@/lib/earn/progress";
 import { formatZ } from "@/lib/points/rules";
 import { agentsLink, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
 import { earnAgentWhere } from "@/lib/earn/earner";
@@ -33,8 +33,9 @@ export default async function EarnHomePage() {
   // Where each task stands, from its own row: the four are independent.
   const taskStates = EARN_TASKS.map((_, index) => taskStateFor(taskRows, index));
   const stateDot = { paid: "bg-zk-ok-fg", "in-review": "bg-zk-warn-fg", "in-progress": "bg-electric-blue-strong", open: "bg-zk-seg" } as const;
-  // How far along each task is, from the data: nothing until the work is sent in, most of the way while Ziki checks it, all once paid.
-  const stateShare = { open: 0, "in-progress": 0, "in-review": 0.6, paid: 1 } as const;
+  // Each task's real share, from the data (lib/earn/progress taskProgress): what its proof lists while it is checked, all of it once paid.
+  const glance = taskProgress(taskRows);
+  const share = glance.map(({ done, target }) => (target > 0 ? done / target : 0));
   const stateBar = { paid: "bg-zk-ok-fg", "in-review": "bg-zk-warn-fg", "in-progress": "bg-electric-blue-strong", open: "bg-zk-seg" } as const;
   const stateWord = { paid: "Paid", "in-review": "Checking", "in-progress": "In progress", open: "" } as const;
   // Tasks the earner can still work on now, and what they pay.
@@ -51,8 +52,8 @@ export default async function EarnHomePage() {
       text: "Where your agent starts: help people find Ziki with four short tasks, in any order.",
       ringText: String(EARN_TASKS.length - paidTasks),
       ringTone: "stroke-electric-blue-strong",
-      share: taskStates.reduce((sum, state) => sum + stateShare[state], 0) / EARN_TASKS.length,
-      dashes: taskStates.map((state) => (stateShare[state] > 0 ? stateBar[state] : "bg-zk-seg")),
+      share: share.reduce((sum, value) => sum + value, 0) / EARN_TASKS.length,
+      dashes: taskStates.map((state, i) => (share[i] > 0 ? stateBar[state] : "bg-zk-seg")),
       reward: `Up to $${EARN_TASKS.reduce((sum, task) => sum + task.pay, 0)}`,
       status: paidTasks === 0 ? "Open now" : `${paidTasks} of ${EARN_TASKS.length} done`,
     },
@@ -178,7 +179,7 @@ export default async function EarnHomePage() {
                     <span className="font-mono text-xs font-bold tabular-nums text-zk-ok-fg">+${task.pay}</span>
                   </span>
                   <span aria-hidden="true" className="block h-1.5 overflow-hidden rounded-full bg-zk-seg">
-                    <span className={`earn-grow block h-full rounded-full ${stateBar[taskStates[taskIndex]]}`} style={{ width: `${stateShare[taskStates[taskIndex]] * 100}%` }} />
+                    <span className={`earn-grow block h-full rounded-full ${stateBar[taskStates[taskIndex]]}`} style={{ width: `${share[taskIndex] * 100}%` }} />
                   </span>
                 </li>
               ))}

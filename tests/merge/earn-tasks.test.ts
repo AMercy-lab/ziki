@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 /**
  * Earn marketing tasks (#earn-tasks): a task pays when staff confirm it, once,
- * and never before. The four tasks are independent: all open from the start, in any order.
+ * and never before. Tasks open in order.
  */
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
-import { confirmTask, grantWelcome, isNewEarnAccount, paidCount, rejectTask, startedFromRows, startTask, submitTask, taskStateFor, tasksLeftPay, type EarnTaskRow } from "@/lib/earn/progress";
+import { confirmTask, grantWelcome, isNewEarnAccount, paidCount, rejectTask, doneTasks, startTask, submitTask, taskStateFor } from "@/lib/earn/progress";
 
 type TaskRow = { userId: string; taskKey: string; status: string; proof?: string | null; note?: string | null };
 type Where = { userId?: string; taskKey?: string; status?: string | { in: string[] } };
@@ -25,6 +25,17 @@ function fakeEarnDb() {
         const { userId, taskKey } = where.userId_taskKey;
         if (!state.tasks.some((row) => row.userId === userId && row.taskKey === taskKey)) state.tasks.push({ ...create, status: "started" });
       }),
+      createMany: vi.fn(async ({ data }: { data: Array<{ userId: string; taskKey: string }> }) => {
+        let count = 0;
+        for (const row of data) {
+          if (state.tasks.some((existing) => existing.userId === row.userId && existing.taskKey === row.taskKey)) continue;
+          state.tasks.push({ ...row, status: "started" });
+          count++;
+        }
+        return { count };
+      }),
+      findUnique: vi.fn(async ({ where }: { where: { userId_taskKey: { userId: string; taskKey: string } } }) =>
+        state.tasks.find((row) => row.userId === where.userId_taskKey.userId && row.taskKey === where.userId_taskKey.taskKey) ? { id: "t" } : null),
       updateMany: vi.fn(async ({ where, data }: { where: Where; data: Partial<TaskRow> }) => {
         const hit = state.tasks.filter((row) => matches(row, where));
         hit.forEach((row) => Object.assign(row, data));
@@ -79,24 +90,24 @@ describe("earn tasks (#earn-tasks)", () => {
     expect(state.ledger).toEqual([]);
   });
 
-  it("opens every task from the start: any one can be sent in, and paid, in any order", async () => {
+  it("opens all four tasks at once: any can be sent in and paid first, each on its own", async () => {
     const { state, db } = fakeEarnDb();
-    // Nothing starts until the earner opens a task; opening one starts that one only, once.
-    expect(state.tasks).toEqual([]);
-    expect(await startTask(db, "earner", 3)).toBe(true);
-    expect(await startTask(db, "earner", 3)).toBe(false);
-    expect(state.tasks.map((row) => row.taskKey)).toEqual(["emails"]);
-    expect(await submitTask(db, "earner", 3, "ten addresses")).toEqual({ ok: true });
-    expect(await confirm(db, "emails")).toEqual({ ok: true });
-    expect(state.ledger).toEqual([expect.objectContaining({ points: 4, sourceKey: "earn:earner:emails" })]);
+    expect(await submitTask(db, "earner", 2, "ten businesses")).toEqual({ ok: true });
+    expect(await confirm(db, "research")).toEqual({ ok: true });
+    expect(state.ledger).toEqual([expect.objectContaining({ points: 2, sourceKey: "earn:earner:research" })]);
+    const rows = state.tasks.map((row) => ({ taskKey: row.taskKey, status: row.status as "confirmed", note: null }));
+    expect(doneTasks(rows)).toEqual(["research"]);
+    expect(paidCount(rows)).toBe(1);
+    // Nothing waits on another task: the ones not started are open, the paid one is paid.
+    expect([0, 1, 2, 3].map((i) => taskStateFor(rows, i))).toEqual(["open", "paid", "open", "open"]);
+    expect(await submitTask(db, "earner", 4, "https://x.com/me/status/1")).toEqual({ ok: true });
   });
 
-  it("counts confirmed tasks wherever they sit, and reads each task's state from its own row", () => {
-    const rows: EarnTaskRow[] = [{ taskKey: "emails", status: "confirmed", note: null }, { taskKey: "who", status: "submitted", note: null }, { taskKey: "post", status: "started", note: null }];
-    expect(paidCount(rows)).toBe(1);
-    expect([0, 1, 2, 3].map((i) => taskStateFor(rows, i))).toEqual(["in-review", "open", "paid", "in-progress"]);
-    expect(startedFromRows(rows)).toBe(1);
-    expect(tasksLeftPay(rows)).toBe(3 + 2 + 5);
+  it("refuses to send in a task that is already paid", async () => {
+    const { db } = fakeEarnDb();
+    await submitTask(db, "earner", 1, "x");
+    await confirm(db);
+    expect(await submitTask(db, "earner", 1, "again")).toEqual({ ok: false, error: expect.any(String) });
   });
 
   it("sends a task back with a reason, lets it be sent again, and refuses a send-back with no reason", async () => {
@@ -131,5 +142,14 @@ describe("earn tasks (#earn-tasks)", () => {
     expect(await isNewEarnAccount(db, "old-timer")).toBe(false);
     // The money is not tied to it: the older account still gets the $5.
     expect(await grantWelcome(db, "old-timer", "ziki-earn")).toBe(true);
+  });
+
+  it("starts a task only when it is opened, once, and touches no other: an unopened task has no row and so no status", async () => {
+    const { state, db } = fakeEarnDb();
+    expect(await startTask(db, "earner", 3)).toBe(true);
+    expect(await startTask(db, "earner", 3)).toBe(false);
+    expect(state.tasks).toEqual([expect.objectContaining({ taskKey: "emails", status: "started" })]);
+    const rows = state.tasks.map((row) => ({ taskKey: row.taskKey, status: row.status as "started", note: null }));
+    expect([0, 1, 2, 3].map((i) => taskStateFor(rows, i))).toEqual(["open", "open", "in-progress", "open"]);
   });
 });

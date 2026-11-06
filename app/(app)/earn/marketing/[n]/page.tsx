@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { formatZ } from "@/lib/points/rules";
 import { EARN_TASKS, EARN_WORK, zikiTaskPath } from "@/lib/earn/draft";
 import { taskStateFor, type EarnTaskState } from "@/lib/earn/progress";
-import { earnState, requireEarnAgent, startIfAgentConnected } from "@/lib/earn/state";
+import { earnState, requireEarnAgent, startTaskIfAgentConnected } from "@/lib/earn/state";
 import { startEarnTaskAction } from "@/app/(app)/earn/actions";
 import { EarnSubmitForm } from "@/components/earn-submit-form";
 import { EarnPromptBox } from "@/components/earn-prompt-box";
@@ -40,7 +40,7 @@ export default async function EarnTaskPage({
   if (!Number.isInteger(n) || n < 1 || n > EARN_TASKS.length) notFound();
   const user = await requireUser();
   await requireEarnAgent(user.id);
-  await startIfAgentConnected(user.id, n);
+  await startTaskIfAgentConnected(user.id, n);
   const { rows } = await earnState(user.id);
   const index = n - 1;
   const task = EARN_TASKS[index];
