@@ -217,34 +217,13 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
 
                     {/* Decision Buttons */}
                     <td className="px-4 py-3.5 whitespace-nowrap text-right">
-                      <div className="inline-flex items-center gap-2 justify-end">
-                        <button
-                          type="button"
-                          onClick={() => setInspectingItem(item)}
-                          className="rounded-lg border border-zk-border bg-zk-surface px-2.5 py-1 text-xs font-medium text-zk-text hover:bg-zk-tint transition"
-                        >
-                          Inspect Prompt
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isSubmitting}
-                          onClick={() => handleApprove(item)}
-                          className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700 transition shadow-xs disabled:opacity-50"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isSubmitting}
-                          onClick={() => {
-                            setRejectPromptItem(item);
-                            setRejectionReasonInput("");
-                          }}
-                          className="rounded-lg border border-zk-border bg-zk-surface px-2.5 py-1 text-xs font-semibold text-zk-muted hover:text-zk-text hover:bg-zk-tint transition disabled:opacity-50"
-                        >
-                          Reject
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setInspectingItem(item)}
+                        className="rounded-lg border border-zk-border bg-zk-surface px-3 py-1.5 text-xs font-semibold text-zk-accent hover:bg-zk-tint transition shadow-xs"
+                      >
+                        Review Submission →
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -411,7 +390,7 @@ export function SkillApprovalsManager({ initialSubmissions = [] }: SkillApproval
                   <ul className="space-y-1.5 rounded-xl border border-zk-border bg-zk-surface/50 p-3">
                     {inspectingItem.checklist.map((item, idx) => (
                       <li key={idx} className="flex items-start gap-2 text-zk-text text-xs">
-                        <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                        <span className="text-zk-muted font-bold shrink-0">•</span>
                         <span>{item}</span>
                       </li>
                     ))}
