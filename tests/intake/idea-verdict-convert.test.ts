@@ -25,7 +25,7 @@ import { convertIdea, convertVettedIdea, giveIdeaVerdict, maxVotesFor, rejectIde
 const idea = (overrides: Record<string, unknown> = {}) => ({
   id: "i1",
   number: 7,
-  tenantId: "t1",
+  organisationId: "t1",
   projectId: "p1",
   status: "open", substatus: "open",
   score: 3,
@@ -48,7 +48,7 @@ const report = {
 };
 
 const input = { opinion: "good" as const, summary: "Useful. It saves a click.", description: "The activity list is long; an icon would keep the page short." };
-const person = { tenantId: "t1", userId: "bob" };
+const person = { organisationId: "t1", userId: "bob" };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -143,7 +143,7 @@ describe("giveIdeaVerdict", () => {
 
 describe("convertIdea", () => {
   const agentOf = (level: AgentContext["level"], ownerId = "dana"): AgentContext => ({
-    agentId: `agent-${ownerId}`, name: ownerId, ownerId, tenantId: "t1", level, burst: false, keyId: "k1",
+    agentId: `agent-${ownerId}`, name: ownerId, ownerId, organisationId: "t1", level, burst: false, keyId: "k1",
   });
 
   it("creates the issue from the idea's report, moves its files, and marks the idea converted", async () => {
@@ -151,7 +151,7 @@ describe("convertIdea", () => {
     expect(result).toMatchObject({ ideaId: "i1", ideaNumber: 7, issueId: "b9", issueNumber: 42, ideaScore: 3, ideaThreshold: 3 });
     expect(db.bug.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
-        tenantId: "t1",
+        organisationId: "t1",
         projectId: "p1",
         title: report.title,
         summary: report.summary,
@@ -187,7 +187,7 @@ describe("convertIdea", () => {
 
 /** Already vetted: an idea its owner says was approved elsewhere becomes an issue at once, with no verdicts. */
 describe("convertVettedIdea", () => {
-  const owner: AgentContext = { agentId: "agent-ada", name: "ada", ownerId: "ada", tenantId: "t1", level: "working", burst: false, keyId: "k1" };
+  const owner: AgentContext = { agentId: "agent-ada", name: "ada", ownerId: "ada", organisationId: "t1", level: "working", burst: false, keyId: "k1" };
 
   it("converts an idea with no verdicts, says it was vetted on the issue's activity and on the event, and nothing else is skipped", async () => {
     db.$queryRaw.mockResolvedValue([idea({ score: 0 })]);
@@ -214,7 +214,7 @@ describe("convertVettedIdea", () => {
 
 describe("rejectIdea (#idea-rejected)", () => {
   const manager = (level: AgentContext["level"], ownerId = "dana"): AgentContext => ({
-    agentId: `agent-${ownerId}`, name: ownerId, ownerId, tenantId: "t1", level, burst: false, keyId: "k1",
+    agentId: `agent-${ownerId}`, name: ownerId, ownerId, organisationId: "t1", level, burst: false, keyId: "k1",
   });
   const verdicts = (good: number, bad: number) => [
     ...Array.from({ length: good }, () => ({ opinion: "good", votes: 1 })),

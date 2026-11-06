@@ -55,8 +55,8 @@ function fakeEarnDb() {
       }),
     },
     user: { findUnique: vi.fn(async () => ({ createdAt: state.accountCreatedAt })) },
-    // The Earn workspace is made on first use; every earn credit goes there, whatever workspaces the person is in.
-    tenant: { upsert: vi.fn(async () => ({ id: "tenant-earn" })) },
+    // The Earn organisation is made on first use; every earn credit goes there, whatever organisations the person is in.
+    organisation: { upsert: vi.fn(async () => ({ id: "organisation-earn" })) },
     $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
       const before = { tasks: state.tasks.map((row) => ({ ...row })), ledger: [...state.ledger] };
       try {
@@ -71,15 +71,15 @@ function fakeEarnDb() {
   return { state, db: db as never };
 }
 
-const confirm = (db: never, taskKey = "who") => confirmTask(db, { userId: "earner", taskKey, staffId: "staff", earnTenantSlug: "ziki-earn" });
+const confirm = (db: never, taskKey = "who") => confirmTask(db, { userId: "earner", taskKey, staffId: "staff", earnOrganisationSlug: "ziki-earn" });
 
 describe("earn tasks (#earn-tasks)", () => {
-  it("pays a confirmed task its amount once, in the Earn workspace only, however often staff confirm", async () => {
+  it("pays a confirmed task its amount once, in the Earn organisation only, however often staff confirm", async () => {
     const { state, db } = fakeEarnDb();
     expect(await submitTask(db, "earner", 1, "Bakeries in Lagos")).toEqual({ ok: true });
     expect(await confirm(db)).toEqual({ ok: true });
     expect((await confirm(db)).ok).toBe(false);
-    expect(state.ledger).toEqual([expect.objectContaining({ tenantId: "tenant-earn", userId: "earner", role: "submission", points: 3, sourceKey: "earn:earner:who" })]);
+    expect(state.ledger).toEqual([expect.objectContaining({ organisationId: "organisation-earn", userId: "earner", role: "submission", points: 3, sourceKey: "earn:earner:who" })]);
     expect(state.tasks[0].status).toBe("confirmed");
   });
 
@@ -121,11 +121,11 @@ describe("earn tasks (#earn-tasks)", () => {
     expect(state.ledger).toEqual([]);
   });
 
-  it("pays the $5 welcome once to anyone who comes to earn, in the Earn workspace and no other", async () => {
+  it("pays the $5 welcome once to anyone who comes to earn, in the Earn organisation and no other", async () => {
     const { state, db } = fakeEarnDb();
     expect(await grantWelcome(db, "earner", "ziki-earn")).toBe(true);
     expect(await grantWelcome(db, "earner", "ziki-earn")).toBe(false);
-    expect(state.ledger).toEqual([expect.objectContaining({ tenantId: "tenant-earn", userId: "earner", role: "signup", points: 5, sourceKey: "earn:welcome:earner" })]);
+    expect(state.ledger).toEqual([expect.objectContaining({ organisationId: "organisation-earn", userId: "earner", role: "signup", points: 5, sourceKey: "earn:welcome:earner" })]);
   });
 
   it("pays the welcome to an account made long ago too, once", async () => {

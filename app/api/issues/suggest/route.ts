@@ -7,7 +7,7 @@ import { escapeSearchQuery } from "@/lib/search";
 import { parseIssueNumberQuery } from "@/lib/issue-number";
 import { issueHref } from "@/lib/issue-ref";
 import { resolveSessionUserId } from "@/lib/session-user";
-import { bugInTenant, currentTenantIdFor } from "@/lib/tenant-context";
+import { bugInOrganisation, currentOrganisationIdFor } from "@/lib/organisation-context";
 import {
   normalizeSuggestQuery,
   shouldSuggest,
@@ -19,7 +19,7 @@ import {
 /**
  * Issue titles matching `?q=`, for the search box's autocomplete (#671).
  * Same limits as the list the suggestions come from: signed-in only, the
- * searcher's tenant and project, and no deleted issues.
+ * searcher's organisation and project, and no deleted issues.
  */
 export async function GET(req: NextRequest) {
   const resolved = await resolveSessionUserId();
@@ -33,9 +33,9 @@ export async function GET(req: NextRequest) {
   const query = normalizeSuggestQuery(req.nextUrl.searchParams.get("q"));
   if (!shouldSuggest(query)) return NextResponse.json({ issues: [] });
 
-  const tenantId = await currentTenantIdFor(resolved.userId);
-  if (!tenantId) return NextResponse.json({ issues: [] });
-  const projectId = await activeProjectIdFor(prisma, tenantId);
+  const organisationId = await currentOrganisationIdFor(resolved.userId);
+  if (!organisationId) return NextResponse.json({ issues: [] });
+  const projectId = await activeProjectIdFor(prisma, organisationId);
 
   const contains = escapeSearchQuery(query);
   const matches: Prisma.BugWhereInput[] = [
@@ -48,12 +48,12 @@ export async function GET(req: NextRequest) {
   try {
     const rows = await prisma.bug.findMany({
       where: {
-        ...bugInTenant(tenantId),
+        ...bugInOrganisation(organisationId),
         ...(projectId ? { projectId } : {}),
         isDeleted: false,
         OR: matches,
       },
-      select: { id: true, number: true, title: true, status: true, project: { select: { slug: true, tenant: { select: { slug: true } } } } },
+      select: { id: true, number: true, title: true, status: true, project: { select: { slug: true, organisation: { select: { slug: true } } } } },
       orderBy: { updatedAt: "desc" },
       take: SUGGEST_LIMIT,
     });

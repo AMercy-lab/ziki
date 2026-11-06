@@ -65,7 +65,7 @@ import { moveTo } from "@/lib/issue-substatus";
 export const mergeBugSelect = {
   id: true,
   title: true,
-  tenantId: true,
+  organisationId: true,
   projectId: true,
   pullRequestUrl: true,
   pullRequestHeadSha: true,
@@ -269,13 +269,13 @@ async function reviewFix(
   review: MergeReviewInput,
 ): Promise<AcceptFixResult> {
   // #457: the path may be the readable number (`123`, `ZE-123`) or the id.
-  const bugId = await issueIdFor(prisma, issueRef, agent.tenantId);
-  if (!bugId) return { status: 404, error: "not_found", message: "No such issue in this agent's tenant." };
+  const bugId = await issueIdFor(prisma, issueRef, agent.organisationId);
+  if (!bugId) return { status: 404, error: "not_found", message: "No such issue in this agent's organisation." };
   const bug = await prisma.bug.findFirst({
-    where: { id: bugId, tenantId: agent.tenantId, isDeleted: false },
+    where: { id: bugId, organisationId: agent.organisationId, isDeleted: false },
     select: mergeBugSelect,
   });
-  if (!bug) return { status: 404, error: "not_found", message: "No such issue in this agent's tenant." };
+  if (!bug) return { status: 404, error: "not_found", message: "No such issue in this agent's organisation." };
 
   // #vote-governance: a merge review is a manager's decision, or in a
   // threshold-only project one weighted vote among any independent agents'.
@@ -442,7 +442,7 @@ async function reviewFix(
       { bugId: bug.id, db: tx },
     );
     await publish(tx, {
-      tenantId: bug.tenantId,
+      organisationId: bug.organisationId,
       type: "issue.updated",
       payload: {
         issueId: bug.id,
@@ -544,7 +544,7 @@ type RecordValue = string | number | boolean | null;
 
 export type FinalizeResolvedInput = {
   agent: AgentContext;
-  bug: Pick<MergeBug, "id" | "tenantId" | "projectId" | "status" | "substatus" | "pullRequestUrl">;
+  bug: Pick<MergeBug, "id" | "organisationId" | "projectId" | "status" | "substatus" | "pullRequestUrl">;
   claim: MergeClaim;
   solverUserId: string | null;
   rewardedReviewerUserIds: readonly string[];
@@ -601,7 +601,7 @@ export async function finalizeResolved(tx: Prisma.TransactionClient, input: Fina
   const payout: PointAward[] = [];
   if (solverUserId) {
     payout.push({
-      tenantId: bug.tenantId,
+      organisationId: bug.organisationId,
       userId: solverUserId,
       bugId: bug.id,
       role: "solver",
@@ -613,7 +613,7 @@ export async function finalizeResolved(tx: Prisma.TransactionClient, input: Fina
     });
   }
   if (claim?.dispatcherUserId) {
-    payout.push({ tenantId: bug.tenantId, bugId: bug.id, userId: claim.dispatcherUserId, role: "dispatcher", points: platform.dispatcher, sourceKey: `dispatcher:${bug.id}` });
+    payout.push({ organisationId: bug.organisationId, bugId: bug.id, userId: claim.dispatcherUserId, role: "dispatcher", points: platform.dispatcher, sourceKey: `dispatcher:${bug.id}` });
   }
   const reviewerPoints = calculateReviewerPoints(rewardConfig);
   // Attribution: each tester's award names the agent that gave their good-to-merge judgement.
@@ -630,7 +630,7 @@ export async function finalizeResolved(tx: Prisma.TransactionClient, input: Fina
   }
   for (const [index, userId] of rewardedReviewerUserIds.entries()) {
     payout.push({
-      tenantId: bug.tenantId,
+      organisationId: bug.organisationId,
       userId,
       bugId: bug.id,
       role: "reviewer",
@@ -657,7 +657,7 @@ export async function finalizeResolved(tx: Prisma.TransactionClient, input: Fina
     { bugId: bug.id, db: tx },
   );
   await publish(tx, {
-    tenantId: bug.tenantId,
+    organisationId: bug.organisationId,
     type: "issue.accepted",
     payload: {
       issueId: bug.id,
@@ -685,7 +685,7 @@ type Voting = { threshold: number; managerVoteWeight: number };
 async function recordReviewVote(
   tx: Prisma.TransactionClient,
   agent: AgentContext,
-  bug: Pick<LoadedBug, "id" | "tenantId" | "status">,
+  bug: Pick<LoadedBug, "id" | "organisationId" | "status">,
   saved: { review: StoredMergeReview; replaced: boolean },
   votes: number,
   threshold: number,
@@ -693,7 +693,7 @@ async function recordReviewVote(
   const facts = { mergeReviewId: saved.review.id, verdict: saved.review.verdict, votes, threshold, summary: saved.review.summary };
   await audit(agent, "issue.merge_reviewed", `bug:${bug.id}`, facts, { bugId: bug.id, db: tx });
   await publish(tx, {
-    tenantId: bug.tenantId,
+    organisationId: bug.organisationId,
     type: "issue.updated",
     payload: { issueId: bug.id, status: bug.status, ...facts },
     actorAgentId: agent.agentId,
@@ -772,7 +772,7 @@ async function rejectFix(agent: AgentContext, bug: LoadedBug, review: MergeRevie
       { bugId: bug.id, db: tx },
     );
     await publish(tx, {
-      tenantId: bug.tenantId,
+      organisationId: bug.organisationId,
       type: "issue.updated",
       payload: {
         issueId: bug.id,
@@ -829,7 +829,7 @@ export async function mergeReviewEntries(
 }
 
 /** GET /issues/{id}/merge-reviews: the issue's merge reviews, each with its replies. */
-export async function listMergeReviews(scope: { tenantId: string; projectId?: string }, issueRef: string) {
+export async function listMergeReviews(scope: { organisationId: string; projectId?: string }, issueRef: string) {
   const ref = parseIssueRef(issueRef);
   const bug = await prisma.bug.findFirst({
     where: { ...scope, isDeleted: false, ...(ref.kind === "number" ? { number: ref.number } : { id: ref.id }) },

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-/** Project settings (#595, #vote-governance): only workspace admins change a project's workflow, values are range-checked, and a saved change takes effect at once. */
+/** Project settings (#595, #vote-governance): only organisation admins change a project's workflow, values are range-checked, and a saved change takes effect at once. */
 const requireUser = vi.hoisted(() => vi.fn());
-const isTenantAdmin = vi.hoisted(() => vi.fn());
-const currentTenantIdFor = vi.hoisted(() => vi.fn());
+const isAdminOfOrganisation = vi.hoisted(() => vi.fn());
+const currentOrganisationIdFor = vi.hoisted(() => vi.fn());
 const revalidatePath = vi.hoisted(() => vi.fn());
 const invalidateWorkflow = vi.hoisted(() => vi.fn());
 const findFirst = vi.hoisted(() => vi.fn());
@@ -13,10 +13,10 @@ const transaction = vi.hoisted(() => vi.fn());
 
 vi.mock("next/cache", () => ({ revalidatePath }));
 vi.mock("@/lib/auth-helpers", () => ({ requireUser }));
-vi.mock("@/lib/agents/membership", () => ({ isTenantAdmin }));
-vi.mock("@/lib/tenant-context", () => ({
-  currentTenantIdFor,
-  NO_TENANT_MESSAGE: "You're not a member of a workspace yet.",
+vi.mock("@/lib/agents/membership", () => ({ isAdminOfOrganisation }));
+vi.mock("@/lib/organisation-context", () => ({
+  currentOrganisationIdFor,
+  NO_ORGANISATION_MESSAGE: "You're not a member of a organisation yet.",
 }));
 vi.mock("@/lib/workflow", () => ({ invalidateWorkflow }));
 vi.mock("@/lib/prisma", () => ({
@@ -73,8 +73,8 @@ describe("updateProjectWorkflowAction (#595)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     requireUser.mockResolvedValue({ id: "admin" });
-    isTenantAdmin.mockResolvedValue(true);
-    currentTenantIdFor.mockResolvedValue("tenant-1");
+    isAdminOfOrganisation.mockResolvedValue(true);
+    currentOrganisationIdFor.mockResolvedValue("organisation-1");
     findFirst.mockResolvedValue({ id: "project-1", slug: "web", workflow: null });
     transaction.mockImplementation(async (run: (tx: unknown) => unknown) =>
       run({
@@ -85,7 +85,7 @@ describe("updateProjectWorkflowAction (#595)", () => {
   });
 
   it("refuses a member who is not an admin", async () => {
-    isTenantAdmin.mockResolvedValue(false);
+    isAdminOfOrganisation.mockResolvedValue(false);
     await expect(updateProjectWorkflowAction(undefined, form())).resolves.toMatchObject({ ok: false });
     expect(findFirst).not.toHaveBeenCalled();
     expect(transaction).not.toHaveBeenCalled();
@@ -109,7 +109,7 @@ describe("updateProjectWorkflowAction (#595)", () => {
     });
     expect(auditCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        tenantId: "tenant-1",
+        organisationId: "organisation-1",
         projectId: "project-1",
         actorUserId: "admin",
         action: "workflow.updated",
@@ -154,7 +154,7 @@ describe("updateProjectWorkflowAction (#595)", () => {
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
-  it("does not touch a project outside the tenant", async () => {
+  it("does not touch a project outside the organisation", async () => {
     findFirst.mockResolvedValue(null);
     await expect(updateProjectWorkflowAction(undefined, form())).resolves.toMatchObject({
       ok: false,

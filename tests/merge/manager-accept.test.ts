@@ -67,7 +67,7 @@ function bugRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "bug1",
     title: "Session cookie dropped on redirect",
-    tenantId: "tenant_zedu",
+    organisationId: "organisation_zedu",
     pullRequestUrl: PR,
     pullRequestHeadSha: "linked-sha",
     status: "open", substatus: "open",
@@ -112,7 +112,7 @@ function reportRow(overrides: Record<string, unknown> = {}) {
 }
 
 function merger(id: string, ownerId: string, level: AgentLevel = "manager") {
-  return { agentId: id, name: id, ownerId, tenantId: "tenant_zedu", level, burst: false, keyId: `key-${id}` };
+  return { agentId: id, name: id, ownerId, organisationId: "organisation_zedu", level, burst: false, keyId: `key-${id}` };
 }
 
 /** The two independent confirmation entries that confirm an issue (#issue-confirmations). */

@@ -116,16 +116,16 @@ export async function structureIssue(
   const input = structureInputSchema.parse(rawInput ?? {});
 
   // #457: the path may be the readable number (`123`, `ZE-123`) or the id.
-  const bugId = await issueIdFor(prisma, issueRef, agent.tenantId);
+  const bugId = await issueIdFor(prisma, issueRef, agent.organisationId);
   if (!bugId) throw new IssueApiError(404, "Issue not found in this project.");
   const bug = await prisma.bug.findFirst({
-    where: { id: bugId, tenantId: agent.tenantId, projectId, isDeleted: false },
+    where: { id: bugId, organisationId: agent.organisationId, projectId, isDeleted: false },
     select: {
       id: true,
       title: true,
       description: true,
       projectId: true,
-      tenantId: true,
+      organisationId: true,
       typeId: true,
       duplicateOfId: true,
       status: true,
@@ -152,7 +152,7 @@ export async function structureIssue(
   if (input.checkDuplicates) {
     potentialDuplicates = await findSimilarIssues(
       prisma,
-      { tenantId: agent.tenantId, projectId },
+      { organisationId: agent.organisationId, projectId },
       queryTitle,
     );
     // Exclude self from duplicates list
@@ -161,7 +161,7 @@ export async function structureIssue(
 
   // Load available types
   const types = await prisma.issueType.findMany({
-    where: { tenantId: agent.tenantId, isActive: true },
+    where: { organisationId: agent.organisationId, isActive: true },
     select: { id: true, name: true },
   });
 
@@ -201,7 +201,7 @@ export async function structureIssue(
   let resolvedDuplicateOfId = bug.duplicateOfId;
   if (input.duplicateOfId) {
     const canonical = await prisma.bug.findFirst({
-      where: { id: input.duplicateOfId, tenantId: agent.tenantId, projectId, isDeleted: false },
+      where: { id: input.duplicateOfId, organisationId: agent.organisationId, projectId, isDeleted: false },
       select: { id: true },
     });
     if (!canonical) throw new IssueApiError(422, "Canonical duplicate issue not found in this project.");
@@ -233,7 +233,7 @@ export async function structureIssue(
 
     // Emit event
     await publish(tx, {
-      tenantId: agent.tenantId,
+      organisationId: agent.organisationId,
       type: "issue.structured",
       payload: {
         issueId: bug.id,
@@ -252,7 +252,7 @@ export async function structureIssue(
     }, { db: tx, bugId: bug.id });
   });
 
-  const updatedIssue = await readAgentIssue({ tenantId: agent.tenantId, projectId }, bug.id);
+  const updatedIssue = await readAgentIssue({ organisationId: agent.organisationId, projectId }, bug.id);
 
   return {
     ok: true,

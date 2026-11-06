@@ -39,7 +39,7 @@ const manager = (ownerId = "owner-dana", level: AgentContext["level"] = "manager
   agentId: `agent-${ownerId}`,
   name: "Manager",
   ownerId,
-  tenantId: "t1",
+  organisationId: "t1",
   level,
   burst: false,
   keyId: "k1",
@@ -58,7 +58,7 @@ const reviewed = {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  db.bug.findFirst.mockResolvedValue({ id: "b8", number: 8, tenantId: "t1", projectId: "p1" });
+  db.bug.findFirst.mockResolvedValue({ id: "b8", number: 8, organisationId: "t1", projectId: "p1" });
   db.bug.findUnique.mockImplementation(async (args: { select: Record<string, unknown> }) => ("reporterId" in args.select ? reviewed : { assigneeId: "owner-cara", status: "open", substatus: "open" }));
   db.bug.updateMany.mockResolvedValue({ count: 1 });
   db.$queryRaw.mockResolvedValue([{ id: "b8" }]);

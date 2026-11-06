@@ -10,7 +10,7 @@ const agent = {
   agentId: "agent1",
   name: "Ada's Claude",
   ownerId: "ada",
-  tenantId: "tenant_zedu",
+  organisationId: "organisation_zedu",
   level: "working" as const,
   burst: false,
   keyId: "key1",
@@ -24,7 +24,7 @@ describe("issueProject project scope (#742)", () => {
 
   it("allows a legacy key that is not limited to a project", async () => {
     await expect(issueProject({ ...agent, projectId: null }, new URLSearchParams("projectId=project_web"))).resolves.toEqual({
-      tenantId: "tenant_zedu",
+      organisationId: "organisation_zedu",
       projectId: "project_web",
     });
   });
@@ -60,10 +60,10 @@ describe("project addresses carry the organisation (#project-urls)", () => {
 
   it("never lets a new project or organisation take a name an address reads as old or as a site page", async () => {
     const { unreservedProjectSlug } = await import("@/lib/project-slug");
-    const { tenantSlugCandidate } = await import("@/lib/tenants");
+    const { organisationSlugCandidate } = await import("@/lib/organisations");
     expect(unreservedProjectSlug("123")).toBe("123-project");
     expect(unreservedProjectSlug("workstream")).toBe("workstream-project");
-    expect(tenantSlugCandidate("agents", 0, () => "x2y3")).toBe("agents-x2y3");
-    expect(tenantSlugCandidate("zedu", 0)).toBe("zedu");
+    expect(organisationSlugCandidate("agents", 0, () => "x2y3")).toBe("agents-x2y3");
+    expect(organisationSlugCandidate("zedu", 0)).toBe("zedu");
   });
 });

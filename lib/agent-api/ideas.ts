@@ -41,7 +41,7 @@ export const VETTED_IDEAS_PER_DAY = 5;
  * Ideas are numbered apart from issues.
  */
 
-type Scope = { tenantId: string; projectId: string };
+type Scope = { organisationId: string; projectId: string };
 
 const idSchema = z.string().trim().min(1).max(191);
 const attachmentIdsSchema = z.array(idSchema).max(MAX_ATTACHMENTS_PER_ITEM).optional();
@@ -186,10 +186,10 @@ export async function readAgentIdea(scope: Scope, ref: string) {
   return { ...json, attachments: idea.attachments.map((file) => ({ ...file, url: agentAttachmentUrl(file.id) })), votes };
 }
 
-async function normalizeTenantMentions(db: Prisma.TransactionClient, tenantId: string, body: string) {
+async function normalizeOrganisationMentions(db: Prisma.TransactionClient, organisationId: string, body: string) {
   const ids = extractMentionedUserIds(body);
   const users = ids.length
-    ? await db.user.findMany({ where: { id: { in: ids }, memberships: { some: { tenantId } } }, select: { id: true, name: true } })
+    ? await db.user.findMany({ where: { id: { in: ids }, memberships: { some: { organisationId } } }, select: { id: true, name: true } })
     : [];
   return normalizeMentions(body, new Map(users.map((user) => [user.id, user.name])));
 }
@@ -314,17 +314,17 @@ async function createIdeaFromBody(agent: AgentContext, request: NextRequest, bod
     acknowledgeSimilar: input.acknowledgeSimilar,
     insert: async (tx, policy) => {
       const member = await tx.membership.findUnique({
-        where: { tenantId_userId: { tenantId: scope.tenantId, userId: beneficiaryUserId } },
+        where: { organisationId_userId: { organisationId: scope.organisationId, userId: beneficiaryUserId } },
         select: { userId: true },
       });
-      if (!member) throw new IssueApiError(422, "The beneficiary must be a member of the tenant.");
+      if (!member) throw new IssueApiError(422, "The beneficiary must be a member of the organisation.");
       if (input.alreadyVetted) await assertVettedCap(tx, agent);
       const areaId = input.areaId || null;
       if (areaId) {
         const area = await tx.projectArea.findFirst({ where: { id: areaId, projectId: scope.projectId }, select: { id: true } });
         if (!area) throw new IssueApiError(422, "Area not found in this project.");
       }
-      const description = await normalizeTenantMentions(tx, scope.tenantId, input.description);
+      const description = await normalizeOrganisationMentions(tx, scope.organisationId, input.description);
       const idea = await tx.idea.create({
         data: {
           ...scope,
@@ -343,7 +343,7 @@ async function createIdeaFromBody(agent: AgentContext, request: NextRequest, bod
       await linkAgentIdeaAttachments(tx, agent, { requested: input.attachmentIds, text: description, ideaId: idea.id });
       await audit(agent, "idea.created", `idea:${idea.id}`, { beneficiaryUserId, number: idea.number }, { db: tx });
       await publish(tx, {
-        tenantId: scope.tenantId,
+        organisationId: scope.organisationId,
         type: "idea.created",
         payload: { ideaId: idea.id, ideaNumber: idea.number, projectId: scope.projectId, beneficiaryUserId },
         actorAgentId: agent.agentId,

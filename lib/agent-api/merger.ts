@@ -48,7 +48,7 @@ export async function findReadyToMergeIssues(
 
   // Confirmation from one bulk read, not one isConfirmed() per row (#714).
   const confirmed = await confirmedIssueIds(prisma, {
-    tenantId: agent.tenantId,
+    organisationId: agent.organisationId,
     projectId,
     ...queueWhere(status),
     pullRequestUrl: { not: null },
@@ -59,7 +59,7 @@ export async function findReadyToMergeIssues(
   const candidates = await prisma.bug.findMany({
     where: {
       id: { in: [...confirmed] },
-      tenantId: agent.tenantId,
+      organisationId: agent.organisationId,
       projectId,
       isDeleted: false,
       ...queueWhere(status),

@@ -42,8 +42,8 @@ import { assertVettedCap, assertVettedFields, createIdeaSchema, listAgentIdeas, 
 import { structureIdea } from "@/lib/idea-structuring";
 
 const NOW = new Date("2026-10-19T12:00:00Z");
-const agent = { agentId: "agent1", tenantId: "tenant_zedu" };
-const scope = { tenantId: "t1", projectId: "p1" };
+const agent = { agentId: "agent1", organisationId: "organisation_zedu" };
+const scope = { organisationId: "t1", projectId: "p1" };
 const insert = vi.fn();
 const input = (overrides: Partial<CreatePolicyInput> = {}): CreatePolicyInput => ({
   agent,
@@ -97,11 +97,11 @@ describe("creating an idea", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
-  it("flags a similar report in this tenant and project until it is acknowledged", async () => {
+  it("flags a similar report in this organisation and project until it is acknowledged", async () => {
     db.$queryRaw.mockResolvedValue([similarRow]);
     expect(await createIdeaWithPolicy(input())).toMatchObject({ status: 409, error: "similar_issues" });
     const values = (db.$queryRaw.mock.calls[0] as unknown[]).slice(1);
-    expect(values).toEqual(expect.arrayContaining(["tenant_zedu", "project_zedu"]));
+    expect(values).toEqual(expect.arrayContaining(["organisation_zedu", "project_zedu"]));
     expect(await createIdeaWithPolicy(input({ acknowledgeSimilar: true }))).toMatchObject({ status: 201 });
   });
 });
@@ -116,7 +116,7 @@ describe("seeing an idea", () => {
 
   it("lists the project's ideas and names a bad filter", async () => {
     const page = await listAgentIdeas(scope, new URLSearchParams("status=open"));
-    expect(db.idea.findMany.mock.calls[0][0].where).toMatchObject({ tenantId: "t1", projectId: "p1", isDeleted: false, status: "open" });
+    expect(db.idea.findMany.mock.calls[0][0].where).toMatchObject({ organisationId: "t1", projectId: "p1", isDeleted: false, status: "open" });
     expect(page.items[0]).toMatchObject({ id: "i1", convertible: true });
     await expect(listAgentIdeas(scope, new URLSearchParams("status=idea"))).rejects.toMatchObject({ status: 400 });
   });
@@ -172,7 +172,7 @@ describe("structuring an idea as it is submitted", () => {
 
 /** Already vetted: an idea the owner says was approved elsewhere skips the verdicts, with a note and a daily limit. */
 describe("already vetted ideas", () => {
-  const owner = { agentId: "agent1", name: "Ada's Claude", ownerId: "ada", tenantId: "t1", level: "working" as const, burst: false, keyId: "k1" };
+  const owner = { agentId: "agent1", name: "Ada's Claude", ownerId: "ada", organisationId: "t1", level: "working" as const, burst: false, keyId: "k1" };
 
   it("takes alreadyVetted only with a note saying where it was approved, and a note only with alreadyVetted", () => {
     expect(() => assertVettedFields({})).not.toThrow();

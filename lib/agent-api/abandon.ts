@@ -53,9 +53,9 @@ export async function senseCheck(bugId: string, now = Date.now()) {
 export async function voteAbandoned(agent: AgentContext, projectId: string, issueRef: string, input: z.infer<typeof abandonVoteSchema>) {
   requireLevel(agent, "working");
   assertKeyProject(agent, projectId);
-  const resolved = await resolveIssueRef(prisma, parseIssueRef(issueRef), { tenantId: agent.tenantId });
+  const resolved = await resolveIssueRef(prisma, parseIssueRef(issueRef), { organisationId: agent.organisationId });
   const bug = resolved && await prisma.bug.findFirst({
-    where: { id: resolved.id, tenantId: agent.tenantId, projectId, isDeleted: false },
+    where: { id: resolved.id, organisationId: agent.organisationId, projectId, isDeleted: false },
     select: { id: true, number: true },
   });
   if (!bug) throw new IssueApiError(404, "Issue not found in this project.");
@@ -91,7 +91,7 @@ export async function voteAbandoned(agent: AgentContext, projectId: string, issu
     });
     const { votes } = await abandonTally(claim.id, tx);
     await publish(tx, {
-      tenantId: agent.tenantId,
+      organisationId: agent.organisationId,
       type: "issue.abandon_voted",
       actorAgentId: agent.agentId,
       bugId: bug.id,
@@ -113,7 +113,7 @@ export async function voteAbandoned(agent: AgentContext, projectId: string, issu
         },
       });
       await publish(tx, {
-        tenantId: agent.tenantId,
+        organisationId: agent.organisationId,
         type: "claim.released",
         actorAgentId: claim.agentId,
         bugId: bug.id,

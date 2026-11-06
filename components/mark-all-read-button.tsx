@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { markAllNotificationsReadAction } from "@/app/actions/notifications";
 import { Button } from "@/components/ui/button";
 
-export function MarkAllReadButton({ allWorkspaces = false }: { allWorkspaces?: boolean }) {
+export function MarkAllReadButton({ allOrganisations = false }: { allOrganisations?: boolean }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -12,7 +12,7 @@ export function MarkAllReadButton({ allWorkspaces = false }: { allWorkspaces?: b
     setError(null);
     startTransition(async () => {
       try {
-        const result = await markAllNotificationsReadAction(allWorkspaces);
+        const result = await markAllNotificationsReadAction(allOrganisations);
         if (!result.ok) setError("Could not mark notifications as read. Please try again.");
       } catch {
         setError("Could not mark notifications as read. Please try again.");

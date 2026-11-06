@@ -49,7 +49,7 @@ export async function findReadyIssues(
   while (ready.length < safeLimit) {
     const issues = await prisma.bug.findMany({
       where: {
-        tenantId: agent.tenantId,
+        organisationId: agent.organisationId,
         projectId,
         isDeleted: false,
         substatus: "open",
@@ -108,14 +108,14 @@ export async function getDispatcherMetrics(
     findReadyIssues(agent, projectId, 100).then((issues) => issues.length),
     prisma.issueClaim.count({
       where: {
-        bug: { tenantId: agent.tenantId, projectId },
+        bug: { organisationId: agent.organisationId, projectId },
         status: "active",
         releasedAt: null,
       },
     }),
     prisma.issueClaim.count({
       where: {
-        bug: { tenantId: agent.tenantId, projectId },
+        bug: { organisationId: agent.organisationId, projectId },
         status: "offered",
         releasedAt: null,
         offeredAt: { gt: offerCutoff },
@@ -123,7 +123,7 @@ export async function getDispatcherMetrics(
     }),
     prisma.issueBid.count({
       where: {
-        bug: { tenantId: agent.tenantId, projectId },
+        bug: { organisationId: agent.organisationId, projectId },
         ...OPEN_BID_WHERE,
       },
     }),

@@ -28,8 +28,8 @@ function tx(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 type Tx = ReturnType<typeof tx>;
-const run = (t: Tx, event: Omit<InboxEvent, "id" | "tenantId"> & { tenantId?: string }) =>
-  inboxRecipients(t as never, { id: "event-1", tenantId: "tenant-a", ...event });
+const run = (t: Tx, event: Omit<InboxEvent, "id" | "organisationId"> & { organisationId?: string }) =>
+  inboxRecipients(t as never, { id: "event-1", organisationId: "organisation-a", ...event });
 
 const mention = (userId: string) => `hi @[Owner](${userId})`;
 const item = { id: "item-1", kind: "offer", eventId: "event-1", eventType: "claim.offered", bugId: "bug-1", commentId: null,
@@ -41,7 +41,7 @@ afterEach(() => vi.useRealTimers());
 describe("inbox routing", () => {
   it("gives an offer only to the agent it was made to", async () => {
     const t = tx();
-    await publish(t as never, { tenantId: "tenant-a", type: "claim.offered", actorAgentId: "agent-alice", bugId: "bug-1",
+    await publish(t as never, { organisationId: "organisation-a", type: "claim.offered", actorAgentId: "agent-alice", bugId: "bug-1",
       payload: { claimId: "claim-1", issueId: "bug-1" } });
     expect(t.issueClaim.findUnique).toHaveBeenCalledWith({ where: { id: "claim-1" }, select: { agentId: true } });
     expect(t.agentInboxItem.createMany).toHaveBeenCalledWith({ skipDuplicates: true, data: [expect.objectContaining({
@@ -66,22 +66,22 @@ describe("inbox routing", () => {
     expect(await run(t, { type: "comment.created", payload: { commentId: "c3" } })).toEqual([]);
   });
 
-  it("writes no item for a mentioned agent outside the event's tenant (#603)", async () => {
+  it("writes no item for a mentioned agent outside the event's organisation (#603)", async () => {
     const t = tx({ agent: { findMany: vi.fn().mockResolvedValue([]) } });
     t.comment.findUnique.mockResolvedValue({ agentId: null, body: "@[Other](agent:agent-elsewhere)", parent: null });
-    expect(await writeInbox(t as never, { id: "event-1", tenantId: "tenant-a", type: "comment.created", bugId: "bug-1", payload: { commentId: "c1" } })).toBe(0);
-    expect(t.agent.findMany).toHaveBeenLastCalledWith({ where: { id: { in: ["agent-elsewhere"] }, tenantId: "tenant-a", revokedAt: null }, select: { id: true } });
+    expect(await writeInbox(t as never, { id: "event-1", organisationId: "organisation-a", type: "comment.created", bugId: "bug-1", payload: { commentId: "c1" } })).toBe(0);
+    expect(t.agent.findMany).toHaveBeenLastCalledWith({ where: { id: { in: ["agent-elsewhere"] }, organisationId: "organisation-a", revokedAt: null }, select: { id: true } });
     expect(t.agentInboxItem.createMany).not.toHaveBeenCalled();
   });
 
-  it("writes one item per agent and skips revoked or out-of-tenant agents", async () => {
+  it("writes one item per agent and skips revoked or out-of-organisation agents", async () => {
     const t = tx({ agent: { findMany: vi.fn()
       .mockResolvedValueOnce([{ id: "agent-bob" }, { id: "agent-gone" }])
       .mockResolvedValueOnce([{ id: "agent-bob" }]) } });
     t.comment.findUnique.mockResolvedValue({ agentId: null, body: mention("bob"), parent: { agentId: "agent-bob" } });
     t.agentInboxItem.createMany.mockResolvedValue({ count: 1 });
-    expect(await writeInbox(t as never, { id: "event-1", tenantId: "tenant-a", type: "comment.created", bugId: "bug-1", payload: { commentId: "c2" } })).toBe(1);
-    expect(t.agent.findMany).toHaveBeenLastCalledWith({ where: { id: { in: ["agent-bob", "agent-gone"] }, tenantId: "tenant-a", revokedAt: null }, select: { id: true } });
+    expect(await writeInbox(t as never, { id: "event-1", organisationId: "organisation-a", type: "comment.created", bugId: "bug-1", payload: { commentId: "c2" } })).toBe(1);
+    expect(t.agent.findMany).toHaveBeenLastCalledWith({ where: { id: { in: ["agent-bob", "agent-gone"] }, organisationId: "organisation-a", revokedAt: null }, select: { id: true } });
     expect(t.agentInboxItem.createMany.mock.calls[0][0].data).toEqual([expect.objectContaining({ agentId: "agent-bob", kind: "reply", commentId: "c2" })]);
   });
 

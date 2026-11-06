@@ -38,13 +38,13 @@ beforeEach(() => {
   vi.resetAllMocks();
   // setTimeout is faked so the re-offer's expiry timer is armed but never fires.
   vi.useFakeTimers({ toFake: ["Date", "setTimeout"] }); vi.setSystemTime(now);
-  db.agentApiKey.findUnique.mockResolvedValue({ id: "key", revokedAt: null, agent: { id: "agent", name: "Agent", ownerUserId: "owner", tenantId: "tenant", level: "working", burst: false, revokedAt: null, username: "agent", tagline: "Test agent", about: "A test agent.", _count: { skills: 1 }, owner: { memberships: [{ tenantId: "tenant" }] } } });
+  db.agentApiKey.findUnique.mockResolvedValue({ id: "key", revokedAt: null, agent: { id: "agent", name: "Agent", ownerUserId: "owner", organisationId: "organisation", level: "working", burst: false, revokedAt: null, username: "agent", tagline: "Test agent", about: "A test agent.", _count: { skills: 1 }, owner: { memberships: [{ organisationId: "organisation" }] } } });
   db.project.findFirst.mockResolvedValue({ id: "project" });
-  db.project.findUnique.mockResolvedValue({ id: "project", tenantId: "tenant" });
+  db.project.findUnique.mockResolvedValue({ id: "project", organisationId: "organisation" });
   db.$queryRaw.mockResolvedValue([{ id: "issue" }]);
   db.$transaction.mockImplementation((run) => run(db));
   db.issueClaim.findFirst.mockResolvedValue(claim);
-  db.issueClaim.findMany.mockResolvedValue([{ id: "claim", bugId: "issue", bug: { tenantId: "tenant", projectId: "project" } }]);
+  db.issueClaim.findMany.mockResolvedValue([{ id: "claim", bugId: "issue", bug: { organisationId: "organisation", projectId: "project" } }]);
   db.issueClaim.update.mockResolvedValue({ ...claim, lastHeartbeatAt: now });
   db.issueClaim.count.mockResolvedValue(0);
   db.issueClaim.create.mockResolvedValue({ id: "claim-next", bugId: "issue", offeredAt: now });
@@ -68,7 +68,7 @@ describe("claim heartbeats", () => {
     expect(db.issueClaim.update).toHaveBeenCalledWith({ where: { id: "claim" }, data: { lastHeartbeatAt: now } });
     const [sql, ...values] = db.$queryRaw.mock.calls[0];
     expect(sql.join("?")).toContain("FOR NO KEY UPDATE");
-    expect(values).toEqual(["issue", "tenant", "project"]);
+    expect(values).toEqual(["issue", "organisation", "project"]);
     expect(db.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(db.issueClaim.findFirst.mock.invocationCallOrder[0]);
     expect(db.agentAuditEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ action: "claims.heartbeat", payload: { status: 200, request: true } }) });
   });
@@ -92,7 +92,7 @@ describe("stale claim release", () => {
       type: "claim.released",
       payload: expect.objectContaining({ claimId: "claim", issueId: "issue", projectId: "project", beneficiaryUserId: "owner", reason: "silence" }),
     }) }));
-    expect(db.bug.updateMany).toHaveBeenCalledWith({ where: { id: "issue", projectId: "project", tenantId: "tenant", isDeleted: false, assigneeId: "owner", status: "in_progress", pullRequestUrl: null }, data: { assigneeId: null, status: "open", substatus: "open" } });
+    expect(db.bug.updateMany).toHaveBeenCalledWith({ where: { id: "issue", projectId: "project", organisationId: "organisation", isDeleted: false, assigneeId: "owner", status: "in_progress", pullRequestUrl: null }, data: { assigneeId: null, status: "open", substatus: "open" } });
     expect(db.agentAuditEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ action: "claim.released", agentId: "agent", actorUserId: "admin", bugId: "issue", payload: { claimId: "claim", reason: "silence", projectId: "project" } }) });
     expect(db.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(db.issueClaim.findFirst.mock.invocationCallOrder[0]);
   });

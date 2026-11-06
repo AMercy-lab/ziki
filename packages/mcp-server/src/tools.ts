@@ -110,7 +110,7 @@ export const TOOLS: readonly ToolDef[] = [
   },
   {
     name: "ziki_list_skill_tags",
-    summary: "List the workspace's shared skill tags, most used first. Reuse one of these before making a new tag.",
+    summary: "List the organisation's shared skill tags, most used first. Reuse one of these before making a new tag.",
     level: "working",
     method: "GET",
     route: "/skill-tags",
@@ -160,7 +160,7 @@ export const TOOLS: readonly ToolDef[] = [
   },
   {
     name: "ziki_list_agents",
-    summary: "List the workspace's active agents with their profiles: username, tagline, about, rating, picture and skills. Filter by a skill tag.",
+    summary: "List the organisation's active agents with their profiles: username, tagline, about, rating, picture and skills. Filter by a skill tag.",
     level: "working",
     method: "GET",
     route: "/agents",
@@ -169,7 +169,7 @@ export const TOOLS: readonly ToolDef[] = [
   },
   {
     name: "ziki_get_agent",
-    summary: "Read one agent's profile in the workspace by its username.",
+    summary: "Read one agent's profile in the organisation by its username.",
     level: "working",
     method: "GET",
     route: "/agents/{username}",
@@ -177,7 +177,7 @@ export const TOOLS: readonly ToolDef[] = [
   },
   {
     name: "ziki_list_projects",
-    summary: "List the projects in this agent's tenant, to find a projectId.",
+    summary: "List the projects in this agent's organisation, to find a projectId.",
     level: "working",
     method: "GET",
     route: "/projects",
@@ -933,7 +933,7 @@ export const TOOLS: readonly ToolDef[] = [
   },
   {
     name: "ziki_poll_events",
-    summary: "Poll tenant events, oldest first. Pass the returned cursor as after on the next call.",
+    summary: "Poll organisation events, oldest first. Pass the returned cursor as after on the next call.",
     level: "working",
     method: "GET",
     route: "/events",

@@ -45,7 +45,7 @@ function issueDb(bugs: Record<string, { reward: number; pullRequestUrl?: string 
   } as never;
 }
 
-const issue = { id: "bug-1", tenantId: "tenant-zedu", assigneeId: "user-1" };
+const issue = { id: "bug-1", organisationId: "organisation-zedu", assigneeId: "user-1" };
 
 describe("points ledger (#428)", () => {
 
@@ -57,7 +57,7 @@ describe("points ledger (#428)", () => {
 
   it("pays the solver the issue's reward, in $, $1 before any estimate (#rewards)", () => {
     expect(solverAward({ ...issue, reward: 6.5 })).toEqual({
-      tenantId: "tenant-zedu",
+      organisationId: "organisation-zedu",
       userId: "user-1",
       bugId: "bug-1",
       role: "solver",
@@ -128,7 +128,7 @@ describe("payouts wait for the work to be live (#live-payout)", () => {
   /** One issue, its held payout and its deployment reports, with an in-memory ledger. */
   function payoutDb(reporters: string[]) {
     const ledger = fakeLedger();
-    const bug = { id: "bug-1", number: 1, tenantId: "tenant-zedu", projectId: "p1", assigneeId: "solver", heldPayout: null as unknown, payoutReleasedAt: null as Date | null };
+    const bug = { id: "bug-1", number: 1, organisationId: "organisation-zedu", projectId: "p1", assigneeId: "solver", heldPayout: null as unknown, payoutReleasedAt: null as Date | null };
     const db = {
       pointEntry: (ledger.db as unknown as { pointEntry: unknown }).pointEntry,
       bug: {
@@ -139,8 +139,8 @@ describe("payouts wait for the work to be live (#live-payout)", () => {
     };
     return { db: db as never, bug, rows: ledger.rows, reporters };
   }
-  const solver = { tenantId: "tenant-zedu", userId: "solver", bugId: "bug-1", role: "solver" as const, points: 6, sourceKey: "solver:bug-1:solver" };
-  const tester = { tenantId: "tenant-zedu", userId: "tester", bugId: "bug-1", role: "reviewer" as const, points: 3, sourceKey: "reviewer:bug-1:tester" };
+  const solver = { organisationId: "organisation-zedu", userId: "solver", bugId: "bug-1", role: "solver" as const, points: 6, sourceKey: "solver:bug-1:solver" };
+  const tester = { organisationId: "organisation-zedu", userId: "tester", bugId: "bug-1", role: "reviewer" as const, points: 3, sourceKey: "reviewer:bug-1:tester" };
 
   it("holds what resolving earned until three people other than the solver report it deployed", async () => {
     const { db, rows, reporters } = payoutDb(["solver", "a", "b"]);

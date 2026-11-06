@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { currentTenantIdFor, notificationInTenant } from "@/lib/tenant-context";
+import { currentOrganisationIdFor, notificationInOrganisation } from "@/lib/organisation-context";
 import { requireUser } from "@/lib/auth-helpers";
 import { LocalTime } from "@/components/local-time";
 import { MarkAllReadButton } from "@/components/mark-all-read-button";
@@ -18,18 +18,18 @@ export async function NotificationsView({
 }) {
   const user = await requireUser();
   const params = await searchParams;
-  const allWorkspaces = params?.scope === "all";
-  const tenantId = await currentTenantIdFor(user.id);
-  const scope = notificationInTenant(tenantId, allWorkspaces);
+  const allOrganisations = params?.scope === "all";
+  const organisationId = await currentOrganisationIdFor(user.id);
+  const scope = notificationInOrganisation(organisationId, allOrganisations);
   const totalCount = await prisma.notification.count({ where: { userId: user.id, ...scope } });
   const pagination = calculatePagination({ page: params?.page, pageSize: PAGE_SIZE, totalCount });
-  const [notifications, unread, workspaceCount] = await Promise.all([
+  const [notifications, unread, organisationCount] = await Promise.all([
     prisma.notification.findMany({
       where: { userId: user.id, ...scope },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: pagination.skip,
       take: pagination.take,
-      select: { id: true, title: true, tenant: { select: { name: true } }, readAt: true, createdAt: true },
+      select: { id: true, title: true, organisation: { select: { name: true } }, readAt: true, createdAt: true },
     }),
     prisma.notification.count({ where: { userId: user.id, readAt: null, ...scope } }),
     prisma.membership.count({ where: { userId: user.id } }),
@@ -51,24 +51,24 @@ export async function NotificationsView({
             {unread === 0 ? "You're all caught up." : `${unread} unread`}
           </p>
         </div>
-        {unread > 0 ? <MarkAllReadButton allWorkspaces={allWorkspaces} /> : null}
+        {unread > 0 ? <MarkAllReadButton allOrganisations={allOrganisations} /> : null}
       </div>
 
-      {workspaceCount > 1 ? (
-        <nav className="flex gap-1.5" aria-label="Notification workspaces">
+      {organisationCount > 1 ? (
+        <nav className="flex gap-1.5" aria-label="Notification organisations">
           <Link
             href="/inbox"
-            aria-current={!allWorkspaces ? "page" : undefined}
-            className={scopePill(!allWorkspaces)}
+            aria-current={!allOrganisations ? "page" : undefined}
+            className={scopePill(!allOrganisations)}
           >
-            This workspace
+            This organisation
           </Link>
           <Link
             href="/inbox?scope=all"
-            aria-current={allWorkspaces ? "page" : undefined}
-            className={scopePill(allWorkspaces)}
+            aria-current={allOrganisations ? "page" : undefined}
+            className={scopePill(allOrganisations)}
           >
-            All workspaces
+            All organisations
           </Link>
         </nav>
       ) : null}
@@ -109,8 +109,8 @@ export async function NotificationsView({
                     <span className="mt-0.5 block text-xs text-zk-muted">
                       <LocalTime date={n.createdAt} />
                     </span>
-                    {workspaceCount > 1 && n.tenant ? (
-                      <span className="mt-1 block text-xs text-zk-muted">{n.tenant.name}</span>
+                    {organisationCount > 1 && n.organisation ? (
+                      <span className="mt-1 block text-xs text-zk-muted">{n.organisation.name}</span>
                     ) : null}
                   </span>
                 </a>
@@ -126,7 +126,7 @@ export async function NotificationsView({
           totalCount={pagination.totalCount}
           from={pagination.from}
           to={pagination.to}
-          queryParams={{ scope: allWorkspaces ? "all" : undefined }}
+          queryParams={{ scope: allOrganisations ? "all" : undefined }}
           basePath="/inbox"
           itemLabel="notification"
         />

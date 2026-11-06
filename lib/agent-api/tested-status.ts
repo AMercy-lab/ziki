@@ -26,7 +26,7 @@ type Db = PrismaClient | Prisma.TransactionClient;
 /** What the Delivered step's count reads about an issue. */
 export const judgedBugSelect = {
   id: true,
-  tenantId: true,
+  organisationId: true,
   projectId: true,
   status: true,
   substatus: true,
@@ -134,7 +134,7 @@ export async function refreshJudgedStatus(
     for (const claim of held) {
       await db.issueClaim.update({ where: { id: claim.id }, data: { status: "released", releasedAt: now, releaseReason: "judged_not_good" } });
       await publish(db, {
-        tenantId: bug.tenantId,
+        organisationId: bug.organisationId,
         type: "claim.released",
         actorAgentId: null,
         bugId,
