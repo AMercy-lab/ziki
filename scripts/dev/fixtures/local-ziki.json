@@ -29062,12 +29062,11 @@
    "bugId": "fx-bug-221",
    "agentId": "fx-agent-demo-w",
    "beneficiaryUserId": "fx-user-demo",
-   "summary": "Finished it and linked the result.",
+   "summary": "Finished the post, ready to publish.",
    "description": "Checked it with two people who hadn't seen it, and checked every link. Nothing is left open.",
    "pullRequestUrl": null,
-   "deliverableUrls": [
-    "https://example.com/blog/new-issue-list"
-   ],
+   "deliverableUrls": [],
+   "deliverableText": "# What changed in the issue list\n\nThe issue list now reads the way the work moves. Each tab holds one main status, and every row says which step it is on.\n\n## What you will notice\n\n- **One status per issue.** A row says *Open · Requires confirmation*, and nothing else competes with it.\n- **Who holds the work.** The holder sits on the row, so you can see what is taken at a glance.\n- **Faster search.** Results now include the text of each description.\n\n## Why we changed it\n\nPeople kept asking what a label meant. Now there is only one to read.",
    "ago": 41400,
    "updatedAt": 41400
   },
@@ -29082,6 +29081,7 @@
    "deliverableUrls": [
     "https://example.com/social/how-bidding-works"
    ],
+   "deliverableText": null,
    "ago": 39960,
    "updatedAt": 39960
   },
@@ -29096,6 +29096,7 @@
    "deliverableUrls": [
     "https://example.com/pricing"
    ],
+   "deliverableText": null,
    "ago": 38520,
    "updatedAt": 38520
   },
@@ -29110,6 +29111,7 @@
    "deliverableUrls": [
     "https://example.com/drafts/good-bug-reports"
    ],
+   "deliverableText": null,
    "ago": 37080,
    "updatedAt": 37080
   },
@@ -29124,6 +29126,7 @@
    "deliverableUrls": [
     "https://example.com/drafts/newsletter-pitches"
    ],
+   "deliverableText": null,
    "ago": 35640,
    "updatedAt": 35640
   },
@@ -29138,6 +29141,7 @@
    "deliverableUrls": [
     "https://example.com/drafts/shortcuts-clip"
    ],
+   "deliverableText": null,
    "ago": 34200,
    "updatedAt": 34200
   },
@@ -29152,6 +29156,7 @@
    "deliverableUrls": [
     "https://example.com/drafts/security-page"
    ],
+   "deliverableText": null,
    "ago": 32760,
    "updatedAt": 31320
   },
@@ -29166,6 +29171,7 @@
    "deliverableUrls": [
     "https://example.com/drafts/release-thread"
    ],
+   "deliverableText": null,
    "ago": 29880,
    "updatedAt": 29880
   },
@@ -29180,6 +29186,7 @@
    "deliverableUrls": [
     "https://example.com/drafts/project-invites"
    ],
+   "deliverableText": null,
    "ago": 28440,
    "updatedAt": 27000
   },
@@ -29194,6 +29201,7 @@
    "deliverableUrls": [
     "https://example.com/drafts/spreadsheet-comparison"
    ],
+   "deliverableText": null,
    "ago": 27000,
    "updatedAt": 25560
   }

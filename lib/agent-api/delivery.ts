@@ -16,7 +16,7 @@ import { parseGitHubRepoUrl, parsePullRequestUrl, sameRepo } from "@/lib/github/
 import { standingAcceptance } from "@/lib/accepted-fix";
 import { latestPullRequestReport } from "@/lib/agent-api/pull-request-report";
 import { moveTo } from "@/lib/issue-substatus";
-import { marketingDeliveryBodySchema } from "@/lib/validations/marketing";
+import { deliverableText, marketingDeliveryBodySchema } from "@/lib/validations/marketing";
 import { linkAttachments } from "@/lib/attachment-link";
 import { MAX_ATTACHMENTS_PER_ITEM } from "@/lib/attachments";
 
@@ -30,7 +30,7 @@ import { MAX_ATTACHMENTS_PER_ITEM } from "@/lib/attachments";
  * Open (lib/agent-api/tested-status.ts).
  *
  * Product work delivers a pull request. Marketing work has none: it delivers
- * links to the finished work and uploaded files instead
+ * the finished work as Markdown, links to it, or uploaded files instead
  * (docs/marketing-migration-plan.md, M-API-3), and a payload with a pull
  * request, a head commit or test results is refused.
  *
@@ -58,6 +58,8 @@ export const deliveryBodySchema = z
     testResults: z.union([z.string().trim().min(1).max(20_000), z.record(z.string(), z.unknown())]).optional(),
     /** The pull request's head commit: what judgements and the accept bind to. Product work only. */
     headSha: z.string().trim().regex(/^[0-9a-f]{7,64}$/i, "headSha must be a hexadecimal commit SHA.").optional(),
+    /** The finished work as Markdown, shown as a file. Marketing work only. */
+    deliverableText: deliverableText.optional(),
     /** Links to the finished work. Marketing work only. */
     deliverableUrls: z.array(z.string().trim().min(1).max(2048)).max(20).optional(),
     /** Uploaded files to attach (`POST /api/v1/attachments`). Marketing work only. */
@@ -66,7 +68,7 @@ export const deliveryBodySchema = z
   .strict();
 
 const PRODUCT_ONLY_DELIVERY_FIELDS = ["pullRequestUrl", "headSha", "testResults"] as const;
-const MARKETING_ONLY_DELIVERY_FIELDS = ["deliverableUrls", "attachmentIds"] as const;
+const MARKETING_ONLY_DELIVERY_FIELDS = ["deliverableText", "deliverableUrls", "attachmentIds"] as const;
 
 /** Where work can be delivered: being worked on, or delivered again before it merges. */
 const DELIVERABLE = new Set(["in_progress", "done", "merge"]);
@@ -81,6 +83,8 @@ export type DeliveryEntry = {
   summary: string;
   description: string;
   pullRequestUrl: string | null;
+  /** The finished work as Markdown, on marketing work. */
+  deliverableText: string | null;
   /** Links to the finished work, on marketing work. */
   deliverableUrls: string[];
   headSha: string | null;
@@ -116,6 +120,7 @@ export async function deliveryEntries(bug: { id: string; pullRequestUrl: string 
       summary: true,
       description: true,
       pullRequestUrl: true,
+      deliverableText: true,
       deliverableUrls: true,
       headSha: true,
       screenshots: true,
@@ -195,10 +200,10 @@ export async function deliverWork(
 
   const marketing = bug.track === "marketing";
   if (marketing) {
-    // A marketing delivery links or attaches the work; it has no pull request.
+    // A marketing delivery carries, links or attaches the work; it has no pull request.
     for (const field of PRODUCT_ONLY_DELIVERY_FIELDS) {
       if (body[field] !== undefined) {
-        return { status: 400, error: "invalid_request", message: "A marketing delivery has no pull request: send deliverableUrls or attachmentIds.", field };
+        return { status: 400, error: "invalid_request", message: "A marketing delivery has no pull request: send deliverableText, deliverableUrls or attachmentIds.", field };
       }
     }
     const marketingBody = marketingDeliveryBodySchema.safeParse(rawBody ?? {});
@@ -334,6 +339,7 @@ export async function deliverWork(
       summary: body.summary,
       description: body.description,
       pullRequestUrl,
+      deliverableText: marketing ? body.deliverableText ?? null : null,
       deliverableUrls: marketing ? body.deliverableUrls ?? [] : [],
       headSha,
       screenshots,

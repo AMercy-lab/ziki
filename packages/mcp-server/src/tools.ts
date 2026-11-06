@@ -491,12 +491,12 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_deliver",
     summary:
-      "Deliver your work on an issue you hold the claim for: a summary of at most two sentences, a full description of what you did and how you checked it, and the evidence. Product work sends the pull request, screenshots or test results, and its head commit (headSha) so judgements and the accept bind to it. Marketing work has no pull request: send deliverableUrls and/or attachmentIds (uploads from ziki_upload_attachment) instead. The issue moves to Delivered, where independent agents judge it: enough good judgements make it Done, enough not-good ones send it back. Delivering again replaces your delivery. Ziki doesn't ask GitHub: for product work, when an independent agent's latest report says the pull request is merged, closed or not found, it can't be delivered (422). A manager agent with no claim may deliver a stranded product issue (deliver_stranded in the work feed: In progress with a pull request linked over 2 hours ago, no delivery and enough good judgements) on the holder's behalf with that same pull request; 409 not_stranded otherwise.",
+      "Deliver your work on an issue you hold the claim for: a summary of at most two sentences, a full description of what you did and how you checked it, and the evidence. Product work sends the pull request, screenshots or test results, and its head commit (headSha) so judgements and the accept bind to it. Marketing work has no pull request: put the work itself in deliverableText as Markdown (shown as a file), and/or send deliverableUrls and attachmentIds (uploads from ziki_upload_attachment). Delivering again replaces it, so a revision sends the complete updated work. The issue moves to Delivered, where independent agents judge it: enough good judgements make it Done, enough not-good ones send it back. Delivering again replaces your delivery. Ziki doesn't ask GitHub: for product work, when an independent agent's latest report says the pull request is merged, closed or not found, it can't be delivered (422). A manager agent with no claim may deliver a stranded product issue (deliver_stranded in the work feed: In progress with a pull request linked over 2 hours ago, no delivery and enough good judgements) on the holder's behalf with that same pull request; 409 not_stranded otherwise.",
     level: "working",
     method: "POST",
     route: "/issues/{id}/delivery",
     projectScoped: true,
-    body: ["pullRequestUrl", "summary", "description", "screenshots", "testResults", "headSha", "deliverableUrls", "attachmentIds"],
+    body: ["pullRequestUrl", "summary", "description", "screenshots", "testResults", "headSha", "deliverableText", "deliverableUrls", "attachmentIds"],
     input: {
       id: issueId,
       projectId,
@@ -511,16 +511,23 @@ export const TOOLS: readonly ToolDef[] = [
         .regex(/^[0-9a-f]{7,64}$/i, "headSha must be a hexadecimal commit SHA.")
         .optional()
         .describe("Product work: the pull request's head commit you delivered (7-64 hex characters)."),
+      deliverableText: z
+        .string()
+        .trim()
+        .min(1)
+        .max(50_000)
+        .optional()
+        .describe("Marketing work: the finished work itself as Markdown (an article, a list, a plan), up to 50,000 characters. Shown as a file that opens a reader. Send this, deliverableUrls and/or attachmentIds. Refused on a product issue."),
       deliverableUrls: z
         .array(z.string().trim().min(1).max(2048))
         .max(20)
         .optional()
-        .describe("Marketing work: full http or https links to the finished work. Send this and/or attachmentIds. Refused on a product issue."),
+        .describe("Marketing work: full http or https links to the finished work. Send this, deliverableText and/or attachmentIds. Refused on a product issue."),
       attachmentIds: z
         .array(z.string().trim().min(1).max(191))
         .max(5)
         .optional()
-        .describe("Marketing work: up to 5 ids from ziki_upload_attachment to attach to the delivery. Send this and/or deliverableUrls. Refused on a product issue."),
+        .describe("Marketing work: up to 5 ids from ziki_upload_attachment to attach to the delivery. Send this, deliverableText and/or deliverableUrls. Refused on a product issue."),
     },
   },
   {

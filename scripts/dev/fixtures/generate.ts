@@ -577,6 +577,8 @@ type MarketingIssue = {
   /** The worker used up every round, so it reopened for bids with a fresh count. */
   reopened?: boolean;
   deliverable?: string;
+  /** The finished work as Markdown, on a delivery with no link. */
+  deliverableText?: string;
   /** Linked to a related product issue (D6). */
   linked?: boolean;
   comment?: string;
@@ -589,7 +591,21 @@ const MARKETING_ISSUES: MarketingIssue[] = [
     summary: "A short post explaining what changed in the issue list and why.",
     description: "Write and publish a post for people who already use the issue list. Cover what changed, with screenshots.",
     rationale: "People keep asking what changed, and a post answers them all at once.",
-    deliverable: "https://example.com/blog/new-issue-list",
+    deliverableText: [
+      "# What changed in the issue list",
+      "",
+      "The issue list now reads the way the work moves. Each tab holds one main status, and every row says which step it is on.",
+      "",
+      "## What you will notice",
+      "",
+      "- **One status per issue.** A row says *Open · Requires confirmation*, and nothing else competes with it.",
+      "- **Who holds the work.** The holder sits on the row, so you can see what is taken at a glance.",
+      "- **Faster search.** Results now include the text of each description.",
+      "",
+      "## Why we changed it",
+      "",
+      "People kept asking what a label meant. Now there is only one to read.",
+    ].join("\n"),
   },
   {
     substatus: "published", type: "social", reporter: "demo-m", worker: "bayo-w",
@@ -763,12 +779,12 @@ for (const [index, m] of MARKETING_ISSUES.entries()) {
   });
   if (!m.reopened) b.assigneeId = userId(ownerOf(worker));
   activity(bug, ownerOf(worker), "Offer accepted: moved to In progress", clock, "open", "in_progress");
-  if (!m.deliverable) continue;
+  if (!m.deliverable && !m.deliverableText) continue;
 
   // Delivered, with no pull request.
   const delivery: Row = {
-    id: id("delivery", num), bugId: bug, agentId: agentId(worker), beneficiaryUserId: userId(ownerOf(worker)), summary: "Finished it and linked the result.",
-    description: "Checked it with two people who hadn't seen it, and checked every link. Nothing is left open.", pullRequestUrl: null, deliverableUrls: [m.deliverable], ago: step(), updatedAt: clock,
+    id: id("delivery", num), bugId: bug, agentId: agentId(worker), beneficiaryUserId: userId(ownerOf(worker)), summary: m.deliverableText ? "Finished the post, ready to publish." : "Finished it and linked the result.",
+    description: "Checked it with two people who hadn't seen it, and checked every link. Nothing is left open.", pullRequestUrl: null, deliverableUrls: m.deliverable ? [m.deliverable] : [], deliverableText: m.deliverableText ?? null, ago: step(), updatedAt: clock,
   };
   rows.deliveries.push(delivery);
   activity(bug, ownerOf(worker), "Work delivered: moved to Done · Requires review", clock, "in_progress", "requires_review");

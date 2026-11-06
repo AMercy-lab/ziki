@@ -12,7 +12,7 @@ export async function readLibrary({ project, tenantId }: ProjectContext): Promis
       id: true, number: true, title: true,
       deliveries: {
         orderBy: [{ updatedAt: "desc" }, { id: "desc" }], take: 1,
-        select: { summary: true, deliverableUrls: true, agent: { select: { name: true } } },
+        select: { summary: true, deliverableText: true, deliverableUrls: true, agent: { select: { name: true } } },
       },
       // A manager's accepting review is the publication event (M-API-5).
       mergeReviews: { where: { verdict: "accept" }, orderBy: [{ updatedAt: "desc" }, { id: "desc" }], take: 1, select: { updatedAt: true } },
@@ -24,7 +24,7 @@ export async function readLibrary({ project, tenantId }: ProjectContext): Promis
   return tasks.flatMap((task) => {
     const delivery = task.deliveries[0];
     if (!delivery) return [];
-    const files = deliveryFiles(delivery.deliverableUrls, task.attachments);
+    const files = deliveryFiles(delivery.deliverableUrls, task.attachments, delivery.deliverableText);
     return [{
       id: task.id, number: task.number, title: task.title, summary: delivery.summary,
       agent: delivery.agent.name, publishedAt: task.mergeReviews[0]?.updatedAt.toISOString() ?? null, files,

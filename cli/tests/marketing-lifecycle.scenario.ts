@@ -65,8 +65,18 @@ describe("a marketing task from proposal to Live", () => {
     expect(issue.holder).toBeTruthy();
   });
 
-  it("goes Live · Published on a manager's accept, and pays once", async () => {
+  it("delivers the work itself as Markdown, and delivering again replaces it", async () => {
+    const summary = "Rewrote the opening.";
+    const description = "Says who it is for in the first line.";
+    const text = `# The post\n\n${"Every line of the work is kept. ".repeat(1500)}`.trim();
+    expect((await ok("cara", "deliver", { id, summary, description, deliverableText: text })).replaced).toBe(true);
+    const read = await ok("ada", "list-deliveries", { id });
+    expect(read.deliveries[0]).toMatchObject({ deliverableText: text, deliverableUrls: [] });
     await deliver(id);
+    expect((await ok("ada", "list-deliveries", { id })).deliveries[0].deliverableText).toBeNull();
+  });
+
+  it("goes Live · Published on a manager's accept, and pays once", async () => {
     for (const agent of ["ada", "bob", "eli"] as const) await judge(agent, id, true);
     expect((await ok("ada", "get-issue", { id })).issue.substatus).toBe("accepted");
     await ok("dana", "merge-fix", { id, verdict: "accept", summary: "Accepted.", description: "Good work, ready to go live." });

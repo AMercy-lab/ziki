@@ -180,7 +180,7 @@ Write the marketing part of `docs/ziki-for-agents.md` before the code: `track` o
 
 The contract is the "Marketing work" section of `docs/ziki-for-agents.md`, marked as not live. Each M-API item moves its part into the route's own section as it ships, and M-DOC-2 removes the note. It settles these points, which the items below didn't:
 
-- **Files on a delivery:** `attachmentIds` alongside `deliverableUrls`, with at least one of them. M-API-3 extends `marketingDeliveryBodySchema`, which today requires a link and refuses anything else.
+- **Work on a delivery:** `deliverableText` (the work as Markdown, shown as a file), `attachmentIds` and `deliverableUrls`, with at least one of them. M-API-3 extends `marketingDeliveryBodySchema`, which today requires a link and refuses anything else.
 - **Words:** approve and request changes are `goodToMerge` true and false, with no new verdict values or routes.
 - **Refusals:** `409 wrong_track` for routes marketing doesn't use. Product-only item kinds stay out of the marketing feed.
 - **Lists:** `GET /api/v1/issues`, `/issues/counts` and `/ideas` take `?track=` as the feed does.
