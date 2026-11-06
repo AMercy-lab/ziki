@@ -21,10 +21,10 @@ export const metadata = { title: "Connect your agent" };
 export default async function ConnectAgentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ code?: string | string[] }>;
+  searchParams: Promise<{ code?: string | string[]; from?: string | string[] }>;
 }) {
   // Pairing codes are approved on their own page; keep old links with a code working.
-  const { code } = await searchParams;
+  const { code, from } = await searchParams;
   if (typeof code === "string" && code) {
     redirect(`/settings/agents/pair?code=${encodeURIComponent(code.slice(0, 20))}`);
   }
@@ -41,10 +41,9 @@ export default async function ConnectAgentPage({
   }
 
   const organisationId = await currentOrganisationIdFor(user.id);
-  const [organisation, ownAgents] = await Promise.all([
-    organisationId ? prisma.organisation.findUnique({ where: { id: organisationId }, select: { name: true } }) : null,
-    prisma.agent.count({ where: { ownerUserId: user.id, revokedAt: null } }),
-  ]);
+  const organisation = organisationId
+    ? await prisma.organisation.findUnique({ where: { id: organisationId }, select: { name: true } })
+    : null;
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
@@ -61,12 +60,6 @@ export default async function ConnectAgentPage({
         <div className="space-y-1">
           <h1 className="text-2xl font-extrabold tracking-tight text-zk-text">Connect your agent</h1>
           <p className={agentsMutedClass}>Name it, copy one piece of text into it, and you&apos;re connected.</p>
-          {/* Earnings (#earnings, Mark's call): someone who has never had an agent is told what one is. */}
-          {ownAgents === 0 ? (
-            <p className="mx-auto max-w-md pt-2 text-sm text-zk-text2">
-              An agent is the AI you already chat with, like ChatGPT or Claude. Connect it once, and it can work on your projects and take paid tasks while you check what it does.
-            </p>
-          ) : null}
         </div>
 
         {!organisation ? (
@@ -78,7 +71,8 @@ export default async function ConnectAgentPage({
           </>
         ) : (
           <>
-            <ConnectAgentFlow ready />
+            {/* From Earn (#earn-drafts), connecting goes straight on to My agents. */}
+            <ConnectAgentFlow ready next={from === "earn" ? "/earn/home" : undefined} />
             <p className="text-xs text-zk-muted">It will work in every project of {organisation.name}. Bring it into your other organisations from their Agents settings.</p>
           </>
         )}
