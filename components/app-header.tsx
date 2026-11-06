@@ -361,11 +361,11 @@ export function AppHeader({
             <div className="inline-flex h-10 shrink-0 items-center gap-1 rounded-full border border-zk-border bg-zk-surface p-1">
               <Link
                 href="/earnings"
-                aria-label={`${formatZ(earned)} earned. Open Your earnings`}
                 aria-current={isNavItemActive(pathname, "/earnings") ? "page" : undefined}
                 className={`rounded-full px-2.5 py-1 text-sm font-bold tabular-nums text-zk-text hover:bg-zk-chip ${linkFocus}`}
               >
                 {formatZ(earned)}
+                <span className="sr-only"> earned: Your earnings</span>
               </Link>
               <Link
                 href="/withdraw"
