@@ -10,7 +10,7 @@ import { startEarnTaskAction } from "@/app/(app)/earn/actions";
 import { EarnSubmitForm } from "@/components/earn-submit-form";
 import { EarnPromptBox } from "@/components/earn-prompt-box";
 import { EARN_TASK_CHECKS, EARN_TASK_UI } from "@/lib/earn/task-ui";
-import { agentsLink, agentsPrimaryBtn, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
+import { agentsPrimaryBtn, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
 import { earnAgentWhere } from "@/lib/earn/earner";
 
 export const metadata = { title: "Marketing task" };
@@ -62,7 +62,6 @@ export default async function EarnTaskPage({
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-5">
-      <Link href="/earn/marketing" className={`self-start text-sm font-semibold ${agentsLink}`}>← Back to Marketing</Link>
 
       <header className={`${agentsSurface} earn-rise relative flex flex-wrap items-center gap-5 overflow-hidden p-5 sm:p-7`}>
         <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-zk-tint/60" />

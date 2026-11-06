@@ -524,6 +524,29 @@
 .ziki-homepage .earn-steps { padding-bottom: 40px; padding-top: 72px; }
 .ziki-homepage .earn-closing { padding-bottom: 96px; padding-top: 56px; }
 
+/* Home page FAQ (after koyaacademy.com): two columns of questions on hairline rows, each with a small plus that
+   turns into a cross when it opens. No boxes. */
+.ziki-homepage .home-faq { padding-bottom: 48px; padding-top: 80px; }
+.ziki-homepage .home-faq .section-heading { margin-bottom: 40px; }
+.ziki-homepage .home-faq-list { column-gap: 48px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0 auto; max-width: 1040px; }
+.ziki-homepage .home-faq-item { border-top: 1px solid var(--line); }
+.ziki-homepage .home-faq-item:nth-last-child(-n+2) { border-bottom: 1px solid var(--line); }
+.ziki-homepage .home-faq-item summary { align-items: center; cursor: pointer; display: flex; font-size: 16px; font-weight: 500; gap: 16px; justify-content: space-between; letter-spacing: -.01em; list-style: none; padding: 20px 0; transition: color .2s ease; }
+.ziki-homepage .home-faq-item summary:hover { color: var(--green); }
+.ziki-homepage .home-faq-item summary::-webkit-details-marker { display: none; }
+.ziki-homepage .home-faq-item summary:focus-visible { border-radius: 6px; outline: 3px solid #3978f6; outline-offset: 2px; }
+.ziki-homepage .home-faq-plus { flex-shrink: 0; height: 12px; position: relative; transition: transform .25s cubic-bezier(0.16, 1, 0.3, 1); width: 12px; }
+.ziki-homepage .home-faq-plus::before, .ziki-homepage .home-faq-plus::after { background: currentColor; border-radius: 1px; content: ""; height: 1.5px; left: 0; opacity: .7; position: absolute; top: 5px; width: 12px; }
+.ziki-homepage .home-faq-plus::after { transform: rotate(90deg); }
+.ziki-homepage .home-faq-item[open] .home-faq-plus { transform: rotate(45deg); }
+.ziki-homepage .home-faq-item p { color: var(--muted); font-size: 15px; line-height: 1.65; margin: 0; padding: 0 28px 22px 0; }
+@media (max-width: 760px) {
+  .ziki-homepage .home-faq-list { grid-template-columns: 1fr; }
+  .ziki-homepage .home-faq-item:nth-last-child(-n+2) { border-bottom: 0; }
+  .ziki-homepage .home-faq-item:last-child { border-bottom: 1px solid var(--line); }
+}
+@media (prefers-reduced-motion: reduce) { .ziki-homepage .home-faq-plus { transition: none; } }
+
 /* /earn: the headline's last word cycles, each one sliding up into place. */
 .ziki-homepage .earn-word-slot { display: inline-block; overflow: hidden; vertical-align: bottom; padding-bottom: .08em; }
 .ziki-homepage .earn-word { display: inline-block; animation: earn-word-in .55s cubic-bezier(0.16, 1, 0.3, 1) both; }
