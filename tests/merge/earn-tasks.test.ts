@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
 import { giveEarnVerdict, listEarnTasksToCheck } from "@/lib/earn/review";
+import { outreachProof, parseResearch, recordOpen, setSent } from "@/lib/earn/outreach";
 import { confirmTask, grantWelcome, isNewEarnAccount, paidCount, rejectTask, doneTasks, startTask, submitTask, taskStateFor } from "@/lib/earn/progress";
 
 type TaskRow = { userId: string; taskKey: string; status: string; proof?: string | null; note?: string | null };
@@ -198,5 +199,48 @@ describe("manager agent verdicts on earn tasks (#earn-agent-review)", () => {
     const tasks = await listEarnTasksToCheck(db, manager, "tenant-earn");
     expect(tasks.map((task) => task.id)).toEqual(["t1"]);
     expect(tasks[0].task.checklist.length).toBeGreaterThan(0);
+  });
+});
+
+/** Send 10 emails (#earn-outreach): each business gets its own link that counts who opened it. */
+describe("earn email task outreach (#earn-outreach)", () => {
+  it("reads the businesses from the research answer, one per line, with an email or website, no repeats, at most 10", () => {
+    const list = parseResearch("1. Dainty Affairs, Ikeja, bakemycake@daintyaffairs.com\n- Cakes By Tegz, Ikeja, cakesbytegz.com\nDainty Affairs, again\n\n" + Array.from({ length: 12 }, (_, i) => `Bakery ${i}`).join("\n"));
+    expect(list[0]).toEqual({ name: "Dainty Affairs", contact: "bakemycake@daintyaffairs.com" });
+    expect(list[1]).toEqual({ name: "Cakes By Tegz", contact: "cakesbytegz.com" });
+    expect(list).toHaveLength(10);
+  });
+
+  it("ticks only the earner's own businesses, and counts every open of a link", async () => {
+    const rows = [{ id: "c1", userId: "earner", code: "abc1234", openedAt: null as Date | null, opens: 0, sentAt: null as Date | null }];
+    const db = {
+      earnContact: {
+        updateMany: vi.fn(async ({ where, data }: { where: { id: string; userId: string }; data: { sentAt: Date | null } }) => {
+          const hit = rows.filter((row) => row.id === where.id && row.userId === where.userId);
+          hit.forEach((row) => Object.assign(row, data));
+          return { count: hit.length };
+        }),
+        findUnique: vi.fn(async ({ where }: { where: { code: string } }) => rows.find((row) => row.code === where.code) ?? null),
+        update: vi.fn(async ({ where, data }: { where: { id: string }; data: { opens: { increment: number }; openedAt?: Date } }) => {
+          const row = rows.find((candidate) => candidate.id === where.id)!;
+          row.opens += data.opens.increment;
+          if (data.openedAt) row.openedAt = data.openedAt;
+        }),
+      },
+    } as never;
+    expect(await setSent(db, "someone-else", "c1", true)).toBe(false);
+    expect(await setSent(db, "earner", "c1", true)).toBe(true);
+    expect(await recordOpen(db, "abc1234")).toBe(true);
+    expect(await recordOpen(db, "abc1234")).toBe(true);
+    expect(await recordOpen(db, "nope000")).toBe(false);
+    expect(rows[0]).toMatchObject({ opens: 2, openedAt: expect.any(Date), sentAt: expect.any(Date) });
+  });
+
+  it("sends in only the businesses ticked sent, noting who opened their link", () => {
+    const proof = outreachProof([
+      { name: "Dainty Affairs", contact: "a@b.co", sentAt: new Date(), opens: 1 },
+      { name: "Not sent yet", contact: null, sentAt: null, opens: 0 },
+    ]);
+    expect(proof).toBe("Dainty Affairs, a@b.co (opened the link)");
   });
 });

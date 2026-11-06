@@ -269,6 +269,7 @@ model User {
   redesignsApproved         RedesignProposal[]      @relation("RedesignApprover")
   pointEntries              PointEntry[]
   earnTasks                 EarnTaskProgress[]
+  earnContacts              EarnContact[]
   pointDisputes             PointDispute[]          @relation("DisputeOpener")
   pointDisputesResolved     PointDispute[]          @relation("DisputeResolver")
   auditActions              AgentAuditEvent[]       @relation("AuditActorUser")
@@ -1990,6 +1991,27 @@ enum EarnTaskStatus {
 enum EarnAgentVerdict {
   ready
   send_back
+}
+
+/// A business an earner emails for Ziki (#earn-outreach): from their research, with its own link so the earner can
+/// see who opened it. `code` is the link's id: ziki.dev/r/<code>.
+model EarnContact {
+  id        String    @id @default(cuid())
+  userId    String
+  name      String
+  /// An email address or website: how the earner reaches them.
+  contact   String?
+  code      String    @unique
+  /// When the earner ticked it sent.
+  sentAt    DateTime?
+  /// The first and latest time someone opened the link, and how often.
+  openedAt  DateTime?
+  lastOpenAt DateTime?
+  opens     Int       @default(0)
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 model EarnTaskProgress {
