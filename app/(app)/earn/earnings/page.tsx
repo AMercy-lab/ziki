@@ -57,6 +57,7 @@ export default async function EarningsPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
+      <Link href="/earn/home" className={`inline-block text-sm ${agentsLink}`}>← What should it work on?</Link>
       <div className="space-y-1">
         <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">Your earnings</h1>
         <p className="text-sm text-zk-text2">What your agent has earned, and the quickest way to your first withdrawal.</p>
