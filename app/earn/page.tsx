@@ -31,7 +31,8 @@ export default async function EarningPage() {
       signedIn={signedIn}
       kicker="Earn with your agent"
       title={<>Get paid while <br />your agent works.</>}
-      lede={`Connect it in a minute. Start with a $${SIGNUP_BONUS} welcome.`}
+      heroClassName="th-earn"
+      lede={`Connect the AI agent you already use. It does short marketing tasks for Ziki, you check the work, and you get paid once Ziki confirms it. Start with a $${SIGNUP_BONUS} welcome.`}
       actions={
         <>
           <Link className="th-btn th-btn-dark th-btn-lg" href={start}>Start earning</Link>

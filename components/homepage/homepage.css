@@ -493,6 +493,9 @@
 .ziki-homepage .th-page { min-height: 560px; padding-bottom: 96px; }
 .ziki-homepage .th-page .th-photo img { object-position: 50% 30%; }
 .ziki-homepage .th-page .th-title { font-size: clamp(38px, 4.8vw, 66px); }
+/* /earn: as tall as the other photo headers, with the boat kept whole. */
+.ziki-homepage .th-earn { min-height: 640px; }
+.ziki-homepage .th-earn .th-lede { max-width: 560px; }
 .ziki-homepage .th-kicker { color: rgba(255,255,255,.85); display: block; font-family: var(--font-geist-mono), ui-monospace, monospace; font-size: 12px; letter-spacing: .08em; margin-bottom: 18px; text-transform: uppercase; }
 
 /* Homepage: three ways in */

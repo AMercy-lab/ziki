@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 /**
  * Earn marketing tasks (#earn-tasks): a task pays when staff confirm it, once,
- * and never before. Tasks open in order.
+ * and never before. The four tasks are independent: all open from the start, in any order.
  */
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
-import { confirmTask, grantWelcome, isNewEarnAccount, paidCount, rejectTask, startNextTask, submitTask, taskStateFor } from "@/lib/earn/progress";
+import { confirmTask, grantWelcome, isNewEarnAccount, paidCount, rejectTask, startedFromRows, startTask, submitTask, taskStateFor, tasksLeftPay, type EarnTaskRow } from "@/lib/earn/progress";
 
 type TaskRow = { userId: string; taskKey: string; status: string; proof?: string | null; note?: string | null };
 type Where = { userId?: string; taskKey?: string; status?: string | { in: string[] } };
@@ -74,17 +74,29 @@ describe("earn tasks (#earn-tasks)", () => {
 
   it("pays nothing for a task that was never sent in", async () => {
     const { state, db } = fakeEarnDb();
-    await startNextTask(db, "earner");
+    await startTask(db, "earner", 1);
     expect((await confirm(db)).ok).toBe(false);
     expect(state.ledger).toEqual([]);
   });
 
-  it("opens tasks in order: a later task cannot be sent in, or counted, before the one before is confirmed", async () => {
+  it("opens every task from the start: any one can be sent in, and paid, in any order", async () => {
     const { state, db } = fakeEarnDb();
-    expect(await submitTask(db, "earner", 2, "ten businesses")).toEqual({ ok: false, error: expect.any(String) });
+    // Nothing starts until the earner opens a task; opening one starts that one only, once.
     expect(state.tasks).toEqual([]);
-    expect(paidCount([{ taskKey: "research", status: "confirmed", note: null }])).toBe(0);
-    expect(taskStateFor([], 1)).toBe("locked");
+    expect(await startTask(db, "earner", 3)).toBe(true);
+    expect(await startTask(db, "earner", 3)).toBe(false);
+    expect(state.tasks.map((row) => row.taskKey)).toEqual(["emails"]);
+    expect(await submitTask(db, "earner", 3, "ten addresses")).toEqual({ ok: true });
+    expect(await confirm(db, "emails")).toEqual({ ok: true });
+    expect(state.ledger).toEqual([expect.objectContaining({ points: 4, sourceKey: "earn:earner:emails" })]);
+  });
+
+  it("counts confirmed tasks wherever they sit, and reads each task's state from its own row", () => {
+    const rows: EarnTaskRow[] = [{ taskKey: "emails", status: "confirmed", note: null }, { taskKey: "who", status: "submitted", note: null }, { taskKey: "post", status: "started", note: null }];
+    expect(paidCount(rows)).toBe(1);
+    expect([0, 1, 2, 3].map((i) => taskStateFor(rows, i))).toEqual(["in-review", "open", "paid", "in-progress"]);
+    expect(startedFromRows(rows)).toBe(1);
+    expect(tasksLeftPay(rows)).toBe(3 + 2 + 5);
   });
 
   it("sends a task back with a reason, lets it be sent again, and refuses a send-back with no reason", async () => {
@@ -119,12 +131,5 @@ describe("earn tasks (#earn-tasks)", () => {
     expect(await isNewEarnAccount(db, "old-timer")).toBe(false);
     // The money is not tied to it: the older account still gets the $5.
     expect(await grantWelcome(db, "old-timer", "ziki-earn")).toBe(true);
-  });
-
-  it("starts the next task once, however often it is asked", async () => {
-    const { state, db } = fakeEarnDb();
-    expect(await startNextTask(db, "earner")).toBe(1);
-    expect(await startNextTask(db, "earner")).toBeNull();
-    expect(state.tasks).toHaveLength(1);
   });
 });
