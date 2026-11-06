@@ -313,7 +313,12 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
       issueId: lookup.issueId,
     });
     if (!hint) notFound();
-    const currentWorkspace = activeTenantId ? await prisma.tenant.findFirst({ where: { id: activeTenantId, archivedAt: null, memberships: { some: { userId } } }, select: { name: true } }) : null;
+    const currentWorkspace = activeTenantId ? await loadOptional("current workspace", null, () =>
+      prisma.tenant.findFirst({
+        where: { id: activeTenantId, archivedAt: null, memberships: { some: { userId } } },
+        select: { name: true },
+      }),
+    ) : null;
     return <IssueTenantSwitch issueId={lookup.issueId} tenant={hint} currentWorkspace={currentWorkspace?.name} destination={`${issuePath(projectRef(org, projectSlug), number)}${queryString(query)}`} />;
   }
   if (lookup.kind === "moved") {

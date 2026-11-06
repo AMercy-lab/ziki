@@ -17,7 +17,6 @@ import {
 } from "@/lib/invites";
 import { acceptShareLink, createShareLink, revokeShareLink } from "@/lib/share-invites";
 import { prisma } from "@/lib/prisma";
-import { resolveIssueWorkspaceSwitch } from "@/lib/issue-workspace-switch";
 import { RATE_LIMIT_MESSAGE, consumeRateLimit } from "@/lib/rate-limit";
 import {
   CREATE_TENANT_RATE_LIMIT,
@@ -76,20 +75,6 @@ export async function selectTenantAction(formData: FormData): Promise<void> {
     redirect(`/tenants?error=${encodeURIComponent("Restore this organization before opening it.")}`);
   }
   await enterTenant(tenant.id);
-}
-
-/**
- * Switch to the tenant that owns an issue the viewer followed a link to
- * (#519), then land on that issue. Membership is re-checked here: the hint
- * on the page is presentation, this is the guard.
- */
-export async function switchTenantForIssueAction(formData: FormData): Promise<void> {
-  const user = await requireUser();
-  const result = await resolveIssueWorkspaceSwitch(prisma, user.id, {issueId: String(formData.get("issueId") ?? ""), tenantId: String(formData.get("tenantId") ?? ""), returnTo: formData.get("returnTo")});
-  if (!result) redirect("/home");
-  await setActiveTenantCookie(result.tenantId);
-  revalidatePath("/", "layout");
-  redirect(result.destination);
 }
 
 /** Create a tenant owned by the person, with its first project, and enter it. */
