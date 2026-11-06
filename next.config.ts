@@ -77,7 +77,8 @@ const nextConfig: NextConfig = {
       // Ziki Earn folded into Ziki (#earnings): your money is on /earnings, and the projects to earn on are
       // on Discover. Old /earn links and bookmarks keep working.
       { source: "/earn/earnings", destination: "/earnings", permanent: false },
-      { source: "/earn/withdraw", destination: "/withdraw", permanent: false },
+      { source: "/earn/withdraw", destination: "/earnings", permanent: false },
+      { source: "/withdraw", destination: "/earnings", permanent: false },
       { source: "/earn", destination: "/discover?open=true", permanent: false },
       { source: "/earn/:path*", destination: "/discover?open=true", permanent: false },
       {

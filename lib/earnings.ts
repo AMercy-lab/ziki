@@ -13,8 +13,7 @@ import { issueHref } from "@/lib/issue-ref";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
-/** Withdrawals open once someone has earned this much. */
-export const WITHDRAW_THRESHOLD = 30;
+export { WITHDRAW_THRESHOLD } from "@/lib/earnings-threshold";
 
 /** The weekly goal until a person sets their own. */
 export const DEFAULT_WEEKLY_GOAL = 50;

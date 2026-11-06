@@ -26,6 +26,7 @@ import { BASE_PATH } from "@/lib/base-path";
 import { PAGE_CONTAINER_CLASS } from "@/components/page-container";
 import { ZikiMark } from "@/components/ziki-mark";
 import { formatZ } from "@/lib/points/rules";
+import { WithdrawWindow } from "@/components/withdraw-window";
 
 const linkFocus =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue focus-visible:ring-offset-2";
@@ -357,7 +358,7 @@ export function AppHeader({
             squeezed. */}
         <div className={`ml-auto flex min-w-0 items-center justify-end gap-2 max-sm:gap-1 lg:shrink-0 flex-wrap`}>
           {earned !== null ? (
-            // Earnings (#earnings), on every page: the amount opens Your earnings, Withdraw opens Withdraw. Two pages.
+            // Earnings (#earnings), on every page: the amount opens Your earnings; Withdraw opens a window over the page.
             <div className="inline-flex h-10 shrink-0 items-center gap-1 rounded-full border border-zk-border bg-zk-surface p-1">
               <Link
                 href="/earnings"
@@ -367,13 +368,9 @@ export function AppHeader({
                 {formatZ(earned)}
                 <span className="sr-only"> earned: Your earnings</span>
               </Link>
-              <Link
-                href="/withdraw"
-                aria-current={isNavItemActive(pathname, "/withdraw") ? "page" : undefined}
-                className={`rounded-full bg-electric-blue-strong px-3 py-1.5 text-xs font-bold text-white hover:bg-[#2552af] max-sm:hidden ${linkFocus}`}
-              >
+              <WithdrawWindow earned={earned} className={`rounded-full bg-electric-blue-strong px-3 py-1.5 text-xs font-bold text-white hover:bg-[#2552af] max-sm:hidden ${linkFocus}`}>
                 Withdraw
-              </Link>
+              </WithdrawWindow>
             </div>
           ) : null}
 
