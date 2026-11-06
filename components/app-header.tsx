@@ -154,6 +154,11 @@ function TopNav({ pathname, projectSlug }: { pathname: string | null; projectSlu
           <path d="m9 12 2 2 4-4" />
         </NavIcon>
       </TopNavLink>
+      <TopNavLink href="/forum" active={isNavItemActive(pathname, "/forum")} label="Forum">
+        <NavIcon>
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </NavIcon>
+      </TopNavLink>
     </nav>
   );
 }
