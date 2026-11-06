@@ -101,8 +101,8 @@ export function isMissingTenantColumnError(error: unknown): boolean {
     (error as { code?: unknown }).code === "P2022" &&
     "meta" in error &&
     typeof (error as { meta?: { column?: unknown } }).meta?.column === "string"
-    ? (error as { meta: { column: string } }).meta.column
-    : "";
+      ? (error as { meta: { column: string } }).meta.column
+      : "";
   return /column [`'"]?(?:[\w."]+\.)*(?:tenantId|projectId)[`'"]?(?: of relation [`'"]?[\w.]+[`'"]?)? does not exist/i.test(
     `${message}\n${metaColumn}`,
   ) || /^(?:[\w."]+\.)*(?:tenantId|projectId)$/i.test(metaColumn);

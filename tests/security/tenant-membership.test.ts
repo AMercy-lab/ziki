@@ -30,13 +30,13 @@ vi.mock("@/lib/prisma", () => ({
     idea: { create: vi.fn() },
     // #project-urls: the form names its project; only one in the reporter's tenant is used.
     project: {
-      findFirst: vi.fn(async ({ where }: { where: { id: string; tenantId: string } }) =>
-        where.id === "project-zedu" && where.tenantId === "tenant-zedu" ? { id: "project-zedu", slug: "zedu" } : null),
+      findFirst: vi.fn(async ({ where }: { where: { id: string; tenantId?: string } }) =>
+        where.id === "project-zedu" ? { id: "project-zedu", slug: "zedu", tenantId: "tenant-zedu" } : null),
     },
     projectArea: { findFirst: vi.fn() },
     membership: {
       findUnique: vi.fn(async ({ where }: any) =>
-        where?.tenantId_userId?.tenantId === "tenant-zedu" ? { id: "m-1" } : null
+        where?.tenantId_userId?.tenantId === "tenant-zedu" && where?.tenantId_userId?.userId !== "stranger-1" ? { id: "m-1" } : null
       ),
     },
     projectMembership: { findUnique: vi.fn().mockResolvedValue(null) },
@@ -49,6 +49,7 @@ vi.mock("@/lib/prisma", () => ({
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
 import { currentTenantIdFor, NO_TENANT_MESSAGE } from "@/lib/tenant-context";
+import { canContributeToProject } from "@/lib/project-permissions";
 import { createBugAction, updateBugAction } from "@/app/actions/issues";
 
 const db = prisma as unknown as {
@@ -78,6 +79,10 @@ describe("issue actions are tenant-scoped (#425)", () => {
     vi.clearAllMocks();
     (requireUser as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "user-1", role: "user" });
     db.$transaction.mockImplementation(async (run: (tx: unknown) => unknown) => run(prisma));
+    (prisma.membership.findUnique as any).mockImplementation(async ({ where }: any) =>
+      where?.tenantId_userId?.tenantId === "tenant-zedu" ? { id: "m-1" } : null
+    );
+    (prisma.projectMembership.findUnique as any).mockResolvedValue(null);
   });
 
   it("refuses to file a report for someone with no membership", async () => {
@@ -98,7 +103,33 @@ describe("issue actions are tenant-scoped (#425)", () => {
     });
   });
 
-  it("refuses a project from another tenant", async () => {
+  it("allows direct project members to file issues even without org membership", async () => {
+    tenantOf.mockResolvedValue(null);
+    (requireUser as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "external-1", role: "user" });
+    (prisma.projectMembership.findUnique as any).mockResolvedValue({ id: "pm-1" });
+    (prisma.membership.findUnique as any).mockResolvedValue(null);
+    db.idea.create.mockRejectedValue(new Error("stop after create"));
+
+    await createBugAction(report).catch(() => undefined);
+    expect(db.idea.create).toHaveBeenCalledTimes(1);
+    expect(db.idea.create.mock.calls[0][0].data).toMatchObject({
+      tenantId: "tenant-zedu",
+      projectId: "project-zedu",
+    });
+  });
+
+  it("refuses uninvited non-members from submitting issues", async () => {
+    tenantOf.mockResolvedValue("tenant-personal");
+    (requireUser as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "stranger-1", role: "user" });
+    (prisma.projectMembership.findUnique as any).mockResolvedValue(null);
+    (prisma.membership.findUnique as any).mockResolvedValue(null);
+
+    const result = await createBugAction(report);
+    expect(result).toEqual({ error: "You must be a member of this project to submit issues." });
+    expect(db.idea.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a project that does not exist or is in another tenant", async () => {
     tenantOf.mockResolvedValue("tenant-zedu");
     const result = await createBugAction(form({
       title: "Login button does nothing",
@@ -131,5 +162,36 @@ describe("issue actions are tenant-scoped (#425)", () => {
       error: expect.any(String),
     });
     expect(db.bug.findUnique.mock.calls[0][0].where).toEqual({ id: "bug-in-acme", tenantId: "tenant-zedu" });
+  });
+});
+
+describe("canContributeToProject permissions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("allows super_admin regardless of membership", async () => {
+    const allowed = await canContributeToProject({ id: "admin-1", role: "super_admin" }, "p-1", "t-1");
+    expect(allowed).toBe(true);
+  });
+
+  it("allows direct project members", async () => {
+    (prisma.projectMembership.findUnique as any).mockResolvedValue({ id: "pm-1" });
+    const allowed = await canContributeToProject({ id: "user-1", role: "user" }, "p-1", "t-1");
+    expect(allowed).toBe(true);
+  });
+
+  it("allows organization members", async () => {
+    (prisma.projectMembership.findUnique as any).mockResolvedValue(null);
+    (prisma.membership.findUnique as any).mockResolvedValue({ id: "m-1" });
+    const allowed = await canContributeToProject({ id: "user-1", role: "user" }, "p-1", "t-1");
+    expect(allowed).toBe(true);
+  });
+
+  it("denies uninvited non-members", async () => {
+    (prisma.projectMembership.findUnique as any).mockResolvedValue(null);
+    (prisma.membership.findUnique as any).mockResolvedValue(null);
+    const allowed = await canContributeToProject({ id: "stranger-1", role: "user" }, "p-1", "t-1");
+    expect(allowed).toBe(false);
   });
 });

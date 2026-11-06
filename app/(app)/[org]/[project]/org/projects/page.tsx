@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { CopyProjectIdButton } from "@/app/(app)/projects/copy-project-id";
 import { ideasPath, issuesPath, projectRef } from "@/lib/project-paths";
+import { CreateProjectForm } from "@/app/(app)/projects/create-project-form";
 import {
   deleteProjectAction,
   setProjectArchivedAction,
@@ -77,24 +78,19 @@ export default async function OrgProjectsPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <OrgPageHeader
-        title="Projects"
-        actions={
-          canManageProjects ? (
-            <Link
-              href={`/${(await routeParams).org}/projects/new`}
-              className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-electric-blue-strong px-4 text-xs font-bold text-white shadow-sm transition hover:brightness-110"
-            >
-              + Create Project
-            </Link>
-          ) : null
-        }
-      >
+      <OrgPageHeader title="Projects">
         A project is one product inside {org.name}, such as a web app. The issue list follows the
         project selected in the bar.{canManageProjects ? " Open a project's settings for its workflow, areas and GitHub App." : ""}
       </OrgPageHeader>
 
       <OrgMessages error={oneParam(params.error)} notice={oneParam(params.notice)} />
+
+      <section className="rounded-[20px] border border-zk-border bg-zk-surface p-4 sm:p-6">
+        <h3 className="text-base font-semibold text-zk-text">
+          Create a project
+        </h3>
+        <CreateProjectForm defaults={platformDefaults} />
+      </section>
 
       <section className="overflow-hidden rounded-[20px] border border-zk-border bg-zk-surface">
         <div className="border-b border-zk-border bg-zk-tint px-4 py-3 sm:px-6">
@@ -112,7 +108,7 @@ export default async function OrgProjectsPage({
             </p>
           ) : (
             <div className="space-y-2 px-4 py-6 text-sm text-zk-text2 sm:px-6">
-              <p className="font-medium text-zk-text">No projects yet. Create your first project to get started.</p>
+              <p className="font-medium text-zk-text">No projects yet. Create the first one above.</p>
               <p>
                 Make one project per product you track, so each gets its own issues. For example, a
                 software team might have <span className="font-medium">Web app</span>,{" "}

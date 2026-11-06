@@ -236,17 +236,31 @@ export async function createBugAction(
       ? parsed.data.typeId
       : null;
 
-  // #425: the idea goes into the reporter's tenant. No membership, no idea.
-  const tenantId = await currentTenantIdFor(userId);
-  // #project-urls: the project the form was opened in, and only if it is in this workspace.
-  const requestedProjectId = typeof formData.get("projectId") === "string" ? String(formData.get("projectId")) : "";
-  const targetProject = tenantId && requestedProjectId
-    ? await prisma.project.findFirst({ where: { id: requestedProjectId, tenantId, archivedAt: null }, select: { id: true, slug: true, tenant: { select: { slug: true } } } })
+  // #project-urls: the project the form was opened in.
+  const currentTenant = await currentTenantIdFor(userId);
+  const requestedProjectId = typeof formData.get("projectId") === "string" ? String(formData.get("projectId")).trim() : "";
+  const targetProject = requestedProjectId
+    ? await prisma.project.findFirst({
+        where: { id: requestedProjectId, archivedAt: null },
+        select: { id: true, slug: true, tenantId: true, tenant: { select: { slug: true } } },
+      })
     : null;
-  if (!tenantId || !targetProject) {
+  if (!targetProject) {
     return { error: NO_TENANT_MESSAGE };
   }
   const projectId = targetProject.id;
+  const tenantId = targetProject.tenantId;
+
+  const isDirectProjectMember = Boolean(
+    await prisma.projectMembership?.findUnique?.({
+      where: { projectId_userId: { projectId, userId } },
+      select: { id: true },
+    })
+  );
+  if (!currentTenant && !isDirectProjectMember && user.role !== "super_admin") {
+    return { error: NO_TENANT_MESSAGE };
+  }
+
   if (!(await canContributeToProject(user, projectId, tenantId))) {
     return { error: "You must be a member of this project to submit issues." };
   }
@@ -1248,7 +1262,7 @@ export async function addCommentAction(
   }
 
   const bug = await prisma.bug.findUnique({
-    where: { id: bugId, ...bugInTenant(await currentTenantIdFor(userId)) },
+    where: { id: bugId },
     select: {
       id: true,
       isDeleted: true,
@@ -1256,6 +1270,7 @@ export async function addCommentAction(
       reporterId: true,
       assigneeId: true,
       tenantId: true,
+      projectId: true,
       status: true,
       substatus: true,
       pullRequestUrl: true,
@@ -1263,6 +1278,11 @@ export async function addCommentAction(
   });
   if (!bug || bug.isDeleted) {
     return { error: "Issue not found" };
+  }
+
+  const currentUser = await requireUser();
+  if (!(await canContributeToProject(currentUser, bug.projectId, bug.tenantId))) {
+    return { error: "You must be a member of this project to comment." };
   }
 
   // One rule for where a comment may go, as for agents (lib/comment-placement.ts).
@@ -1412,11 +1432,15 @@ export async function toggleVoteAction(
   }
 
   const bug = await prisma.bug.findUnique({
-    where: { id: bugId, ...bugInTenant(await currentTenantIdFor(userId)) },
-    select: { id: true, isDeleted: true, tenantId: true },
+    where: { id: bugId },
+    select: { id: true, isDeleted: true, tenantId: true, projectId: true },
   });
   if (!bug || bug.isDeleted) {
     return { error: "Issue not found" };
+  }
+  const votingUser = await requireUser();
+  if (!(await canContributeToProject(votingUser, bug.projectId, bug.tenantId))) {
+    return { error: "You must be a member of this project to vote." };
   }
 
   const result = await prisma.$transaction(async (tx) => {

@@ -35,8 +35,8 @@ export async function requestToJoinProjectAction(formData: FormData): Promise<Jo
   });
 
   if (!project) return { error: "Project not found." };
-  if (!project.isOpenForContributors && project.visibility !== "public") {
-    return { error: "This project is not currently accepting join requests." };
+  if (!project.isOpenForContributors || project.visibility !== "public") {
+    return { error: "This project is not currently accepting contributor applications." };
   }
 
   // Check if already an org member or project member
@@ -47,6 +47,20 @@ export async function requestToJoinProjectAction(formData: FormData): Promise<Jo
 
   if (isOrgMember || isProjectMember) {
     return { error: "You are already a member of this project." };
+  }
+
+  // Check existing request for rate limiting and duplicate prevention
+  const existingRequest = await prisma.projectJoinRequest.findUnique({
+    where: { projectId_userId: { projectId, userId: user.id } },
+  });
+  if (existingRequest?.status === "pending") {
+    return { error: "You already have a pending request to join this project." };
+  }
+  if (
+    existingRequest?.updatedAt &&
+    Date.now() - existingRequest.updatedAt.getTime() < 10 * 60 * 1000
+  ) {
+    return { error: "Please wait a few minutes before submitting another request." };
   }
 
   // Upsert join request (re-apply if previously rejected)

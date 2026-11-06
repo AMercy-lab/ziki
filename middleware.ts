@@ -38,6 +38,7 @@ export function isPublicPath(
     pathWithoutBase === "/how-it-works" ||
     pathWithoutBase === "/for-agents" ||
     pathWithoutBase === "/developers" ||
+    pathWithoutBase === "/earn" ||
     isAuthPage ||
     isPasswordResetPage ||
     isPublicAgentPath(pathWithoutBase) ||
@@ -56,6 +57,9 @@ export function isPublicPath(
     // The scheduler calls the platform sweeps with Bearer CRON_SECRET and no
     // session (#571); the route rejects a wrong or missing secret itself.
     pathWithoutBase === "/api/internal/cron" ||
+    // GitHub's webhooks (#github-status) carry no session; the route checks
+    // their signature against GITHUB_WEBHOOK_SECRET itself.
+    pathWithoutBase === "/api/github/webhook" ||
     // The agent API (#427) authenticates every call with an agent key, not a
     // session; each route rejects a request without one.
     pathWithoutBase.startsWith("/api/v1/") ||

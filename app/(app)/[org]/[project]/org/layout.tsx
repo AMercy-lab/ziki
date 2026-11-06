@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { MEMBERSHIP_ROLE_LABELS } from "@/lib/tenants";
 import { loadOrg } from "./org-context";
@@ -15,28 +16,20 @@ import { prisma } from "@/lib/prisma";
 export default async function OrgLayout({ children, params }: { children: React.ReactNode; params: Promise<{ org: string; project: string }> }) {
   const { org: orgParam, project } = await params;
   // The address picks the organisation and checks access (lib/project-route.ts).
-  await requireProject(orgParam, project);
+  const projectContext = await requireProject(orgParam, project);
+  if (!projectContext.isOrgMember) {
+    notFound();
+  }
   const { org } = await loadOrg();
-  const pendingJoinCount = org?.admin
+  if (!org || org.id !== projectContext.tenantId) {
+    notFound();
+  }
+
+  const pendingJoinCount = org.admin
     ? await prisma.projectJoinRequest.count({
         where: { project: { tenantId: org.id }, status: "pending" },
       })
     : 0;
-
-  if (!org) {
-    return (
-      <div className="mx-auto max-w-2xl space-y-3">
-        <h1 className="text-2xl font-extrabold tracking-tight text-zk-text">Organization</h1>
-        <p className="text-sm text-zk-text2">
-          You&apos;re not working in an organization yet. Open one, accept an invite, or create your
-          own, and its members, invites, projects and settings appear here.
-        </p>
-        <Link href="/tenants" className="text-sm font-medium text-zk-accent hover:underline">
-          Your workspaces
-        </Link>
-      </div>
-    );
-  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">

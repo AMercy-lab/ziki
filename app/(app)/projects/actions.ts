@@ -235,16 +235,18 @@ export async function createProjectAction(
     return { error: "Only organization owners and admins can create projects." };
   }
 
-  const parsed = projectNameSchema.safeParse({ name: formData.get("name") });
-  if (!parsed.success) return fromZodError(parsed.error, "Invalid project name");
+  const parsed = projectSettingsSchema.safeParse({
+    name: formData.get("name"),
+    goal: formData.get("goal") ?? "",
+    repoUrl: formData.get("repoUrl") ?? "",
+    stagingUrl: formData.get("stagingUrl") ?? "",
+    siteUrl: formData.get("siteUrl") ?? "",
+  });
+  if (!parsed.success) return fromZodError(parsed.error, "Check the project settings.");
 
-  const goal = (formData.get("goal") as string | null)?.trim() || null;
-  const repoUrl = (formData.get("repoUrl") as string | null)?.trim() || null;
-  const siteUrl = (formData.get("siteUrl") as string | null)?.trim() || null;
-  const stagingUrl = (formData.get("stagingUrl") as string | null)?.trim() || null;
   const visibilityRaw = (formData.get("visibility") as string | null)?.trim();
   const visibility: "public" | "private" = visibilityRaw === "public" ? "public" : "private";
-  const isOpenForContributors = formData.get("isOpenForContributors") === "true" || formData.get("isOpenForContributors") === "on";
+  const isOpenForContributors = visibility === "public" && (formData.get("isOpenForContributors") === "true" || formData.get("isOpenForContributors") === "on");
 
   const existing = await prisma.project.findMany({
     where: { tenantId },
@@ -265,10 +267,10 @@ export async function createProjectAction(
         tenantId,
         name: parsed.data.name,
         slug,
-        goal,
-        repoUrl,
-        siteUrl,
-        stagingUrl,
+        goal: parsed.data.goal,
+        repoUrl: parsed.data.repoUrl,
+        siteUrl: parsed.data.siteUrl,
+        stagingUrl: parsed.data.stagingUrl,
         visibility,
         isOpenForContributors,
         rewardConfig: rewardConfig ?? undefined,
