@@ -1,3 +1,4 @@
+import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import { prisma } from "@/lib/prisma";
 import { absoluteUrl } from "@/lib/site-url";
 import { projectPath, projectRef } from "@/lib/project-paths";
@@ -54,7 +55,7 @@ export async function listAgentProjects(organisationId: string) {
   const base = projectDefaultsFromPlatform(platform);
   const openCounts = await prisma.bug.groupBy({
     by: ["projectId"],
-    where: { organisationId, projectId: { in: projects.map((project) => project.id) }, isDeleted: false, substatus: "open" },
+    where: { organisationId, projectId: { in: projects.map((project) => project.id) }, ...PRODUCT_TRACK, isDeleted: false, substatus: "open" },
     _count: { _all: true },
   });
   const openByProject = new Map(openCounts.map((row) => [row.projectId, row._count._all]));
@@ -81,7 +82,7 @@ export async function getAgentProject(organisationId: string, projectId: string)
   if (!project) throw new IssueApiError(404, "Project not found.");
   const orgSlug = await organisationSlugOf(organisationId);
   const openIssueCount = await prisma.bug.count({
-    where: { organisationId, projectId: project.id, isDeleted: false, substatus: "open" },
+    where: { organisationId, projectId: project.id, ...PRODUCT_TRACK, isDeleted: false, substatus: "open" },
   });
   return {
     ...project,

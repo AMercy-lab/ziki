@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { auth } from "@/auth";
 import { requireUser } from "@/lib/auth-helpers";
 import { isLinkPreviewBot } from "@/lib/link-preview";
@@ -23,6 +23,7 @@ import { appVersionLabel } from "@/lib/deployed-version";
 import { agentActivity, agentEarnings } from "@/lib/points/agent-earnings";
 import { earnState, showEarnWelcome } from "@/lib/earn/state";
 import { EarnPaidCelebration } from "@/components/earn-paid-celebration";
+import { EARN_REF_COOKIE, syncReferral } from "@/lib/earn/outreach";
 import { EARN_TASKS } from "@/lib/earn/draft";
 import { EarnWelcomeToast } from "@/components/earn-welcome-toast";
 import { isEarnPath } from "@/lib/earn/paths";
@@ -118,6 +119,10 @@ export default async function AppLayout({
   // In the Earn organisation the app is Earn's on every page, not only under /earn: the builders' links stay away
   // even when the person lands on one of the organisation's ordinary pages.
   const inEarnOrganisation = earnOrganisationId !== null && organisationId === earnOrganisationId;
+  // A business that opened an earner's link and then made an account (#earn-outreach): trace it back, and tick
+  // when it starts its first project. Only while the link's 30-day note is in this browser.
+  const earnRef = (await cookies()).get(EARN_REF_COOKIE)?.value ?? null;
+  if (earnRef) await syncReferral(prisma, user.id, earnRef, earnOrganisationId).catch((error) => console.error("[layout] earn referral failed", error));
   const earnScoped = isEarnPath(requestPath) || inEarnOrganisation;
   const dockOrganisationId = earnScoped ? earnOrganisationId : organisationId;
   if (organisationId) {
