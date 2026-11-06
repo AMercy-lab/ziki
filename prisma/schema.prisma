@@ -276,6 +276,7 @@ model User {
   memberships               Membership[]
   agents                    Agent[]
   agentPairingsApproved     AgentPairing[]
+  agentPreferences          AgentPreference[]
   beneficiaryBugs           Bug[]                   @relation("BugBeneficiary")
   claims                    IssueClaim[]
   dispatchedClaims          IssueClaim[]            @relation("ClaimDispatcher")
@@ -2711,4 +2712,19 @@ model AgentPicture {
   data        Bytes
   updatedAt   DateTime @updatedAt
   agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+/// A standing instruction one person writes for every agent they own (#838).
+/// Scoped to the user alone, never to an agent or an issue, so the same set
+/// answers every key that user owns — across all their workspaces.
+model AgentPreference {
+  id        String   @id @default(cuid())
+  userId    String
+  /// At most AGENT_PREFERENCE_CONTENT_MAX characters, never blank.
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
