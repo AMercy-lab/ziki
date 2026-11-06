@@ -460,7 +460,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
       }));
     }),
     loadOptional("issue watch", null, () => prisma.issueWatch.findUnique({
-      where: { userId: user.id, bugId: bug.id },
+      where: { userId_bugId: { userId: user.id, bugId: bug.id } },
       select: { watching: true },
     })),
   ]);
@@ -1305,7 +1305,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
           {deliveredBanner ? <DeliveredBanner {...deliveredBanner} /> : null}
 
               {/* Who has the issue, while it is the latest thing (In progress); the timeline below keeps the award after that. */}
-              {hold?.status === "active" && bug.status === "in_progress" ? <AwardBox hold={hold} bugId={bug.id} isWatching={isWatchingIssue} /> : null}
+              {hold?.status === "active" && bug.status === "in_progress" ? <AwardBox hold={hold} bugId={bug.id} isWatching={isWatchingIssue} isIssueOwner={bug.reporterId === user.id} /> : null}
 
               {conversationHasContent ? (
                 <section

@@ -23,6 +23,7 @@ vi.mock("@/lib/agents/rate-budget", async (original) => ({ ...await original<typ
 vi.mock("@/lib/notify", () => ({ notifyLater: mocks.notifyLater }));
 import { releaseStaleClaims } from "@/lib/agent-api/availability";
 import { DEFAULT_PROJECT_WORKFLOW } from "@/lib/workflow-config";
+import { currentHold } from "@/lib/issue-holders";
 import { POST } from "@/app/api/v1/issues/[id]/heartbeat/route";
 import { classifyAgentStatus, isClaimStalled } from "@/lib/dashboard-overview";
 
@@ -51,7 +52,7 @@ beforeEach(() => {
   db.issueClaim.groupBy.mockResolvedValue([]);
   db.membership.findMany.mockResolvedValue([]);
   db.bug.updateMany.mockResolvedValue({ count: 1 });
-  db.bug.findFirst.mockResolvedValue({ id: "issue", projectId: "project", title: "Bug", assigneeId: null, status: "open", substatus: "open" });
+  db.bug.findFirst.mockResolvedValue({ id: "issue", projectId: "project", title: "Bug", reporterId: "reporter", assigneeId: null, status: "open", substatus: "open" });
   db.agentEvent.create.mockResolvedValue({ id: "evt" });
   db.webhookSubscription.findMany.mockResolvedValue([]);
   mocks.admin.mockResolvedValue({ id: "admin" });
@@ -94,6 +95,9 @@ describe("stale claim release", () => {
     }) }));
     expect(db.bug.updateMany).toHaveBeenCalledWith({ where: { id: "issue", projectId: "project", tenantId: "tenant", isDeleted: false, assigneeId: "owner", status: "in_progress", pullRequestUrl: null }, data: { assigneeId: null, status: "open", substatus: "open" } });
     expect(db.agentAuditEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ action: "claim.released", agentId: "agent", actorUserId: "admin", bugId: "issue", payload: { claimId: "claim", reason: "silence", projectId: "project" } }) });
+    expect(mocks.notifyLater).toHaveBeenCalledWith({
+      kind: "status_changed", actorId: "ziki-system", actorName: "Ziki", bugId: "issue", bugTitle: "Bug", reporterId: "reporter", from: "in_progress", to: "open",
+    });
     expect(db.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(db.issueClaim.findFirst.mock.invocationCallOrder[0]);
   });
   it("does not release a silent claim whose fix is already linked (#551)", async () => {
@@ -160,6 +164,24 @@ describe("stale claim release", () => {
 
 });
 
+describe("claim release countdown", () => {
+  it("uses the earlier of the heartbeat and delivery deadlines", async () => {
+    const deliverBy = new Date(now.getTime() + 5 * 60_000);
+    db.issueClaim.findFirst.mockResolvedValueOnce({
+      ...claim,
+      lastHeartbeatAt: now,
+      claimedAt: now,
+      deliverBy,
+      waitingOnOwnerSince: null,
+      agent: { name: "Working agent" },
+      beneficiary: { name: "Issue owner" },
+      dispatcher: null,
+      awardedBid: null,
+      bug: { projectId: "project", pullRequestUrl: null },
+    });
+    await expect(currentHold("issue")).resolves.toMatchObject({ releaseAt: deliverBy });
+  });
+});
 /** The agents dock (#agents-dock) tells its owner which agents are stuck: holding a claim they went quiet on. */
 describe("agent status for its owner", () => {
   const seen = new Date(now.getTime() - 60_000);

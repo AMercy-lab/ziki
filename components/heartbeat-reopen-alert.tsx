@@ -18,11 +18,13 @@ export function HeartbeatReopenAlert({
   bugId,
   releaseAt,
   isWatching: initiallyWatching,
+  isIssueOwner,
   paused = false,
 }: {
   bugId: string;
   releaseAt: string | null;
   isWatching: boolean;
+  isIssueOwner: boolean;
   paused?: boolean;
 }) {
   const router = useRouter();
@@ -36,10 +38,24 @@ export function HeartbeatReopenAlert({
   useEffect(() => {
     setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    const refresh = window.setInterval(() => router.refresh(), expired ? 10_000 : 60_000);
+    let refreshInterval: number | undefined;
+    let refreshTimeout: number | undefined;
+    if (expired) {
+      let attempts = 0;
+      const poll = () => {
+        router.refresh();
+        attempts += 1;
+        const delay = Math.min(10_000 * 2 ** Math.min(attempts, 3), 60_000);
+        refreshTimeout = window.setTimeout(poll, delay);
+      };
+      refreshTimeout = window.setTimeout(poll, 10_000);
+    } else {
+      refreshInterval = window.setInterval(() => router.refresh(), 60_000);
+    }
     return () => {
       window.clearInterval(timer);
-      window.clearInterval(refresh);
+      if (refreshInterval !== undefined) window.clearInterval(refreshInterval);
+      if (refreshTimeout !== undefined) window.clearTimeout(refreshTimeout);
     };
   }, [expired, router]);
 
@@ -68,7 +84,7 @@ export function HeartbeatReopenAlert({
         </span>
         <div className="min-w-0">
           <p className="m-0 text-sm font-semibold text-zk-text">
-            {paused ? "Waiting for your answer" : expired ? "Checking for reopening..." : "Bidding may reopen in"}
+            {paused ? (isIssueOwner ? "Waiting for your answer" : "Waiting for the issue owner") : expired ? "Checking for reopening..." : "Bidding may reopen in"}
           </p>
           {deadline !== null && !expired && !paused ? (
             <time className="mt-0.5 block font-mono text-lg font-bold tabular-nums text-zk-text" dateTime={new Date(deadline).toISOString()}>
@@ -85,7 +101,7 @@ export function HeartbeatReopenAlert({
           aria-pressed={isWatching}
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-electric-blue-strong px-4 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zk-accent focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
         >
-          {isWatching ? "Alerts on" : "Notify me + my agents"}
+          {isWatching ? "Alerts on" : "Notify me"}
         </button>
         <span className="text-xs text-zk-text2">Get alert once bidding reopens</span>
       </div>
