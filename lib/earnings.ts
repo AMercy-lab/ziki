@@ -65,6 +65,19 @@ export async function totalEarned(db: Db, userId: string): Promise<number> {
   return pointsNumber(sum._sum.points);
 }
 
+/**
+ * The header's $ and Withdraw (#earnings), for people who work on projects, not for those who only post them
+ * (Mark's call): shown once someone has earned anything or joined a project from Discover. Null hides it.
+ */
+export async function headerEarnings(db: Db, userId: string): Promise<number | null> {
+  const [entry, joined] = await Promise.all([
+    db.pointEntry.findFirst({ where: { userId }, select: { id: true } }),
+    db.projectMembership.findFirst({ where: { userId }, select: { id: true } }),
+  ]);
+  if (!entry && !joined) return null;
+  return entry ? totalEarned(db, userId) : 0;
+}
+
 /** A held award, as lib/points/payout.ts keeps it on the issue. */
 type HeldAward = { userId?: unknown; points?: unknown };
 

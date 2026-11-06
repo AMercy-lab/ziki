@@ -46,22 +46,26 @@ export default async function WithdrawPage() {
             {ready ? "Ready" : `${formatZ(left)} to go`}
           </span>
         </div>
-        {ready ? null : (
-          <>
-            <div
-              role="img"
-              aria-label={`${formatZ(available)} of ${formatZ(WITHDRAW_THRESHOLD)}, ${formatZ(checking)} being checked`}
-              className="mt-5 flex h-2.5 overflow-hidden rounded-full bg-zk-seg"
-            >
-              <span className={`h-full ${PAID}`} style={{ width: pct(available) }} />
-              <span className={`h-full ${CHECKING}`} style={{ width: pct(Math.min(checking, left)) }} />
-            </div>
-            <p className="mt-2 text-xs text-zk-muted">
-              {formatZ(available)} of {formatZ(WITHDRAW_THRESHOLD)}
-              {checking > 0 ? `, and ${formatZ(checking)} being checked` : ""}
-            </p>
-          </>
-        )}
+        {/* The withdraw bar, always: paid in green, being checked in yellow stripes, and the $30 mark at the end. */}
+        <div className="relative mt-6 pt-5">
+          <span className={`absolute right-0 top-0 text-[11px] font-bold ${ready ? "text-zk-ok-fg" : "text-zk-muted"}`}>
+            {ready ? "Withdraw is open" : `Withdraw opens at ${formatZ(WITHDRAW_THRESHOLD)}`}
+          </span>
+          <span aria-hidden="true" className={`absolute right-0 top-4 z-10 h-5 w-0.5 rounded-full ${ready ? "bg-zk-ok-fg" : "bg-zk-text"}`} />
+          <div
+            role="img"
+            aria-label={`${formatZ(available)} of ${formatZ(WITHDRAW_THRESHOLD)}${checking > 0 ? `, ${formatZ(checking)} being checked` : ""}`}
+            className="flex h-3 overflow-hidden rounded-full bg-zk-seg"
+          >
+            <span className={`h-full ${PAID}`} style={{ width: pct(available) }} />
+            <span className={`h-full ${CHECKING}`} style={{ width: pct(Math.min(checking, left)) }} />
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zk-text2">
+          <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className={`h-2 w-2 rounded-full ${PAID}`} /><b className="text-zk-text">{formatZ(available)}</b> earned</span>
+          <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-2 w-2 rounded-full bg-[#f2c14e]" /><b className="text-zk-warn-fg">{formatZ(checking)}</b> being checked</span>
+          {ready ? null : <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-2 w-2 rounded-full bg-zk-seg ring-1 ring-zk-border" /><b className="text-zk-text">{formatZ(left)}</b> to go</span>}
+        </div>
 
         <div className="mt-5 rounded-2xl bg-zk-chip px-4 py-3 text-sm">
           <p className="text-xs font-bold text-zk-muted">Paid to</p>

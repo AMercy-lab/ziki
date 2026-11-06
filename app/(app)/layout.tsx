@@ -21,7 +21,7 @@ import { loadOwnAgents } from "@/lib/dashboard-overview";
 import { AgentsDock, type DockAgent } from "@/components/agents-dock";
 import { appVersionLabel } from "@/lib/deployed-version";
 import { agentActivity, agentEarnings } from "@/lib/points/agent-earnings";
-import { totalEarned } from "@/lib/earnings";
+import { headerEarnings } from "@/lib/earnings";
 
 async function getOrganisationProjects(organisationId: string) {
   return prisma.project.findMany({
@@ -201,9 +201,9 @@ export default async function AppLayout({
     }
   }
 
-  // Earnings (#earnings): everything this person has earned, on every project, shown with Withdraw on every page.
-  // A failed read hides the pill rather than taking down the page.
-  const earned = await totalEarned(prisma, user.id).catch((error) => {
+  // Earnings (#earnings): everything this person has earned, on every project, shown with Withdraw on every page to
+  // anyone who works on projects (not to people who only post them). A failed read hides it rather than the page.
+  const earned = await headerEarnings(prisma, user.id).catch((error) => {
     console.error("[layout] earnings total failed", error);
     return null;
   });

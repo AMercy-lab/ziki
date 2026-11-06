@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
  */
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
-import { beingChecked, parseWeeklyGoal, totalEarned, weeklyGoalState } from "@/lib/earnings";
+import { beingChecked, headerEarnings, parseWeeklyGoal, totalEarned, weeklyGoalState } from "@/lib/earnings";
 import { confirmTask, grantWelcome, isNewEarnAccount, paidCount, rejectTask, doneTasks, startTask, submitTask, taskStateFor } from "@/lib/earn/progress";
 
 type TaskRow = { userId: string; taskKey: string; status: string; proof?: string | null; note?: string | null };
@@ -186,5 +186,22 @@ describe("weekly earnings goal (#earnings)", () => {
     expect(parseWeeklyGoal("1,000")).toBe(1000);
     expect(parseWeeklyGoal("$75.50")).toBe(75.5);
     for (const bad of ["0", "-5", "abc", "1.234", "", null]) expect(parseWeeklyGoal(bad)).toBeNull();
+  });
+});
+
+/** The header's $ and Withdraw (#earnings): for people who work on projects, not for those who only post them. */
+describe("who sees $ and Withdraw in the header (#earnings)", () => {
+  const db = (entry: boolean, joined: boolean) => ({
+    pointEntry: { findFirst: vi.fn(async () => (entry ? { id: "e" } : null)), aggregate: vi.fn(async () => ({ _sum: { points: 4.5 } })) },
+    projectMembership: { findFirst: vi.fn(async () => (joined ? { id: "m" } : null)) },
+  }) as never;
+
+  it("hides it from someone who has never earned and never joined a project", async () => {
+    expect(await headerEarnings(db(false, false), "poster")).toBeNull();
+  });
+
+  it("shows $0 to someone who just joined a project, and their total once they earn", async () => {
+    expect(await headerEarnings(db(false, true), "joiner")).toBe(0);
+    expect(await headerEarnings(db(true, true), "earner")).toBe(4.5);
   });
 });
