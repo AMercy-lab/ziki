@@ -11,8 +11,6 @@ export type HoldVia = "bid" | "assigned" | "offer" | "claim";
 export type IssueHold = {
   id: string;
   agentId?: string;
-  ownerUserId?: string;
-  pausedAt?: Date | null;
   agentName: string;
   personName: string;
   via: HoldVia;
@@ -89,7 +87,7 @@ export async function currentHold(bugId: string, db: Db = prisma): Promise<Issue
       offeredAt: true,
       claimedAt: true,
       deliverBy: true,
-      agent: { select: { id: true, name: true, ownerUserId: true, pausedAt: true } },
+      agent: { select: { id: true, name: true } },
       beneficiary: { select: { name: true } },
       dispatcher: { select: { name: true } },
       awardedBid: { select: { id: true } },
@@ -105,8 +103,6 @@ export async function currentHold(bugId: string, db: Db = prisma): Promise<Issue
   return {
     id: claim.id,
     agentId: claim.agent.id,
-    ownerUserId: claim.agent.ownerUserId,
-    pausedAt: claim.agent.pausedAt,
     agentName: claim.agent.name,
     personName: claim.beneficiary.name,
     via: claim.awardedBid ? "bid" : claim.dispatcher ? "assigned" : claim.offeredAt ? "offer" : "claim",

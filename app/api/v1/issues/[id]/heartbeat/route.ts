@@ -18,12 +18,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         orderBy: { createdAt: "asc" },
         select: { id: true, payload: true, createdAt: true },
       });
-      if (steering.length) {
-        await prisma.agentInboxItem.updateMany({
-          where: { id: { in: steering.map((item) => item.id) }, agentId: agent.agentId, readAt: null },
-          data: { readAt: new Date() },
-        });
-      }
       return NextResponse.json({
         claim,
         steering: steering.map((item) => ({

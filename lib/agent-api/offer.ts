@@ -98,12 +98,15 @@ export async function sweepExpiredOffers(tenantId?: string, projectId?: string):
 }
 
 export async function acceptOffer(agent: AgentContext, claimId: string) {
+  if (agent.pausedAt) throw new IssueApiError(423, "This agent is paused by its owner.");
   try {
     const result = await prisma.$transaction(async (tx) => {
       const claim = await tx.issueClaim.findUnique({ where: { id: claimId }, include: { beneficiary: { select: { name: true } }, bug: { select: { id: true, title: true, substatus: true, assigneeId: true, tenantId: true, projectId: true, areaId: true, voteCount: true, assignee: { select: { name: true } } } } } });
       if (!claim || claim.bug.tenantId !== agent.tenantId) throw new IssueApiError(404, "Offer not found.");
       const locked = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Bug" WHERE "id" = ${claim.bugId} AND "tenantId" = ${agent.tenantId} FOR UPDATE`;
       if (!locked.length) throw new IssueApiError(404, "Offer not found.");
+      const agents = await tx.$queryRaw<{ pausedAt: Date | null }[]>`SELECT "pausedAt" FROM "Agent" WHERE "id" = ${agent.agentId} FOR UPDATE`;
+      if (agents[0]?.pausedAt) throw new IssueApiError(423, "This agent is paused by its owner.");
       await tx.$queryRaw`SELECT "id" FROM "IssueClaim" WHERE "id" = ${claimId} FOR UPDATE`;
       const fresh = await tx.issueClaim.findUnique({ where: { id: claimId }, include: { beneficiary: { select: { name: true } }, bug: { select: { id: true, title: true, substatus: true, assigneeId: true, tenantId: true, projectId: true, areaId: true, voteCount: true, assignee: { select: { name: true } } } } } });
       if (!fresh || fresh.agentId !== agent.agentId) throw new IssueApiError(409, "This offer is no longer available to this agent.");

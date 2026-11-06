@@ -6,14 +6,15 @@ import { requireUser } from "@/lib/auth-helpers";
 
 export async function setAgentPaused(agentId: string, paused: boolean) {
   const user = await requireUser();
-  const agent = await prisma.agent.findFirst({
-    where: { id: agentId, ownerUserId: user.id },
-    select: { id: true, pausedAt: true },
-  });
-  if (!agent) return { ok: false as const, error: "Agent not found." };
-  if (paused === Boolean(agent.pausedAt)) return { ok: true as const };
-
-  await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
+    // Serialize repeated pause/resume requests before reading the clock.
+    await tx.$queryRaw`SELECT "id" FROM "Agent" WHERE "id" = ${agentId} AND "ownerUserId" = ${user.id} FOR UPDATE`;
+    const agent = await tx.agent.findFirst({
+      where: { id: agentId, ownerUserId: user.id, revokedAt: null },
+      select: { id: true, pausedAt: true },
+    });
+    if (!agent) return { ok: false as const, error: "Agent not found." };
+    if (paused === Boolean(agent.pausedAt)) return { ok: true as const };
     const now = new Date();
     if (paused) {
       await tx.agent.update({ where: { id: agentId }, data: { pausedAt: now } });
@@ -21,7 +22,7 @@ export async function setAgentPaused(agentId: string, paused: boolean) {
         where: { agentId, status: "offered", releasedAt: null },
         data: { status: "released", releasedAt: now, releaseReason: "paused" },
       });
-      return;
+      return { ok: true as const };
     }
 
     const pausedAt = agent.pausedAt!;
@@ -34,18 +35,21 @@ export async function setAgentPaused(agentId: string, paused: boolean) {
       await tx.issueClaim.update({
         where: { id: claim.id },
         data: {
-          claimedAt: claim.claimedAt ? new Date(claim.claimedAt.getTime() + duration) : null,
-          lastHeartbeatAt: claim.lastHeartbeatAt ? new Date(claim.lastHeartbeatAt.getTime() + duration) : null,
+          // claimedAt is historical. Use it only as the heartbeat fallback.
+          lastHeartbeatAt: (claim.lastHeartbeatAt ?? claim.claimedAt)
+            ? new Date((claim.lastHeartbeatAt ?? claim.claimedAt)!.getTime() + duration) : null,
           deliverBy: claim.deliverBy ? new Date(claim.deliverBy.getTime() + duration) : null,
           waitingOnOwnerSince: claim.waitingOnOwnerSince ? new Date(claim.waitingOnOwnerSince.getTime() + duration) : null,
         },
       });
     }
     await tx.agent.update({ where: { id: agentId }, data: { pausedAt: null } });
+    return { ok: true as const };
   });
-  revalidatePath("/agents");
-  revalidatePath("/[project]/[number]", "page");
-  return { ok: true as const };
+  if (!result.ok) return result;
+  revalidatePath("/agents/mine");
+  revalidatePath("/[org]/[project]/[number]", "page");
+  return result;
 }
 
 export async function sendIssueSteer(agentId: string, issueId: string, body: string) {
@@ -65,6 +69,6 @@ export async function sendIssueSteer(agentId: string, issueId: string, body: str
       payload: { type: "steer", issueId, body: text, fromUserId: user.id, from: user.name ?? "Owner" },
     },
   });
-  revalidatePath("/[project]/[number]", "page");
+  revalidatePath("/[org]/[project]/[number]", "page");
   return { ok: true as const };
 }

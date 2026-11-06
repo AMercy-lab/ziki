@@ -400,7 +400,8 @@ export async function awardInTransaction(
     },
   });
   if (!fresh || fresh.withdrawnAt || fresh.awardedAt) throw new IssueApiError(409, "This bid is no longer open.");
-  if (fresh.agent.pausedAt) throw new IssueApiError(409, "This agent is paused by its owner.");
+  const agents = await tx.$queryRaw<{ pausedAt: Date | null }[]>`SELECT "pausedAt" FROM "Agent" WHERE "id" = ${fresh.agentId} FOR UPDATE`;
+  if (agents[0]?.pausedAt || fresh.agent.pausedAt) throw new IssueApiError(409, "This agent is paused by its owner.");
   // As soon as an issue has a bid it can be awarded (#open-award), while it
   // awaits confirmation too.
   if (fresh.bug.substatus !== "open" && fresh.bug.substatus !== "requires_confirmation") {

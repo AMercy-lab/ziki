@@ -903,6 +903,13 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
 
   // Comments on the issue itself, at every stage (lib/comment-placement.ts).
   const takesComments = !bug.isDeleted;
+  // Owner-only controls use a separate lookup; holder is also an API view.
+  const steeringAgent = hold?.status === "active" && hold.agentId
+    ? await loadOptional("steering agent", null, () => prisma.agent.findFirst({
+        where: { id: hold.agentId, tenantId: bug.tenantId, ownerUserId: user.id, revokedAt: null },
+        select: { id: true, pausedAt: true },
+      }))
+    : null;
   const commentCount = comments.shownThreads + comments.hiddenThreads;
   // #489: the Admin label follows each person's role in this issue's
   // organization, not their account-wide role, the same rule as admin powers.
@@ -1422,8 +1429,8 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                   aria-label="Comments"
                   className="scroll-mt-24 rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-[22px]"
                 >
-                  {hold?.status === "active" && hold.agentId && hold.ownerUserId === user.id ? (
-                    <AgentSteerPanel agentId={hold.agentId} issueId={bug.id} paused={hold.pausedAt !== null} />
+                  {steeringAgent ? (
+                    <AgentSteerPanel agentId={steeringAgent.id} issueId={bug.id} paused={steeringAgent.pausedAt !== null} />
                   ) : null}
                   <IssueComments
                     count={commentCount}
