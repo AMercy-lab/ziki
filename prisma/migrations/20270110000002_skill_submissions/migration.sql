@@ -13,7 +13,7 @@ DECLARE
   attempt INT;
 BEGIN
   FOR project IN
-    SELECT "id", "tenantId", "slug"
+    SELECT "id", "organisationId", "slug"
     FROM "Project"
     WHERE "slug" IN ('skills')
     ORDER BY "createdAt", "id"
@@ -21,7 +21,7 @@ BEGIN
     candidate := project."slug" || '-project';
     attempt := 2;
     WHILE EXISTS (
-      SELECT 1 FROM "Project" WHERE "tenantId" = project."tenantId" AND "slug" = candidate
+      SELECT 1 FROM "Project" WHERE "organisationId" = project."organisationId" AND "slug" = candidate
     ) LOOP
       candidate := project."slug" || '-project-' || attempt;
       attempt := attempt + 1;
