@@ -100,6 +100,8 @@ import { PROD_CONFIRMATIONS_NEEDED } from "@/lib/live-confirm";
 import { LiveFlow } from "@/components/live-flow";
 import { latestPullRequestReport } from "@/lib/agent-api/pull-request-report";
 import { parseGitHubRepoUrl } from "@/lib/github/pull-request-url";
+import { DecisionCard } from "@/components/decision-card";
+import { decisionFor } from "@/lib/your-decision";
 import { agentInstructionsFor } from "@/lib/agent-instructions";
 import { countedJudgements } from "@/lib/agent-api/tested-status";
 import { DeliveredBanner, type DeliveredBannerProps } from "@/components/delivered-banner";
@@ -432,7 +434,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   // has it (its claims), then every bid it took (#issue-bids).
   const pastConfirmation = bug.substatus !== "requires_confirmation";
   // Bids come in from the start, while it awaits confirmation too.
-  const [hold, bidList, claimHistory] = await Promise.all([
+  const [hold, bidList, claimHistory, watchRow] = await Promise.all([
     pastConfirmation ? loadOptional<IssueHold | null>("holder", null, () => currentHold(bug.id)) : Promise.resolve(null as IssueHold | null),
     // While Open, an open bid whose bidder is at the project's capacity says so (#bidder-capacity).
     loadOptional<BidEntryView[]>("bids", [], async () => {
@@ -463,7 +465,12 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
         releasedAt: claim.releasedAt,
       }));
     }),
+    loadOptional("issue watch", null, () => prisma.issueWatch.findUnique({
+      where: { userId_bugId: { userId: user.id, bugId: bug.id } },
+      select: { watching: true },
+    })),
   ]);
+  const isWatchingIssue = watchRow?.watching ?? (bug.reporterId === user.id || bug.assigneeId === user.id);
   const awardClaim: AwardStepView | null = claimHistory[0] ?? null;
 
   const [users, voterSummary, activities, activityCount, comments, latestStatusChange, attachments, lastRevision, agentDecisions, escalations] =
@@ -983,6 +990,16 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   const stale = bug.isDeleted ? null : (await loadOptional("stale hold", null, () => staleHold(bug.id)))?.kind ?? null;
   const abandonCheck = bug.isDeleted || bug.status !== "in_progress" ? null : await loadOptional("sense check", null, () => senseCheck(bug.id));
   const closeSuggestions = await loadOptional<CloseSuggestionsData | null>("close suggestions", null, () => closeSuggestionsFor(bug.id));
+  // A decision other members made about the viewer's own issue (#your-decisions).
+  const yourDecision = closeSuggestions
+    ? decisionFor({
+        issue: bug,
+        viewerId: user.id,
+        suggestions: closeSuggestions.entries,
+        threshold: closeSuggestions.threshold,
+        decidedAt: bug.closedAt,
+      })
+    : null;
   // The judgements as the Delivered rule counts them (independent, weighted, on
   // the delivered pull request), so the bar says what will actually move it.
   const judgementCount = bug.status === "done" && !bug.isDeleted
@@ -1353,13 +1370,14 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
           />
 
           <NextStepBar step={liveFix ? liveNextStep(liveFix.check, liveFix.repo) : nextStep} agentInstructions={agentInstructions} />
+          {yourDecision ? <DecisionCard issueId={bug.id} decision={yourDecision} /> : null}
 
           {deliveredBanner ? <DeliveredBanner {...deliveredBanner} /> : null}
 
           {githubPanel ? <GitHubStatusPanel {...githubPanel} /> : null}
 
               {/* Who has the issue, while it is the latest thing (In progress); the timeline below keeps the award after that. */}
-              {hold?.status === "active" && bug.status === "in_progress" ? <AwardBox hold={hold} /> : null}
+              {hold?.status === "active" && bug.status === "in_progress" ? <AwardBox hold={hold} bugId={bug.id} isWatching={isWatchingIssue} isIssueOwner={bug.reporterId === user.id} /> : null}
 
               {conversationHasContent ? (
                 <section

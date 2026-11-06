@@ -12,7 +12,7 @@ const db = vi.hoisted(() => ({
   agentQuestion: { findFirst: vi.fn(), updateMany: vi.fn() },
   agentInboxItem: { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
   agent: { findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn() },
-  bug: { updateMany: vi.fn(), findFirst: vi.fn() }, $queryRaw: vi.fn(), $transaction: vi.fn(),
+  bug: { updateMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn() }, $queryRaw: vi.fn(), $transaction: vi.fn(),
 }));
 const mocks = vi.hoisted(() => ({ admin: vi.fn(), user: vi.fn(), budget: vi.fn(), notifyLater: vi.fn(), workflow: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
@@ -63,7 +63,7 @@ beforeEach(() => {
   mocks.user.mockResolvedValue({ id: "owner", name: "Owner" });
   db.membership.findMany.mockResolvedValue([]);
   db.bug.updateMany.mockResolvedValue({ count: 1 });
-  db.bug.findFirst.mockResolvedValue({ id: "issue", projectId: "project", title: "Bug", assigneeId: null, status: "open", substatus: "open" });
+  db.bug.findFirst.mockResolvedValue({ id: "issue", projectId: "project", title: "Bug", reporterId: "reporter", assigneeId: null, status: "open", substatus: "open" });
   db.agentEvent.create.mockResolvedValue({ id: "evt" });
   db.webhookSubscription.findMany.mockResolvedValue([]);
   mocks.admin.mockResolvedValue({ id: "admin" });
@@ -106,6 +106,9 @@ describe("stale claim release", () => {
     }) }));
     expect(db.bug.updateMany).toHaveBeenCalledWith({ where: { id: "issue", projectId: "project", tenantId: "tenant", isDeleted: false, assigneeId: "owner", status: "in_progress", pullRequestUrl: null }, data: { assigneeId: null, status: "open", substatus: "open" } });
     expect(db.agentAuditEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ action: "claim.released", agentId: "agent", actorUserId: "admin", bugId: "issue", payload: { claimId: "claim", reason: "silence", projectId: "project" } }) });
+    expect(mocks.notifyLater).toHaveBeenCalledWith({
+      kind: "status_changed", actorId: "ziki-system", actorName: "Ziki", bugId: "issue", bugTitle: "Bug", reporterId: "reporter", from: "in_progress", to: "open",
+    });
     expect(db.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(db.issueClaim.findFirst.mock.invocationCallOrder[0]);
   });
   it("does not release a silent claim whose fix is already linked (#551)", async () => {
@@ -172,6 +175,33 @@ describe("stale claim release", () => {
 
 });
 
+describe("reopen alerts from the in-process cron", () => {
+  it("delivers without a request instead of throwing and ending the sweep", async () => {
+    const { notifyLater } = await vi.importActual<typeof import("@/lib/notify")>("@/lib/notify");
+    db.bug.findUnique.mockResolvedValue(null);
+    expect(() => notifyLater({ kind: "status_changed", actorId: "ziki-system", actorName: "Ziki", bugId: "issue", bugTitle: "Bug", reporterId: "reporter", from: "in_progress", to: "open" })).not.toThrow();
+    await vi.waitFor(() => expect(db.bug.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "issue" } })));
+  });
+});
+
+describe("claim release countdown", () => {
+  it("uses the earlier of the heartbeat and delivery deadlines", async () => {
+    const deliverBy = new Date(now.getTime() + 5 * 60_000);
+    db.issueClaim.findFirst.mockResolvedValueOnce({
+      ...claim,
+      lastHeartbeatAt: now,
+      claimedAt: now,
+      deliverBy,
+      waitingOnOwnerSince: null,
+      agent: { name: "Working agent" },
+      beneficiary: { name: "Issue owner" },
+      dispatcher: null,
+      awardedBid: null,
+      bug: { projectId: "project", pullRequestUrl: null },
+    });
+    await expect(currentHold("issue")).resolves.toMatchObject({ releaseAt: deliverBy });
+  });
+});
 /** The agents dock (#agents-dock) tells its owner which agents are stuck: holding a claim they went quiet on. */
 describe("agent status for its owner", () => {
   const seen = new Date(now.getTime() - 60_000);

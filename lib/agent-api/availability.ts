@@ -19,6 +19,7 @@ import { isDeliveryOverdue, isOwnerWaitOver, ownerWaitCapMinutes, OWNER_REMINDER
 import { workflowFor } from "@/lib/workflow";
 import { DEFAULT_PROJECT_WORKFLOW } from "@/lib/workflow-config";
 import { moveTo } from "@/lib/issue-substatus";
+import { notifyLater } from "@/lib/notify";
 
 function heartbeatCutoff(now: Date, heartbeatMinutes: number): Date {
   return new Date(now.getTime() - heartbeatMinutes * 60_000);
@@ -105,7 +106,7 @@ async function releaseClaimIfStale(
 ): Promise<ReleaseOutcome> {
   const tenantId = claim.bug.tenantId;
   const projectId = claim.bug.projectId;
-  return prisma.$transaction(async (tx) => {
+  const outcome = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "Bug" WHERE "id" = ${claim.bugId} FOR NO KEY UPDATE`;
     // Pause/resume and releases serialize on the same agent row. The bug is
     // always locked first by claim transitions; pause/resume never locks it.
@@ -149,6 +150,25 @@ async function releaseClaimIfStale(
     }
     return { released: true, opened: reopened };
   });
+  if (outcome.opened) {
+    const reopenedBug = await prisma.bug.findFirst({
+      where: { id: claim.bugId, status: "open", isDeleted: false },
+      select: { title: true, reporterId: true },
+    });
+    if (reopenedBug) {
+      notifyLater({
+        kind: "status_changed",
+        actorId: "ziki-system",
+        actorName: "Ziki",
+        bugId: claim.bugId,
+        bugTitle: reopenedBug.title,
+        reporterId: reopenedBug.reporterId,
+        from: "in_progress",
+        to: "open",
+      });
+    }
+  }
+  return outcome;
 }
 
 /**
