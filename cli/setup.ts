@@ -101,8 +101,10 @@ export async function setupSandbox(options: { reset: boolean; serverUrl: string 
       create: { organisationId: organisation.id, userId: user.id, role: spec.membership },
     });
 
+    // #user-agents: the owner's agent, active in the sandbox (a reset removes the activation, not the agent).
     const existing = await prisma.agent.findFirst({
-      where: { organisationId: organisation.id, ownerUserId: user.id, name: spec.agent, revokedAt: null },
+      where: { ownerUserId: user.id, name: spec.agent, revokedAt: null },
+      orderBy: { createdAt: "asc" },
       select: { id: true },
     });
     let agentId: string;
@@ -113,9 +115,13 @@ export async function setupSandbox(options: { reset: boolean; serverUrl: string 
       await prisma.$transaction([
         prisma.agentApiKey.updateMany({ where: { agentId: existing.id, revokedAt: null }, data: { revokedAt: new Date() } }),
         prisma.agentApiKey.create({
-          data: { agentId: existing.id, keyHash: key.hash, prefix: key.prefix, projectId: project.id, sealedKey: sealSecret(key.raw) },
+          data: { agentId: existing.id, keyHash: key.hash, prefix: key.prefix, organisationId: organisation.id, sealedKey: sealSecret(key.raw) },
         }),
-        prisma.agent.update({ where: { id: existing.id }, data: { level: spec.level, ...SANDBOX_BUDGET } }),
+        prisma.agentActivation.upsert({
+          where: { agentId_organisationId: { agentId: existing.id, organisationId: organisation.id } },
+          update: { level: spec.level, deactivatedAt: null, ...SANDBOX_BUDGET },
+          create: { agentId: existing.id, organisationId: organisation.id, level: spec.level, ...SANDBOX_BUDGET },
+        }),
       ]);
       agentId = existing.id;
       rawKey = key.raw;
@@ -126,9 +132,11 @@ export async function setupSandbox(options: { reset: boolean; serverUrl: string 
         name: spec.agent,
         model: "Ziki CLI",
         level: spec.level,
-        projectId: project.id,
       });
-      await prisma.agent.update({ where: { id: issued.agentId }, data: SANDBOX_BUDGET });
+      await prisma.agentActivation.update({
+        where: { agentId_organisationId: { agentId: issued.agentId, organisationId: organisation.id } },
+        data: SANDBOX_BUDGET,
+      });
       agentId = issued.agentId;
       rawKey = issued.rawKey;
     }

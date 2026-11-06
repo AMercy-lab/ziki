@@ -10,6 +10,7 @@ import { MAX_SUBSCRIPTIONS_PER_AGENT } from "@/lib/webhooks/manage";
 import { deliverySummaries } from "@/lib/webhooks/history";
 import { z } from "zod";
 import { fromZodError } from "@/lib/form-errors";
+import { activeIn } from "@/lib/agents/active-in";
 
 const createWebhookSchema = z.object({
   agentId: z.string().min(1, "Select an agent."),
@@ -47,7 +48,7 @@ export async function listWebhooksAction(): Promise<ListWebhooksResult> {
   }
 
   const agents = await prisma.agent.findMany({
-    where: { ownerUserId: user.id, organisationId: organisation.organisationId, revokedAt: null },
+    where: { ownerUserId: user.id, ...activeIn(organisation.organisationId), revokedAt: null },
     select: { id: true, name: true, avatar: true },
   });
 
@@ -118,7 +119,7 @@ export async function createWebhookAction(
   const { agentId, url } = parsed.data;
 
   const agent = await prisma.agent.findFirst({
-    where: { id: agentId, ownerUserId: user.id, organisationId: organisation.organisationId, revokedAt: null },
+    where: { id: agentId, ownerUserId: user.id, ...activeIn(organisation.organisationId), revokedAt: null },
     select: { id: true },
   });
   if (!agent) {

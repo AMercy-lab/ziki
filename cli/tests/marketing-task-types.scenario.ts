@@ -11,7 +11,7 @@ import { ok, refused, unique } from "./helpers";
 let project: string;
 
 beforeAll(async () => {
-  project = (await ok("ada", "whoami")).project_id as string;
+  project = (await ok("ada", "whoami")).projects[0].id as string;
   expect(project).toBeTruthy();
 });
 
