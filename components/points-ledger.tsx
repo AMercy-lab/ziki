@@ -82,7 +82,7 @@ export function PointsLedger({
             }
           : null,
         disputes: e.disputes,
-        description: pointRoleDescription(e.role, e.points, e.bug?.severity),
+        description: pointRoleDescription(e.role, e.points),
       }));
     }
 

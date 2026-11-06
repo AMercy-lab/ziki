@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, PointRole, DisputeStatus, Severity } from "@prisma/client";
+import type { Prisma, PrismaClient, PointRole, DisputeStatus } from "@prisma/client";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -14,7 +14,6 @@ export type DetailedPointEntry = {
     number: number;
     title: string;
     status: string;
-    severity: Severity;
   } | null;
   disputes: Array<{
     id: string;
@@ -81,7 +80,6 @@ export async function getDetailedPointLedger(
             number: true,
             title: true,
             status: true,
-            severity: true,
           },
         },
         disputes: {
@@ -144,6 +142,10 @@ export const pointRoleLabels: Record<PointRole, string> = {
   triager: "Triager Award",
   submission: "Job Submission",
   dispatcher: "Dispatcher Award",
+  idea: "Idea Contribution",
+  signup: "Signup Bonus",
+  comment: "Comment Upvote",
+  vote: "Importance / Bid Vote",
 };
 
 /** Explanation for how points were calculated for each role */
