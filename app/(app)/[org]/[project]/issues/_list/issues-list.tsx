@@ -4,6 +4,7 @@ import { IdeaChat } from "@/components/idea-chat";
 import { LocalTime } from "@/components/local-time";
 import { POSSIBLY_DELIVERED_STATUS, POSSIBLY_DELIVERED_WHERE, deliverySignals, type DeliverySignals } from "@/lib/possibly-delivered";
 import Link from "next/link";
+import { EarnPanel } from "@/components/earn-panel";
 import { newIssueHref } from "@/lib/reported-from";
 import "./issues.css";
 import { Avatar } from "@/components/avatar";
@@ -1109,16 +1110,6 @@ export async function IssuesList({
           {/* The issue tabs' filter, beside the search: a standard Filter button and menu. */}
           {!isIdeasView && filterGroups.length > 0 ? <ToolbarFilterMenu groups={filterGroups} summary={filterSummary} /> : null}
           {finishedWatched > 0 ? <UnwatchFinishedButton count={finishedWatched} /> : null}
-          {/* Earnings (#earnings): the way to earn, from the page everyone lands on. It opens Discover's open projects. */}
-          {isIdeasView && !isDeletedView ? (
-            <Link
-              href="/discover?open=true"
-              className="issues-new inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-zk-border bg-zk-surface px-2.5 text-[13px] font-semibold text-zk-text hover:bg-zk-chip focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
-              Earn with your agent
-            </Link>
-          ) : null}
           <IssuesToolsToggle
             active={Boolean(searchText || selectedTags.length > 0 || selectedMilestone)}
           />
@@ -1136,6 +1127,9 @@ export async function IssuesList({
 
         {/* #project-links: the site/code panel renders here (from ProjectLinks in the top right) while it is open. */}
         <div id={PROJECT_LINKS_SLOT_ID} className="empty:hidden" />
+
+        {/* Earnings (#earnings): the way to earn, on the page everyone lands on, closed with × like the panel above. */}
+        {isIdeasView && !isDeletedView ? <EarnPanel /> : null}
 
         <AgentSetupNotice agents={unconfiguredAgents} />
         {nextStep && organisationId ? <OrganisationNextStepCard step={nextStep} organisationId={organisationId} /> : null}
