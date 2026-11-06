@@ -15,7 +15,9 @@
 
 LOCK TABLE "Project", "Bug", "Idea" IN SHARE ROW EXCLUSIVE MODE;
 
-CREATE FUNCTION pg_temp.new_id() RETURNS text LANGUAGE sql AS $$
+-- OR REPLACE: on a fresh database every migration runs in one session, and
+-- 20270101000027 already made this temporary function in it.
+CREATE OR REPLACE FUNCTION pg_temp.new_id() RETURNS text LANGUAGE sql AS $$
   SELECT 'c' || substr(md5(random()::text || clock_timestamp()::text), 1, 24)
 $$;
 
