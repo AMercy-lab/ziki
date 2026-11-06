@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
-import { bugInTenant, currentTenantIdFor } from "@/lib/tenant-context";
+import { bugInOrganisation, currentOrganisationIdFor } from "@/lib/organisation-context";
 import { publishWebEvent } from "@/lib/agent-api/web-events";
 import type { SpeedActionType } from "@/components/speed-request-modal";
 import { DAILY_EXPEDITE_QUOTA } from "@/lib/expedite-constants";
@@ -58,8 +58,8 @@ export async function expediteBugAction(
   urgencyNote?: string
 ): Promise<ExpediteResult> {
   const user = await requireUser();
-  const tenantId = await currentTenantIdFor(user.id);
-  if (!tenantId) {
+  const organisationId = await currentOrganisationIdFor(user.id);
+  if (!organisationId) {
     return { success: false, error: "Workspace membership required." };
   }
 
@@ -77,7 +77,7 @@ export async function expediteBugAction(
   }
 
   const bug = await prisma.bug.findUnique({
-    where: { id: bugId, ...bugInTenant(tenantId) },
+    where: { id: bugId, ...bugInOrganisation(organisationId) },
     select: { id: true, number: true, title: true, isDeleted: true, project: { select: { slug: true } } },
   });
 
@@ -148,13 +148,13 @@ export async function cancelExpediteBugAction(
   bugId: string
 ): Promise<ExpediteResult> {
   const user = await requireUser();
-  const tenantId = await currentTenantIdFor(user.id);
-  if (!tenantId) {
+  const organisationId = await currentOrganisationIdFor(user.id);
+  if (!organisationId) {
     return { success: false, error: "Workspace membership required." };
   }
 
   const bug = await prisma.bug.findUnique({
-    where: { id: bugId, ...bugInTenant(tenantId) },
+    where: { id: bugId, ...bugInOrganisation(organisationId) },
     select: { id: true, number: true, project: { select: { slug: true } } },
   });
 

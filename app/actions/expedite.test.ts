@@ -5,9 +5,9 @@ vi.mock("@/lib/agent-api/web-events", () => ({
   publishWebEvent,
 }));
 
-vi.mock("@/lib/tenant-context", () => ({
-  currentTenantIdFor: vi.fn(async () => "tenant-zedu"),
-  bugInTenant: vi.fn(() => ({ tenantId: "tenant-zedu" })),
+vi.mock("@/lib/organisation-context", () => ({
+  currentOrganisationIdFor: vi.fn(async () => "organisation-zedu"),
+  bugInOrganisation: vi.fn(() => ({ organisationId: "organisation-zedu" })),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
