@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth-helpers";
 import { requireEarnAgent } from "@/lib/earn/state";
-import { agentsLink, agentsPrimaryBtn, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
+import { agentsPrimaryBtn, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
 
 export const metadata = { title: "Open source" };
 
@@ -17,7 +17,6 @@ export default async function EarnOpenSourcePage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="space-y-1">
-        <Link href="/earn/home" className={`text-sm ${agentsLink}`}>← What should it work on?</Link>
         <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">Open source</h1>
       </div>
 

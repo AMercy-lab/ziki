@@ -39,7 +39,6 @@ export default async function EarnPeoplePage() {
   if (people.length === 0) {
     return (
       <div className="mx-auto max-w-4xl space-y-6">
-        <Link href="/earn/earnings" className={`text-sm ${agentsLink}`}>← My earnings</Link>
         <div className="space-y-1">
           <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">People you reached</h1>
           <p className="text-sm text-zk-text2">Everyone you email or reach with your link shows up here, with how far they&apos;ve got.</p>
@@ -70,7 +69,6 @@ export default async function EarnPeoplePage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <Link href="/earn/earnings" className={`text-sm ${agentsLink}`}>← My earnings</Link>
       <div className="space-y-1">
         <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">People you reached</h1>
         <p className="text-sm text-zk-text2">
