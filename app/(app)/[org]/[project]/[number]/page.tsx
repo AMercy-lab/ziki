@@ -98,6 +98,7 @@ import { IssueActionsMenu } from "@/components/issue-actions-menu";
 import { CopyIssueSummaryButton } from "@/components/copy-issue-summary-button";
 import { EditableIssueDescription } from "@/components/editable-issue-description";
 import { IssueLinks } from "@/components/issue-links";
+import { parsePullRequestUrl } from "@/lib/github/pull-request-url";
 import { NextStepBar } from "@/components/next-step-bar";
 import { liveCheck, liveConfirmLabel, liveFactLabel, liveNextStep, liveStepState } from "@/lib/live-check";
 import { loadProdConfirmers } from "@/lib/live-confirm-data";
@@ -964,6 +965,15 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     if (typeof value === "string") pageQuery.set(key, value);
   }
   const proofLinks = bug.proofLinks ?? [];
+  const hasLinkedPullRequest = Boolean(bug.pullRequestUrl || proofLinks.some((link) => parsePullRequestUrl(link)));
+  const isDeliverer = Boolean(userId && deliveryList.some((d) => d.beneficiaryUserId === userId || d.by === user.name));
+  const isHolder = Boolean(userId && hold && hold.personName === user.name);
+  const canEditPullRequest =
+    !bug.isDeleted &&
+    bug.status !== "resolved" &&
+    bug.status !== "closed" &&
+    hasLinkedPullRequest &&
+    (isAssignee || isHolder || isDeliverer || canEdit);
   const prActivity = activities.find((a) => {
     const meta = a.metadata as Record<string, unknown> | null;
     return meta && (meta.screenshots || meta.testResults || meta.field === "pullRequestUrl");
@@ -2174,6 +2184,8 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
             linkedPullRequestUrl={bug.pullRequestUrl}
             idea={sourceIdea ? { number: sourceIdea.number, slug: refOf(bug.project) } : null}
             repairs={linkRepairs}
+            bugId={bug.id}
+            canEditPullRequest={canEditPullRequest}
           />
 
           <SubmissionEvidence
