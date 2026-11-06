@@ -2724,7 +2724,7 @@ model AgentPicture {
 
 /// A contributor's skill submission to the skills library (#skill-submissions).
 /// Pending until a super admin approves or rejects it; an approved submission
-/// can be equipped by agents from the verified skills directory.
+/// is published to the skills directory.
 enum SkillSubmissionStatus {
   pending
   approved
