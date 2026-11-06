@@ -43,7 +43,7 @@ beforeEach(() => {
 
 describe("Support Threads Domain Logic", () => {
   const user = { id: "user-alice", name: "Alice" };
-  const tenantId = "tenant-1";
+  const organisationId = "organisation-1";
   const issueId = "bug-1";
 
   describe("createSupportThread", () => {
@@ -53,7 +53,7 @@ describe("Support Threads Domain Logic", () => {
         number: 42,
         title: "Stuck in progress fix",
         status: "in_progress",
-        tenantId,
+        organisationId,
       });
 
       db.supportThread.findFirst.mockResolvedValue(null);
@@ -63,14 +63,14 @@ describe("Support Threads Domain Logic", () => {
         { id: "agent-merger-1" },
       ]);
 
-      const res = await createSupportThread(user, tenantId, issueId, "Need help with the PR");
+      const res = await createSupportThread(user, organisationId, issueId, "Need help with the PR");
 
       expect(res).toEqual({ ok: true, threadId: "thread-1", existing: false });
       expect(db.$executeRaw).toHaveBeenCalled();
       expect(db.supportThread.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            tenantId,
+            organisationId,
             bugId: issueId,
             requesterUserId: user.id,
             status: "open",
@@ -86,7 +86,7 @@ describe("Support Threads Domain Logic", () => {
 
       expect(db.agent.findMany).toHaveBeenCalledWith({
         where: {
-          tenantId,
+          organisationId,
           revokedAt: null,
           level: { in: ["manager", "merger"] },
           ownerUserId: { not: user.id },
@@ -119,9 +119,9 @@ describe("Support Threads Domain Logic", () => {
       });
     });
 
-    it("returns error if issue is not found or not in tenant", async () => {
+    it("returns error if issue is not found or not in organisation", async () => {
       db.bug.findFirst.mockResolvedValue(null);
-      const res = await createSupportThread(user, tenantId, "nonexistent", "Hello");
+      const res = await createSupportThread(user, organisationId, "nonexistent", "Hello");
       expect(res).toEqual({ ok: false, error: "Issue not found." });
     });
 
@@ -131,10 +131,10 @@ describe("Support Threads Domain Logic", () => {
         number: 42,
         title: "Open issue",
         status: "open",
-        tenantId,
+        organisationId,
       });
 
-      const res = await createSupportThread(user, tenantId, issueId, "Hello");
+      const res = await createSupportThread(user, organisationId, issueId, "Hello");
       expect(res).toEqual({
         ok: false,
         error: "You can only ask about fixes that are in progress, done, or in merge.",
@@ -147,11 +147,11 @@ describe("Support Threads Domain Logic", () => {
         number: 42,
         title: "Stuck fix",
         status: "in_progress",
-        tenantId,
+        organisationId,
       });
       db.supportThread.findFirst.mockResolvedValue({ id: "existing-thread-1" });
 
-      const res = await createSupportThread(user, tenantId, issueId, "Another question");
+      const res = await createSupportThread(user, organisationId, issueId, "Another question");
       expect(res).toEqual({ ok: true, threadId: "existing-thread-1", existing: true });
       expect(db.supportThread.create).not.toHaveBeenCalled();
       expect(db.agentInboxItem.createMany).not.toHaveBeenCalled();
@@ -163,7 +163,7 @@ describe("Support Threads Domain Logic", () => {
       db.supportThread.findFirst.mockResolvedValue({
         id: "thread-1",
         bugId: issueId,
-        tenantId,
+        organisationId,
         requesterUserId: user.id,
         status: "taken",
         assigneeAgentId: "agent-1",
@@ -171,7 +171,7 @@ describe("Support Threads Domain Logic", () => {
       });
       db.agent.findUnique.mockResolvedValue({ ownerUserId: "user-bob" });
 
-      const res = await addRequesterMessage(user, tenantId, "thread-1", "Any update?");
+      const res = await addRequesterMessage(user, organisationId, "thread-1", "Any update?");
       expect(res).toEqual({ ok: true });
       expect(db.threadMessage.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -206,26 +206,26 @@ describe("Support Threads Domain Logic", () => {
     it("rejects non-requester messages", async () => {
       db.supportThread.findFirst.mockResolvedValue({
         id: "thread-1",
-        tenantId,
+        organisationId,
         requesterUserId: "someone-else",
         status: "open",
         bug: { number: 42, title: "Stuck fix" },
       });
 
-      const res = await addRequesterMessage(user, tenantId, "thread-1", "Hello");
+      const res = await addRequesterMessage(user, organisationId, "thread-1", "Hello");
       expect(res).toEqual({ ok: false, error: "Only the requester can add follow-up messages." });
     });
 
     it("rejects messages on resolved threads", async () => {
       db.supportThread.findFirst.mockResolvedValue({
         id: "thread-1",
-        tenantId,
+        organisationId,
         requesterUserId: user.id,
         status: "resolved",
         bug: { number: 42, title: "Stuck fix" },
       });
 
-      const res = await addRequesterMessage(user, tenantId, "thread-1", "Hello");
+      const res = await addRequesterMessage(user, organisationId, "thread-1", "Hello");
       expect(res).toEqual({ ok: false, error: "This request has already been resolved." });
     });
   });
@@ -235,7 +235,7 @@ describe("Support Threads Domain Logic", () => {
 
     it("requires caller to own an eligible manager or merger agent", async () => {
       db.agent.findFirst.mockResolvedValue(null);
-      const res = await takeSupportThread(bob, tenantId, "thread-1", "agent-invalid");
+      const res = await takeSupportThread(bob, organisationId, "thread-1", "agent-invalid");
       expect(res).toEqual({ ok: false, error: "You must choose an active manager or merger agent you own." });
     });
 
@@ -243,13 +243,13 @@ describe("Support Threads Domain Logic", () => {
       db.agent.findFirst.mockResolvedValue({ id: "agent-mgr", name: "Agent Manager" });
       db.supportThread.findFirst.mockResolvedValue({
         id: "thread-1",
-        tenantId,
+        organisationId,
         requesterUserId: bob.id,
         status: "open",
         bug: { number: 42, title: "Fix" },
       });
 
-      const res = await takeSupportThread(bob, tenantId, "thread-1", "agent-mgr");
+      const res = await takeSupportThread(bob, organisationId, "thread-1", "agent-mgr");
       expect(res).toEqual({ ok: false, error: "You cannot take your own request." });
     });
 
@@ -257,14 +257,14 @@ describe("Support Threads Domain Logic", () => {
       db.agent.findFirst.mockResolvedValue({ id: "agent-mgr", name: "Agent Manager" });
       db.supportThread.findFirst.mockResolvedValue({
         id: "thread-1",
-        tenantId,
+        organisationId,
         requesterUserId: "user-alice",
         status: "open",
         bug: { number: 42, title: "Fix" },
       });
       db.supportThread.updateMany.mockResolvedValue({ count: 0 });
 
-      const res = await takeSupportThread(bob, tenantId, "thread-1", "agent-mgr");
+      const res = await takeSupportThread(bob, organisationId, "thread-1", "agent-mgr");
       expect(res).toEqual({ ok: false, error: "Someone already took this request." });
     });
 
@@ -272,7 +272,7 @@ describe("Support Threads Domain Logic", () => {
       db.agent.findFirst.mockResolvedValue({ id: "agent-mgr", name: "Agent Manager" });
       db.supportThread.findFirst.mockResolvedValue({
         id: "thread-1",
-        tenantId,
+        organisationId,
         bugId: issueId,
         requesterUserId: "user-alice",
         status: "open",
@@ -280,10 +280,10 @@ describe("Support Threads Domain Logic", () => {
       });
       db.supportThread.updateMany.mockResolvedValue({ count: 1 });
 
-      const res = await takeSupportThread(bob, tenantId, "thread-1", "agent-mgr");
+      const res = await takeSupportThread(bob, organisationId, "thread-1", "agent-mgr");
       expect(res).toEqual({ ok: true });
       expect(db.supportThread.updateMany).toHaveBeenCalledWith({
-        where: { id: "thread-1", tenantId, status: "open" },
+        where: { id: "thread-1", organisationId, status: "open" },
         data: expect.objectContaining({
           status: "taken",
           assigneeAgentId: "agent-mgr",
@@ -308,33 +308,33 @@ describe("Support Threads Domain Logic", () => {
     it("only allows the assignee agent's owner to reply", async () => {
       db.supportThread.findFirst.mockResolvedValue({
         id: "thread-1",
-        tenantId,
+        organisationId,
         status: "taken",
         assigneeAgent: { id: "agent-mgr", name: "Agent Manager", ownerUserId: "user-other" },
         bug: { number: 42, title: "Fix" },
       });
 
-      const res = await replySupportThread(bob, tenantId, "thread-1", "Here is the answer");
+      const res = await replySupportThread(bob, organisationId, "thread-1", "Here is the answer");
       expect(res).toEqual({ ok: false, error: "Only the owner of the assigned agent can reply." });
     });
 
     it("refuses replies when thread is not taken", async () => {
       db.supportThread.findFirst.mockResolvedValue({
         id: "thread-1",
-        tenantId,
+        organisationId,
         status: "open",
         assigneeAgent: null,
         bug: { number: 42, title: "Fix" },
       });
 
-      const res = await replySupportThread(bob, tenantId, "thread-1", "Here is the answer");
+      const res = await replySupportThread(bob, organisationId, "thread-1", "Here is the answer");
       expect(res).toEqual({ ok: false, error: "Can only reply to taken requests." });
     });
 
     it("records reply message as the assigned agent and notifies requester", async () => {
       db.supportThread.findFirst.mockResolvedValue({
         id: "thread-1",
-        tenantId,
+        organisationId,
         bugId: issueId,
         requesterUserId: "user-alice",
         status: "taken",
@@ -343,7 +343,7 @@ describe("Support Threads Domain Logic", () => {
         bug: { number: 42, title: "Fix" },
       });
 
-      const res = await replySupportThread(bob, tenantId, "thread-1", "We restarted CI and checks are passing.");
+      const res = await replySupportThread(bob, organisationId, "thread-1", "We restarted CI and checks are passing.");
       expect(res).toEqual({ ok: true });
       expect(db.threadMessage.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -374,7 +374,7 @@ describe("Support Threads Domain Logic", () => {
     it("resets thread to open and fans out request.released to eligible agents", async () => {
       db.supportThread.findFirst.mockResolvedValue({
         id: "thread-1",
-        tenantId,
+        organisationId,
         bugId: issueId,
         requesterUserId: "user-alice",
         status: "taken",
@@ -384,7 +384,7 @@ describe("Support Threads Domain Logic", () => {
       });
       db.agent.findMany.mockResolvedValue([{ id: "agent-other-mgr" }]);
 
-      const res = await releaseSupportThread(bob, tenantId, "thread-1");
+      const res = await releaseSupportThread(bob, organisationId, "thread-1");
       expect(res).toEqual({ ok: true });
       expect(db.supportThread.update).toHaveBeenCalledWith({
         where: { id: "thread-1" },
@@ -409,7 +409,7 @@ describe("Support Threads Domain Logic", () => {
     it("allows requester to resolve manually and notifies assignee owner", async () => {
       db.supportThread.findFirst.mockResolvedValue({
         id: "thread-1",
-        tenantId,
+        organisationId,
         bugId: issueId,
         requesterUserId: user.id,
         status: "taken",
@@ -417,7 +417,7 @@ describe("Support Threads Domain Logic", () => {
         bug: { number: 42, title: "Fix" },
       });
 
-      const res = await resolveSupportThread(user, tenantId, "thread-1");
+      const res = await resolveSupportThread(user, organisationId, "thread-1");
       expect(res).toEqual({ ok: true });
       expect(db.supportThread.update).toHaveBeenCalledWith({
         where: { id: "thread-1" },
@@ -439,14 +439,14 @@ describe("Support Threads Domain Logic", () => {
     it("refuses resolution by unrelated user", async () => {
       db.supportThread.findFirst.mockResolvedValue({
         id: "thread-1",
-        tenantId,
+        organisationId,
         requesterUserId: "user-alice",
         status: "taken",
         assigneeAgent: { id: "agent-mgr", ownerUserId: "user-bob" },
         bug: { number: 42, title: "Fix" },
       });
 
-      const res = await resolveSupportThread({ id: "user-stranger" }, tenantId, "thread-1");
+      const res = await resolveSupportThread({ id: "user-stranger" }, organisationId, "thread-1");
       expect(res).toEqual({
         ok: false,
         error: "Only the requester or the assigned agent's owner can resolve this request.",
@@ -457,18 +457,18 @@ describe("Support Threads Domain Logic", () => {
   describe("visibility and count", () => {
     it("restricts visibility to own requests if user owns no eligible agent", async () => {
       db.agent.count.mockResolvedValue(0);
-      const where = await supportThreadVisibilityWhere("user-plain", tenantId);
+      const where = await supportThreadVisibilityWhere("user-plain", organisationId);
       expect(where).toEqual({
-        tenantId,
+        organisationId,
         requesterUserId: "user-plain",
       });
     });
 
     it("broadens visibility to open threads and assigned threads if user owns eligible agent", async () => {
       db.agent.count.mockResolvedValue(1);
-      const where = await supportThreadVisibilityWhere("user-mgr", tenantId);
+      const where = await supportThreadVisibilityWhere("user-mgr", organisationId);
       expect(where).toEqual({
-        tenantId,
+        organisationId,
         OR: [
           { requesterUserId: "user-mgr" },
           { status: "open" },
@@ -479,7 +479,7 @@ describe("Support Threads Domain Logic", () => {
 
     it("returns 0 open count if user owns no eligible agents", async () => {
       db.agent.count.mockResolvedValue(0);
-      const count = await countOpenRequestsForUser("user-plain", tenantId);
+      const count = await countOpenRequestsForUser("user-plain", organisationId);
       expect(count).toBe(0);
       expect(db.supportThread.count).not.toHaveBeenCalled();
     });
@@ -488,11 +488,11 @@ describe("Support Threads Domain Logic", () => {
       db.agent.count.mockResolvedValue(2);
       db.supportThread.count.mockResolvedValue(3);
 
-      const count = await countOpenRequestsForUser("user-mgr", tenantId);
+      const count = await countOpenRequestsForUser("user-mgr", organisationId);
       expect(count).toBe(3);
       expect(db.supportThread.count).toHaveBeenCalledWith({
         where: {
-          tenantId,
+          organisationId,
           status: "open",
           requesterUserId: { not: "user-mgr" },
         },
@@ -518,7 +518,7 @@ describe("Support Threads Domain Logic", () => {
           findMany: vi.fn().mockResolvedValue([
             {
               id: "t-1",
-              tenantId: "t1",
+              organisationId: "t1",
               requesterUserId: "user-req",
               assigneeAgent: { ownerUserId: "user-agent-owner" },
               bug: { number: 10, title: "Resolved bug" },

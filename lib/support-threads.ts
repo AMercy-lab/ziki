@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-import { bugInTenant } from "@/lib/tenant-context";
+import { bugInOrganisation } from "@/lib/organisation-context";
 import { expireUnreadCounts } from "@/lib/cache-tags";
 import {
   ASKABLE_STATUSES,
@@ -19,13 +19,13 @@ type Db = typeof prisma | Prisma.TransactionClient;
 export async function notifySupportThread(
   db: Db,
   {
-    tenantId,
+    organisationId,
     bugId,
     threadId,
     recipientUserIds,
     title,
   }: {
-    tenantId: string;
+    organisationId: string;
     bugId: string;
     threadId: string;
     recipientUserIds: string[];
@@ -38,7 +38,7 @@ export async function notifySupportThread(
   await db.notification.createMany({
     data: uniqueUserIds.map((userId) => ({
       userId,
-      tenantId,
+      organisationId,
       bugId,
       kind: "support_thread",
       title,
@@ -49,12 +49,12 @@ export async function notifySupportThread(
 }
 
 /**
- * Counts how many non-revoked manager/merger agents the user owns in the tenant.
+ * Counts how many non-revoked manager/merger agents the user owns in the organisation.
  */
-export async function countUserEligibleAgents(userId: string, tenantId: string): Promise<number> {
+export async function countUserEligibleAgents(userId: string, organisationId: string): Promise<number> {
   return prisma.agent.count({
     where: {
-      tenantId,
+      organisationId,
       ownerUserId: userId,
       revokedAt: null,
       level: { in: [...ELIGIBLE_AGENT_LEVELS] },
@@ -63,12 +63,12 @@ export async function countUserEligibleAgents(userId: string, tenantId: string):
 }
 
 /**
- * Gets non-revoked manager/merger agents the user owns in the tenant.
+ * Gets non-revoked manager/merger agents the user owns in the organisation.
  */
-export async function getUserEligibleAgents(userId: string, tenantId: string) {
+export async function getUserEligibleAgents(userId: string, organisationId: string) {
   return prisma.agent.findMany({
     where: {
-      tenantId,
+      organisationId,
       ownerUserId: userId,
       revokedAt: null,
       level: { in: [...ELIGIBLE_AGENT_LEVELS] },
@@ -81,12 +81,12 @@ export async function getUserEligibleAgents(userId: string, tenantId: string) {
 /**
  * Number of open requests the user could take (0 if they own no eligible agent).
  */
-export async function countOpenRequestsForUser(userId: string, tenantId: string): Promise<number> {
-  const eligibleCount = await countUserEligibleAgents(userId, tenantId);
+export async function countOpenRequestsForUser(userId: string, organisationId: string): Promise<number> {
+  const eligibleCount = await countUserEligibleAgents(userId, organisationId);
   if (eligibleCount === 0) return 0;
   return prisma.supportThread.count({
     where: {
-      tenantId,
+      organisationId,
       status: "open",
       requesterUserId: { not: userId },
     },
@@ -94,22 +94,22 @@ export async function countOpenRequestsForUser(userId: string, tenantId: string)
 }
 
 /**
- * Returns the Prisma `where` clause for threads visible to the user in this tenant.
+ * Returns the Prisma `where` clause for threads visible to the user in this organisation.
  */
 export async function supportThreadVisibilityWhere(
   userId: string,
-  tenantId: string,
+  organisationId: string,
 ): Promise<Prisma.SupportThreadWhereInput> {
-  const eligibleCount = await countUserEligibleAgents(userId, tenantId);
+  const eligibleCount = await countUserEligibleAgents(userId, organisationId);
   if (eligibleCount === 0) {
     return {
-      tenantId,
+      organisationId,
       requesterUserId: userId,
     };
   }
 
   return {
-    tenantId,
+    organisationId,
     OR: [
       { requesterUserId: userId },
       { status: "open" },
@@ -124,13 +124,13 @@ export async function supportThreadVisibilityWhere(
  */
 export async function createSupportThread(
   user: { id: string; name?: string | null },
-  tenantId: string,
+  organisationId: string,
   issueId: string,
   body: string,
 ): Promise<SupportThreadResult<{ threadId: string; existing: boolean }>> {
   const bug = await prisma.bug.findFirst({
-    where: { id: issueId, ...bugInTenant(tenantId), isDeleted: false },
-    select: { id: true, number: true, title: true, status: true, tenantId: true },
+    where: { id: issueId, ...bugInOrganisation(organisationId), isDeleted: false },
+    select: { id: true, number: true, title: true, status: true, organisationId: true },
   });
   if (!bug) return { ok: false, error: "Issue not found." };
   if (!ASKABLE_STATUSES.includes(bug.status as (typeof ASKABLE_STATUSES)[number])) {
@@ -146,7 +146,7 @@ export async function createSupportThread(
       where: {
         bugId: bug.id,
         requesterUserId: user.id,
-        tenantId,
+        organisationId,
         status: { in: ["open", "taken"] },
       },
       select: { id: true },
@@ -157,7 +157,7 @@ export async function createSupportThread(
 
     const thread = await tx.supportThread.create({
       data: {
-        tenantId,
+        organisationId,
         bugId: bug.id,
         requesterUserId: user.id,
         status: "open",
@@ -174,7 +174,7 @@ export async function createSupportThread(
 
     const eligibleAgents = await tx.agent.findMany({
       where: {
-        tenantId,
+        organisationId,
         revokedAt: null,
         level: { in: [...ELIGIBLE_AGENT_LEVELS] },
         ownerUserId: { not: user.id },
@@ -210,12 +210,12 @@ export async function createSupportThread(
  */
 export async function addRequesterMessage(
   user: { id: string; name?: string | null },
-  tenantId: string,
+  organisationId: string,
   threadId: string,
   body: string,
 ): Promise<SupportThreadResult> {
   const thread = await prisma.supportThread.findFirst({
-    where: { id: threadId, tenantId },
+    where: { id: threadId, organisationId },
     include: { bug: { select: { number: true, title: true } } },
   });
   if (!thread) return { ok: false, error: "Request not found." };
@@ -267,7 +267,7 @@ export async function addRequesterMessage(
       });
       if (assigneeAgent && assigneeAgent.ownerUserId !== user.id) {
         await notifySupportThread(tx, {
-          tenantId,
+          organisationId,
           bugId: thread.bugId,
           threadId: thread.id,
           recipientUserIds: [assigneeAgent.ownerUserId],
@@ -285,14 +285,14 @@ export async function addRequesterMessage(
  */
 export async function takeSupportThread(
   user: { id: string },
-  tenantId: string,
+  organisationId: string,
   threadId: string,
   agentId: string,
 ): Promise<SupportThreadResult> {
   const agent = await prisma.agent.findFirst({
     where: {
       id: agentId,
-      tenantId,
+      organisationId,
       ownerUserId: user.id,
       revokedAt: null,
       level: { in: [...ELIGIBLE_AGENT_LEVELS] },
@@ -304,7 +304,7 @@ export async function takeSupportThread(
   }
 
   const thread = await prisma.supportThread.findFirst({
-    where: { id: threadId, tenantId },
+    where: { id: threadId, organisationId },
     include: { bug: { select: { number: true, title: true } } },
   });
   if (!thread) return { ok: false, error: "Request not found." };
@@ -314,7 +314,7 @@ export async function takeSupportThread(
 
   const now = new Date();
   const updated = await prisma.supportThread.updateMany({
-    where: { id: threadId, tenantId, status: "open" },
+    where: { id: threadId, organisationId, status: "open" },
     data: {
       status: "taken",
       assigneeAgentId: agent.id,
@@ -328,7 +328,7 @@ export async function takeSupportThread(
   }
 
   await notifySupportThread(prisma, {
-    tenantId,
+    organisationId,
     bugId: thread.bugId,
     threadId: thread.id,
     recipientUserIds: [thread.requesterUserId],
@@ -343,12 +343,12 @@ export async function takeSupportThread(
  */
 export async function replySupportThread(
   user: { id: string },
-  tenantId: string,
+  organisationId: string,
   threadId: string,
   body: string,
 ): Promise<SupportThreadResult> {
   const thread = await prisma.supportThread.findFirst({
-    where: { id: threadId, tenantId },
+    where: { id: threadId, organisationId },
     include: {
       bug: { select: { number: true, title: true } },
       assigneeAgent: { select: { id: true, name: true, ownerUserId: true } },
@@ -376,7 +376,7 @@ export async function replySupportThread(
       data: { lastMessageAt: now },
     });
     await notifySupportThread(tx, {
-      tenantId,
+      organisationId,
       bugId: thread.bugId,
       threadId: thread.id,
       recipientUserIds: [thread.requesterUserId],
@@ -392,11 +392,11 @@ export async function replySupportThread(
  */
 export async function releaseSupportThread(
   user: { id: string },
-  tenantId: string,
+  organisationId: string,
   threadId: string,
 ): Promise<SupportThreadResult> {
   const thread = await prisma.supportThread.findFirst({
-    where: { id: threadId, tenantId },
+    where: { id: threadId, organisationId },
     include: {
       bug: { select: { number: true, title: true } },
       assigneeAgent: { select: { id: true, name: true, ownerUserId: true } },
@@ -422,7 +422,7 @@ export async function releaseSupportThread(
 
     const eligibleAgents = await tx.agent.findMany({
       where: {
-        tenantId,
+        organisationId,
         revokedAt: null,
         level: { in: [...ELIGIBLE_AGENT_LEVELS] },
         ownerUserId: { not: thread.requesterUserId },
@@ -458,11 +458,11 @@ export async function releaseSupportThread(
  */
 export async function resolveSupportThread(
   user: { id: string },
-  tenantId: string,
+  organisationId: string,
   threadId: string,
 ): Promise<SupportThreadResult> {
   const thread = await prisma.supportThread.findFirst({
-    where: { id: threadId, tenantId },
+    where: { id: threadId, organisationId },
     include: {
       bug: { select: { number: true, title: true } },
       assigneeAgent: { select: { id: true, name: true, ownerUserId: true } },
@@ -492,7 +492,7 @@ export async function resolveSupportThread(
 
     if (otherUserId) {
       await notifySupportThread(tx, {
-        tenantId,
+        organisationId,
         bugId: thread.bugId,
         threadId: thread.id,
         recipientUserIds: [otherUserId],
@@ -520,7 +520,7 @@ export async function closeSupportThreadsForIssue(
       },
       select: {
         id: true,
-        tenantId: true,
+        organisationId: true,
         requesterUserId: true,
         assigneeAgent: { select: { ownerUserId: true } },
         bug: { select: { number: true, title: true } },
@@ -543,7 +543,7 @@ export async function closeSupportThreadsForIssue(
 
     const notifications: {
       userId: string;
-      tenantId: string;
+      organisationId: string;
       bugId: string;
       kind: string;
       title: string;
@@ -562,7 +562,7 @@ export async function closeSupportThreadsForIssue(
       for (const uid of recipients) {
         notifications.push({
           userId: uid,
-          tenantId: t.tenantId,
+          organisationId: t.organisationId,
           bugId,
           kind: "support_thread",
           title,

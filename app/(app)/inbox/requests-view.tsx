@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
-import { currentTenantIdFor } from "@/lib/tenant-context";
+import { currentOrganisationIdFor } from "@/lib/organisation-context";
 import { issueHref } from "@/lib/issue-ref";
 import { LocalTime } from "@/components/local-time";
 import {
@@ -22,14 +22,14 @@ const muted = "text-sm text-zk-muted";
 
 export async function RequestsView({ thread: selectedId }: { thread?: string }) {
   const user = await requireUser();
-  const tenantId = await currentTenantIdFor(user.id);
-  if (!tenantId) {
+  const organisationId = await currentOrganisationIdFor(user.id);
+  if (!organisationId) {
     return <p className={muted}>Join a workspace to view requests.</p>;
   }
 
   const [eligibleAgents, visibilityWhere] = await Promise.all([
-    getUserEligibleAgents(user.id, tenantId),
-    supportThreadVisibilityWhere(user.id, tenantId),
+    getUserEligibleAgents(user.id, organisationId),
+    supportThreadVisibilityWhere(user.id, organisationId),
   ]);
 
   const rawThreads = await prisma.supportThread.findMany({
@@ -44,7 +44,7 @@ export async function RequestsView({ thread: selectedId }: { thread?: string }) 
           id: true,
           number: true,
           title: true,
-          project: { select: { slug: true, tenant: { select: { slug: true } } } },
+          project: { select: { slug: true, organisation: { select: { slug: true } } } },
         },
       },
     },

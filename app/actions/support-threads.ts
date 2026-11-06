@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth-helpers";
-import { currentTenantIdFor } from "@/lib/tenant-context";
+import { currentOrganisationIdFor } from "@/lib/organisation-context";
 import { revalidateIssue } from "@/lib/revalidate-issue";
 import { consumeRateLimit, ACTION_RATE_LIMITS, RATE_LIMIT_MESSAGE } from "@/lib/rate-limit";
 import { IssueApiError } from "@/lib/agent-api/errors";
@@ -31,8 +31,8 @@ export async function createSupportThreadAction(input: unknown): Promise<ActionR
   const limit = await consumeRateLimit(`support-thread:${user.id}`, ACTION_RATE_LIMITS.supportThread);
   if (!limit.allowed) return { ok: false, error: RATE_LIMIT_MESSAGE };
 
-  const tenantId = await currentTenantIdFor(user.id);
-  if (!tenantId) return { ok: false, error: "Workspace membership required." };
+  const organisationId = await currentOrganisationIdFor(user.id);
+  if (!organisationId) return { ok: false, error: "Workspace membership required." };
 
   const parsed = createSupportThreadSchema.safeParse(input);
   if (!parsed.success) {
@@ -40,7 +40,7 @@ export async function createSupportThreadAction(input: unknown): Promise<ActionR
   }
 
   try {
-    const result = await createSupportThread(user, tenantId, parsed.data.issueId, parsed.data.body);
+    const result = await createSupportThread(user, organisationId, parsed.data.issueId, parsed.data.body);
     if (!result.ok) return result;
 
     revalidatePath("/inbox");
@@ -58,8 +58,8 @@ export async function addRequesterMessageAction(input: unknown): Promise<ActionR
   const limit = await consumeRateLimit(`support-thread:${user.id}`, ACTION_RATE_LIMITS.supportThread);
   if (!limit.allowed) return { ok: false, error: RATE_LIMIT_MESSAGE };
 
-  const tenantId = await currentTenantIdFor(user.id);
-  if (!tenantId) return { ok: false, error: "Workspace membership required." };
+  const organisationId = await currentOrganisationIdFor(user.id);
+  if (!organisationId) return { ok: false, error: "Workspace membership required." };
 
   const parsed = addRequesterMessageSchema.safeParse(input);
   if (!parsed.success) {
@@ -67,7 +67,7 @@ export async function addRequesterMessageAction(input: unknown): Promise<ActionR
   }
 
   try {
-    const result = await addRequesterMessage(user, tenantId, parsed.data.threadId, parsed.data.body);
+    const result = await addRequesterMessage(user, organisationId, parsed.data.threadId, parsed.data.body);
     if (!result.ok) return result;
 
     revalidatePath("/inbox");
@@ -84,8 +84,8 @@ export async function takeSupportThreadAction(input: unknown): Promise<ActionRes
   const limit = await consumeRateLimit(`support-thread:${user.id}`, ACTION_RATE_LIMITS.supportThread);
   if (!limit.allowed) return { ok: false, error: RATE_LIMIT_MESSAGE };
 
-  const tenantId = await currentTenantIdFor(user.id);
-  if (!tenantId) return { ok: false, error: "Workspace membership required." };
+  const organisationId = await currentOrganisationIdFor(user.id);
+  if (!organisationId) return { ok: false, error: "Workspace membership required." };
 
   const parsed = takeSupportThreadSchema.safeParse(input);
   if (!parsed.success) {
@@ -93,7 +93,7 @@ export async function takeSupportThreadAction(input: unknown): Promise<ActionRes
   }
 
   try {
-    const result = await takeSupportThread(user, tenantId, parsed.data.threadId, parsed.data.agentId);
+    const result = await takeSupportThread(user, organisationId, parsed.data.threadId, parsed.data.agentId);
     if (!result.ok) return result;
 
     revalidatePath("/inbox");
@@ -111,8 +111,8 @@ export async function replySupportThreadAction(input: unknown): Promise<ActionRe
   const limit = await consumeRateLimit(`support-thread:${user.id}`, ACTION_RATE_LIMITS.supportThread);
   if (!limit.allowed) return { ok: false, error: RATE_LIMIT_MESSAGE };
 
-  const tenantId = await currentTenantIdFor(user.id);
-  if (!tenantId) return { ok: false, error: "Workspace membership required." };
+  const organisationId = await currentOrganisationIdFor(user.id);
+  if (!organisationId) return { ok: false, error: "Workspace membership required." };
 
   const parsed = replySupportThreadSchema.safeParse(input);
   if (!parsed.success) {
@@ -120,7 +120,7 @@ export async function replySupportThreadAction(input: unknown): Promise<ActionRe
   }
 
   try {
-    const result = await replySupportThread(user, tenantId, parsed.data.threadId, parsed.data.body);
+    const result = await replySupportThread(user, organisationId, parsed.data.threadId, parsed.data.body);
     if (!result.ok) return result;
 
     revalidatePath("/inbox");
@@ -137,8 +137,8 @@ export async function releaseSupportThreadAction(input: unknown): Promise<Action
   const limit = await consumeRateLimit(`support-thread:${user.id}`, ACTION_RATE_LIMITS.supportThread);
   if (!limit.allowed) return { ok: false, error: RATE_LIMIT_MESSAGE };
 
-  const tenantId = await currentTenantIdFor(user.id);
-  if (!tenantId) return { ok: false, error: "Workspace membership required." };
+  const organisationId = await currentOrganisationIdFor(user.id);
+  if (!organisationId) return { ok: false, error: "Workspace membership required." };
 
   const parsed = releaseSupportThreadSchema.safeParse(input);
   if (!parsed.success) {
@@ -146,7 +146,7 @@ export async function releaseSupportThreadAction(input: unknown): Promise<Action
   }
 
   try {
-    const result = await releaseSupportThread(user, tenantId, parsed.data.threadId);
+    const result = await releaseSupportThread(user, organisationId, parsed.data.threadId);
     if (!result.ok) return result;
 
     revalidatePath("/inbox");
@@ -164,8 +164,8 @@ export async function resolveSupportThreadAction(input: unknown): Promise<Action
   const limit = await consumeRateLimit(`support-thread:${user.id}`, ACTION_RATE_LIMITS.supportThread);
   if (!limit.allowed) return { ok: false, error: RATE_LIMIT_MESSAGE };
 
-  const tenantId = await currentTenantIdFor(user.id);
-  if (!tenantId) return { ok: false, error: "Workspace membership required." };
+  const organisationId = await currentOrganisationIdFor(user.id);
+  if (!organisationId) return { ok: false, error: "Workspace membership required." };
 
   const parsed = resolveSupportThreadSchema.safeParse(input);
   if (!parsed.success) {
@@ -173,7 +173,7 @@ export async function resolveSupportThreadAction(input: unknown): Promise<Action
   }
 
   try {
-    const result = await resolveSupportThread(user, tenantId, parsed.data.threadId);
+    const result = await resolveSupportThread(user, organisationId, parsed.data.threadId);
     if (!result.ok) return result;
 
     revalidatePath("/inbox");
