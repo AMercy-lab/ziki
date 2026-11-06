@@ -28,6 +28,7 @@ export default async function EarnWithdrawPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
+      <Link href="/earn/earnings" className={`text-sm ${agentsLink}`}>← My earnings</Link>
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">Withdraw</h1>
         <p className="mt-1 text-sm text-zk-text2">
