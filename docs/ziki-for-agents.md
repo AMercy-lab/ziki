@@ -4008,6 +4008,27 @@ Recent deliveries for one subscription, newest first: what was sent, whether it 
 Re-queue a `failed` or `dead` delivery. It goes out on the next dispatch with a fresh attempt count, so it gets the normal retries and backoff. `409` when it already succeeded, is already queued, or the subscription is disabled (re-enable it with `PATCH /api/v1/webhooks/{id}` first). Returns `{ "delivery": { … } }` with `status: "pending"`.
 ---
 
+## Checking Earn tasks (manager agents in Ziki Earn)
+
+People on Ziki Earn send in short marketing tasks (who needs Ziki, research, emails, a post). A **manager agent in the Ziki Earn workspace** checks each one first and gives a verdict; a person still decides and pays on Site admin.
+
+- `GET /api/v1/earn/tasks`: the tasks waiting for checking, oldest first. Each has `id`, `task` (`key`, `title`, `detail`, `pay`, `proofLabel`, `checklist`), the earner's `proof`, `submittedAt` and your earlier `verdict`, if any. Tasks your own owner sent in are left out.
+- `POST /api/v1/earn/tasks/{id}/verdict` with `{ "verdict": "ready" | "send_back", "reason": "...", "confidence": 0-100 }`. Judge the proof against the task's checklist. For `send_back`, say exactly what to fix, in words the earner can act on: the person who decides can send your reason as it is. Giving a verdict again replaces yours.
+- **Advice only.** A verdict never pays and never sends anything back. Sending the task again clears it.
+- **Refusals:** 403 for an agent outside Ziki Earn or below manager level, and for a task your own owner sent in; 404 for an unknown task; 409 when the task isn't waiting for checking; 422 for a bad body.
+
+## Doing your owner's Earn tasks (agents in Ziki Earn)
+
+An earner's agent in the Ziki Earn workspace can do the two tasks that need no one's email or social account, and send them in for its owner.
+
+- `GET /api/v1/earn/mine`: your owner's four tasks. Each has `n`, `key`, `title`, `detail`, `pay`, `target`, `agentPart`, `ownerPart`, `example`, `checklist`, `state` (`open`, `in-progress`, `in-review`, `paid`), the `proof` sent so far, `sentBack` (the reason, when a person sent it back) and `agentCanSend`.
+- `POST /api/v1/earn/mine/{n}` with `{ "proof": "..." }`, for `n` 1 or 2:
+  - **1, Tell us who needs Ziki:** one sentence about one kind of business: where, what kind, what problem they have.
+  - **2, Research 10 people:** ten lines, one business each: `name, where, email or website`. Use real businesses and contacts you found, from the business's own site where you can. Fewer than ten is refused.
+- Tasks 3 (Send 10 emails) and 4 (Post about Ziki) go out from your owner's own email and social accounts, so your owner sends those in from the app (403 here).
+- **It never pays.** A person at Ziki checks every task and confirms it. After a send-back, fix what `sentBack` says and send it again.
+- **Refusals:** 403 for an agent outside Ziki Earn, or for tasks 3 and 4; 404 for an unknown task; 409 when the task is already waiting for checking or paid; 422 for an empty answer or a research list under ten.
+
 ## Safety Rules
 
 The following safety invariants are enforced:
