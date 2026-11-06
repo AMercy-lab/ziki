@@ -1,5 +1,5 @@
 /**
- * Sets a organisation's points multiplier and brings its existing balances up to it (#points-multiplier).
+ * Sets an organisation's points multiplier and brings its existing balances up to it (#points-multiplier).
  *
  *   node scripts/points-multiplier.mjs <organisation-slug> <factor>            # dry run
  *   node scripts/points-multiplier.mjs <organisation-slug> <factor> --apply    # does it

@@ -9,7 +9,7 @@ const ref = projectRef("zedu", "acme");
 /**
  * The agents bar (#agents-dock): which pages draw it, when the Leaderboard
  * link is worth showing, and the one next step
- * a organisation card names in place of the empty bar. Pure rules.
+ * an organisation card names in place of the empty bar. Pure rules.
  */
 
 describe("dockVisibleOn: where the agents bar shows", () => {
@@ -195,7 +195,7 @@ describe("leaderboardInMenu: the account menu only offers what the bar isn't sho
     expect(leaderboardInMenu("/home", 3, 2)).toBe(false);
   });
 
-  it("is never offered in a organisation of one member, bar or no bar", () => {
+  it("is never offered in an organisation of one member, bar or no bar", () => {
     expect(leaderboardInMenu("/zedu/acme/issues", 0, 1)).toBe(false);
     expect(leaderboardInMenu("/settings", 2, 1)).toBe(false);
   });

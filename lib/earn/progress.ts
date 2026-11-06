@@ -219,7 +219,7 @@ export async function confirmTask(
       role: "submission",
       points: task.pay,
       sourceKey: earnSourceKey(args.userId, task.id),
-      // Earn pays fixed amounts: a organisation multiplier must not change what a task pays.
+      // Earn pays fixed amounts: an organisation multiplier must not change what a task pays.
       exact: true,
     });
     return { ok: true as const };

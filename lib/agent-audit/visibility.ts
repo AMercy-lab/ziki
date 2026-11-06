@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 /**
  * Who can read the agent audit log (#447).
  *
- * A organisation owner or admin (and the site's super admin) reads every row. An
+ * An organisation owner or admin (and the site's super admin) reads every row. An
  * agent owner reads their own agents' rows and nothing of another owner's.
  * Any other member gets 403, so nobody else ever sees raw payloads.
  */

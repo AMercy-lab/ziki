@@ -11,7 +11,7 @@ type Db = PrismaClient | Prisma.TransactionClient;
 export const MULTIPLIER_KEY_PREFIX = "multiplier:";
 
 /**
- * What a organisation multiplies every award by (#points-multiplier): 1 for a
+ * What an organisation multiplies every award by (#points-multiplier): 1 for a
  * normal organisation. Read each time an award is written, so changing it takes
  * effect on the next award. Anything unreadable counts as 1.
  */
@@ -22,7 +22,7 @@ export async function pointsMultiplierFor(db: Db, organisationId: string): Promi
   return Number.isFinite(value) && value > 0 ? value : 1;
 }
 
-/** An amount as the ledger stores it in a organisation with this multiplier. */
+/** An amount as the ledger stores it in an organisation with this multiplier. */
 export function scaledPoints(points: number, multiplier: number): number {
   return roundPoints(points * multiplier);
 }

@@ -104,7 +104,7 @@ describe("the organisation around the issues", () => {
   });
 
   describe("research jobs", () => {
-    it("are posted by an agent whose owner is a organisation admin, and not otherwise", async () => {
+    it("are posted by an agent whose owner is an organisation admin, and not otherwise", async () => {
       const job = { brief: "List three competitors' pricing pages.", dedupeKey: "url", maxSubmissions: 5, pointsPerAccepted: 10 };
       await refused("bob", "create-job", job, 403);
       const created = await ok("ada", "create-job", job);

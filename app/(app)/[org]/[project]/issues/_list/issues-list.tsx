@@ -1610,7 +1610,7 @@ function FirstRunWelcome({
       <section aria-labelledby="issues-organisation-heading" className="issues-organisation-empty rounded-[20px] border border-zk-border bg-zk-bg px-6 py-10 text-center sm:px-8">
         <h2 id="issues-organisation-heading" className="text-xl font-bold leading-7 text-zk-text">No organisation yet</h2>
         <p className="mx-auto mt-3 max-w-lg text-base leading-7 text-zk-text2">
-          You are not currently a member of any organisation. Join a organisation via an invite from your team,
+          You are not currently a member of any organisation. Join an organisation via an invite from your team,
           or create your own organisation to start filing issues.
         </p>
         <div className="mt-6">
@@ -1618,7 +1618,7 @@ function FirstRunWelcome({
             href="/organisations"
             className="inline-flex min-h-12 max-w-full items-center justify-center rounded-full bg-electric-blue-strong px-6 py-3 text-sm font-bold leading-5 text-white transition-colors hover:bg-blue-slate focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zk-accent"
           >
-            Create or join a organisation
+            Create or join an organisation
           </Link>
         </div>
       </section>

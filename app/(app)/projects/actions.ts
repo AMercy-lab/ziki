@@ -56,7 +56,7 @@ async function ownerOrganisationFor(
     select: { role: true },
   });
   if (membership?.role !== "owner") {
-    return { error: "Only a organisation owner can manage its projects." };
+    return { error: "Only an organisation owner can manage its projects." };
   }
   return { organisationId };
 }

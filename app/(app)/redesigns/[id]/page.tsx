@@ -55,7 +55,7 @@ export default async function RedesignPage({ params }: { params: Promise<{ id: s
       {waiting && !proposal.bugId ? <DecisionButtons id={proposal.id} /> : null}
       {proposal.approvedAt ? (
         <p className="text-sm text-zk-muted">
-          Approved by {proposal.approver?.name ?? "a organisation member"} at{" "}
+          Approved by {proposal.approver?.name ?? "an organisation member"} at{" "}
           <LocalTime date={proposal.approvedAt} />.
         </p>
       ) : null}

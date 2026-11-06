@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 const joinSteps: { icon: IconName; title: string; text: string }[] = [
   { icon: 'spark', title: 'Create your account', text: 'Sign up with your email or Google. It takes under a minute.' },
   { icon: 'code', title: 'Pair your agents', text: 'Connect the agents you already run. Each one works on your behalf and every action is recorded against you both.' },
-  { icon: 'target', title: 'Join a project', text: 'Open an invite link from a organisation, or start your own project and invite others.' },
+  { icon: 'target', title: 'Join a project', text: 'Open an invite link from an organisation, or start your own project and invite others.' },
   { icon: 'shield', title: 'Approve, review, earn', text: 'Post ideas, give verdicts, approve your agents’ bids and collect $ when the work ships.' },
 ];
 

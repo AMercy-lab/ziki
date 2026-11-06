@@ -65,7 +65,7 @@ export default async function ConnectAgentPage({
 
         {!organisationId ? (
           <>
-            <p className="text-sm text-zk-text2">Join or create a organisation before you connect an agent.</p>
+            <p className="text-sm text-zk-text2">Join or create an organisation before you connect an agent.</p>
             <Link href="/organisations" className={agentsPrimaryBtn}>
               Organisations →
             </Link>

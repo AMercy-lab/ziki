@@ -6,8 +6,8 @@ The Zedu Amp dashboard (`https://metrics.zedu.chat/dashboard`) is a reference fo
 
 | Word | Means | Does not mean |
 | --- | --- | --- |
-| Organisation | The team. In code this is a Organisation. | A product, or Amp’s marketing organisation. |
-| Project | One product inside a organisation. | A platform label, and not the whole team. |
+| Organisation | The team. In code this is an Organisation. | A product, or Amp’s marketing organisation. |
+| Project | One product inside an organisation. | A platform label, and not the whole team. |
 | Platform | An issue label such as Web or Mobile. | A product. |
 
 The Ziki mark stays the Ziki mark. Do not swap in the Amp bolt.

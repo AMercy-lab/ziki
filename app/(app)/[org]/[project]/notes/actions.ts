@@ -13,7 +13,7 @@ export async function saveNotesAction(projectId: string, input: unknown): Promis
   const user = await requireUser();
   try {
     const organisationId = await currentOrganisationIdFor(user.id);
-    if (!organisationId) return { error: "Select a organisation first." };
+    if (!organisationId) return { error: "Select an organisation first." };
     const actor = await humanNotesActor(user, organisationId, projectId);
     const result = await saveProjectNotes(actor, input);
     revalidatePath("/[org]/[project]/notes", "page");
@@ -30,7 +30,7 @@ export async function restoreNotesAction(projectId: string, revisionId: string, 
   const user = await requireUser();
   try {
     const organisationId = await currentOrganisationIdFor(user.id);
-    if (!organisationId) return { error: "Select a organisation first." };
+    if (!organisationId) return { error: "Select an organisation first." };
     const actor = await humanNotesActor(user, organisationId, projectId);
     const result = await restoreProjectNotes(actor, revisionId, input);
     revalidatePath("/[org]/[project]/notes", "page");
@@ -48,7 +48,7 @@ export async function addNoteCommentAction(projectId: string, body: string, pare
   const user = await requireUser();
   try {
     const organisationId = await currentOrganisationIdFor(user.id);
-    if (!organisationId) return { error: "Select a organisation first." };
+    if (!organisationId) return { error: "Select an organisation first." };
     const actor = await humanNotesActor(user, organisationId, projectId);
     const { comment } = await addNoteComment(actor, parentId ? { body, parentId } : { body });
     revalidatePath("/[org]/[project]/notes", "page");
@@ -66,7 +66,7 @@ export async function voteNoteCommentAction(projectId: string, commentId: string
   const user = await requireUser();
   try {
     const organisationId = await currentOrganisationIdFor(user.id);
-    if (!organisationId) return { error: "Select a organisation first." };
+    if (!organisationId) return { error: "Select an organisation first." };
     const actor = await humanNotesActor(user, organisationId, projectId);
     if (value !== 1 && value !== -1 && value !== 0) return { error: "Vote up or down." };
     const result = await voteNoteComment(actor, commentId, value);

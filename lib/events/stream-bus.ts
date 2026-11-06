@@ -1,6 +1,6 @@
 /**
  * In-process notice of committed events and writes. The work feed listens to
- * drop its cached view of a organisation (lib/agent-api/work.ts). Agents read events
+ * drop its cached view of an organisation (lib/agent-api/work.ts). Agents read events
  * with `GET /api/v1/events` or receive them as webhooks.
  */
 import { EventEmitter } from "node:events";
@@ -25,5 +25,5 @@ class EventStreamBus extends EventEmitter {
 
 export const eventStreamBus = new EventStreamBus();
 
-/** Emitted with a organisation id once an agent write has committed (#work-feed), ahead of its event broadcast. */
+/** Emitted with an organisation id once an agent write has committed (#work-feed), ahead of its event broadcast. */
 export const ORGANISATION_WRITE = "organisation-write";

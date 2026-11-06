@@ -86,7 +86,7 @@ export default async function PointsDisputesPage() {
       <div className="space-y-6">
         <h1 className="text-2xl font-extrabold tracking-tight text-zk-text">$ disputes</h1>
         <p className="rounded-[20px] border border-zk-border bg-zk-surface p-6 text-sm text-zk-text2">
-          You&apos;re not a member of a organisation yet, so there is no $ to dispute.
+          You&apos;re not a member of an organisation yet, so there is no $ to dispute.
         </p>
       </div>
     );
@@ -105,7 +105,7 @@ export default async function PointsDisputesPage() {
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-zk-text">$ disputes</h1>
           <p className="text-sm text-zk-text2">
-            Say an award is missing or wrong; a organisation admin resolves it. Points are never
+            Say an award is missing or wrong; an organisation admin resolves it. Points are never
             deleted — a correction is a reversing entry.
           </p>
         </div>

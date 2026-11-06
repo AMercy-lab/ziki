@@ -94,7 +94,7 @@ async function loadAllEntries(organisationId: string): Promise<LeaderboardEntry[
   return [first.entries, ...rest.map((r) => r.entries)].flat();
 }
 
-/** A organisation member with their leaderboard standing and their Team details. */
+/** An organisation member with their leaderboard standing and their Team details. */
 type RankedMember = {
   userId: string;
   name: string;
@@ -151,8 +151,8 @@ export default async function RankingPanel({
     return (
       <section className="team-empty">
         <h2>No organisation yet</h2>
-        <p>Join or create a organisation to see its ranking and team.</p>
-        <Link href="/organisations" className="team-primary">Create or join a organisation</Link>
+        <p>Join or create an organisation to see its ranking and team.</p>
+        <Link href="/organisations" className="team-primary">Create or join an organisation</Link>
       </section>
     );
   }

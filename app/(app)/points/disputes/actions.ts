@@ -18,7 +18,7 @@ import {
   rejectDispute,
 } from "@/lib/points/disputes";
 
-/** Open a dispute, or resolve one as a organisation admin (#436). */
+/** Open a dispute, or resolve one as an organisation admin (#436). */
 
 export type DisputeActionResult =
   | { ok: true; message: string }
@@ -55,7 +55,7 @@ export async function openDisputeAction(
   });
   if (!result.ok) return { ok: false, error: result.error };
   revalidatePath("/points/disputes");
-  return { ok: true, message: "Dispute opened. A organisation admin will review it." };
+  return { ok: true, message: "Dispute opened. An organisation admin will review it." };
 }
 
 /**
@@ -91,7 +91,7 @@ export async function resolveDisputeAction(
     return { ok: false, error: NOT_IN_ORGANISATION };
   }
   if (!(await canManagePoints(user, dispute.organisationId))) {
-    return { ok: false, error: "Only a organisation admin can resolve disputes." };
+    return { ok: false, error: "Only an organisation admin can resolve disputes." };
   }
   if (dispute.userId === user.id) {
     return { ok: false, error: "You cannot resolve your own points dispute." };
@@ -170,7 +170,7 @@ export async function resolveDisputeAction(
 }
 
 /**
- * Site admins were backfilled as ordinary members, so a organisation-admin check
+ * Site admins were backfilled as ordinary members, so an organisation-admin check
  * alone leaves nobody but a super admin able to repair the ledger.
  */
 async function canManagePoints(
@@ -189,7 +189,7 @@ export async function creditAwardsAction(
   const organisationId = await currentOrganisationIdFor(user.id);
   if (!organisationId) return { ok: false, error: NO_ORGANISATION_MESSAGE };
   if (!(await canManagePoints(user, organisationId))) {
-    return { ok: false, error: "Only a organisation admin can credit awards." };
+    return { ok: false, error: "Only an organisation admin can credit awards." };
   }
 
   const role = formData.get("role");

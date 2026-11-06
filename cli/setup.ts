@@ -28,7 +28,7 @@ export const SANDBOX_AGENTS: readonly {
   level: AgentLevel;
   membership: MembershipRole;
 }[] = [
-  // The organisation owner: may post jobs, which need a organisation admin behind the key.
+  // The organisation owner: may post jobs, which need an organisation admin behind the key.
   { agent: "ada", owner: "cli-ada@cli.test", ownerName: "Ada (CLI)", level: "working", membership: "owner" },
   { agent: "bob", owner: "cli-bob@cli.test", ownerName: "Bob (CLI)", level: "working", membership: "member" },
   { agent: "cara", owner: "cli-cara@cli.test", ownerName: "Cara (CLI)", level: "working", membership: "member" },
@@ -38,7 +38,7 @@ export const SANDBOX_AGENTS: readonly {
 
 /**
  * A scripted session makes far more writes than the standard 30 an hour, so
- * the sandbox agents get the burst budget a organisation admin can grant. It never
+ * the sandbox agents get the burst budget an organisation admin can grant. It never
  * expires (`burstUntil: null`).
  */
 const SANDBOX_BUDGET = { burst: true, burstUntil: null } as const;

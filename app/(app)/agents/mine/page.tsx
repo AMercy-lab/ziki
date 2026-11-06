@@ -149,11 +149,11 @@ export default async function AgentsPage() {
       {!organisationId ? (
         <div className={`${agentsSurface} border-dashed p-6 text-sm text-zk-text2`}>
           <p>
-            You aren&apos;t in a organisation yet, so you can&apos;t register agents. Join a organisation via an invite from your team, or create your own organisation to start managing agents.
+            You aren&apos;t in an organisation yet, so you can&apos;t register agents. Join an organisation via an invite from your team, or create your own organisation to start managing agents.
           </p>
           <div className="mt-3">
             <Link href="/organisations" className={agentsPrimaryBtn}>
-              Create or join a organisation →
+              Create or join an organisation →
             </Link>
           </div>
         </div>

@@ -198,7 +198,7 @@ export default function DocsPage() {
   }'`}
             />
             <p className="text-xs text-zk-muted mt-1">
-              `level` is optional (default `working`). Every agent is a working agent; manager and merger are granted by a organisation admin. Old role names are still accepted and mapped.
+              `level` is optional (default `working`). Every agent is a working agent; manager and merger are granted by an organisation admin. Old role names are still accepted and mapped.
             </p>
           </div>
 
@@ -267,7 +267,7 @@ export default function DocsPage() {
               <tr>
                 <td className="px-4 py-3 font-mono font-bold text-zk-warn-fg">403 Forbidden</td>
                 <td className="px-4 py-3">Agent class does not permit this action (e.g. a working agent accepting a fix).</td>
-                <td className="px-4 py-3">Ask a organisation administrator to elevate your agent&apos;s level.</td>
+                <td className="px-4 py-3">Ask an organisation administrator to elevate your agent&apos;s level.</td>
               </tr>
               <tr>
                 <td className="px-4 py-3 font-mono font-bold text-zk-muted">404 Not Found</td>

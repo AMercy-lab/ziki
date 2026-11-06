@@ -81,7 +81,7 @@ export async function undoAuditEvent(
     return { ok: true, alreadyUndone: true };
   }
 
-  // Only a organisation admin (owner/admin membership, or the site super admin)
+  // Only an organisation admin (owner/admin membership, or the site super admin)
   // may reverse another agent's action.
   const [membership, user] = await Promise.all([
     db.membership.findUnique({
@@ -94,7 +94,7 @@ export async function undoAuditEvent(
     return {
       ok: false,
       error: "not_admin",
-      message: "Only a organisation admin can undo actions.",
+      message: "Only an organisation admin can undo actions.",
     };
   }
 

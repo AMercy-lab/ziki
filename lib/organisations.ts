@@ -15,7 +15,7 @@ import { isReservedProjectSlug } from "@/lib/project-slug";
  *
  * After sign-in a person works inside one organisation: one they already belong
  * to, one they create, or one they were invited to (lib/invites.ts). A
- * membership is the only way in. Nothing here adds anyone to a organisation except
+ * membership is the only way in. Nothing here adds anyone to an organisation except
  * its creator, and there is no joining by name or slug.
  *
  * The organisation picked on this device lives in a cookie, like the active project
@@ -195,7 +195,7 @@ export async function organisationsForUser(
  * - one membership: straight into it, never the picker;
  * - several, and one of them picked on this device: into that one;
  * - several and none picked, or none at all: the picker, where they can
- *   choose, create a organisation, or accept an invite.
+ *   choose, create an organisation, or accept an invite.
  */
 export function landingPath(
   memberOrganisationIds: ReadonlyArray<string>,
@@ -222,7 +222,7 @@ export async function homePathFor(db: Db, userId: string): Promise<"/home" | "/o
   }
 }
 
-/** A organisation the person belongs to, by id. Null for any other id. */
+/** An organisation the person belongs to, by id. Null for any other id. */
 export async function memberOrganisationById(
   db: Db,
   userId: string,
@@ -255,7 +255,7 @@ export async function memberOrganisationById(
 }
 
 // ---------------------------------------------------------------------------
-// Creating a organisation
+// Creating an organisation
 // ---------------------------------------------------------------------------
 
 const collapse = (value: string) => value.replace(/\s+/g, " ").trim();
@@ -350,15 +350,15 @@ export type CreateOrganisationResult =
       ok: false;
       error: string;
       field?: "name";
-      /** #537: set when the creator already belongs to a organisation with this name. */
+      /** #537: set when the creator already belongs to an organisation with this name. */
       duplicateName?: string;
     };
 
 /**
- * Creates a organisation with the creator as its owner. It starts with no
+ * Creates an organisation with the creator as its owner. It starts with no
  * projects: the owner creates them from the organisation's Projects page
  * (`/<org>`). Projects have no owner of their own: the organisation's owner owns
- * every project in it. One nested create, so a organisation never exists without
+ * every project in it. One nested create, so an organisation never exists without
  * its owner.
  */
 export async function createOrganisation(
@@ -424,7 +424,7 @@ export async function createOrganisation(
 }
 
 // ---------------------------------------------------------------------------
-// Renaming, archiving and deleting a organisation (#573)
+// Renaming, archiving and deleting an organisation (#573)
 // ---------------------------------------------------------------------------
 
 export type OrganisationLifecycleResult =
@@ -447,7 +447,7 @@ async function ownerOrganisation(
 }
 
 /**
- * Rename a organisation without changing its slug: links and project URLs keep
+ * Rename an organisation without changing its slug: links and project URLs keep
  * working. Only an owner can rename, and archived organisations are read-only.
  */
 export async function renameOrganisation(
@@ -470,7 +470,7 @@ export async function renameOrganisation(
 }
 
 /**
- * Archive or restore a organisation. Archiving hides it from the switcher, stops it
+ * Archive or restore an organisation. Archiving hides it from the switcher, stops it
  * being auto-selected, and makes its settings read-only. Zedu is the default
  * organisation and is never archived.
  */

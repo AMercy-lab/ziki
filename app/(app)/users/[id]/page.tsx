@@ -54,7 +54,7 @@ export async function generateMetadata({
 export default async function ProfilePage({ params, searchParams }: ProfileProps) {
   const viewer = await requireUser();
   const { id } = await params;
-  // #503: only people who share a organisation with this person can see them.
+  // #503: only people who share an organisation with this person can see them.
   if (!(await canViewProfile(prisma, viewer, id))) notFound();
   // #428: points in the viewer's organisation.
   const organisationId = await currentOrganisationIdFor(viewer.id);

@@ -12,7 +12,7 @@ import { readActiveOrganisationCookie } from "@/lib/organisations";
  * The organisation comes from the person's membership, never from merely having a
  * session. Existing users are members of Zedu (#423), so they land there. A
  * new account has no membership, gets `null`, and sees no issues at all until
- * they create or join a organisation (#444).
+ * they create or join an organisation (#444).
  */
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -114,9 +114,9 @@ export function commentInOrganisation(organisationId: string | null): { bug: Org
 }
 
 /**
- * Notifications in `organisationId`. Personal notifications without a organisation stay
+ * Notifications in `organisationId`. Personal notifications without an organisation stay
  * visible in each organisation; the feed can bypass this scope for all organisations.
- * A organisation invite is personal too: the recipient is not in that organisation yet,
+ * An organisation invite is personal too: the recipient is not in that organisation yet,
  * so hiding it behind the destination organisation means they never see it.
  */
 export function notificationInOrganisation(
@@ -129,6 +129,6 @@ export function notificationInOrganisation(
   return { OR: [{ organisationId: null }, { organisationId }, invite] };
 }
 
-/** Shown when someone without a organisation tries to file an issue. */
+/** Shown when someone without an organisation tries to file an issue. */
 export const NO_ORGANISATION_MESSAGE =
-  "You're not a member of a organisation yet, so you can't file issues here.";
+  "You're not a member of an organisation yet, so you can't file issues here.";

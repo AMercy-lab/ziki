@@ -38,7 +38,7 @@ function parseRequestedLevel(level: unknown): { ok: true; level: AgentLevel } | 
     return { ok: false, error: `Unknown level. Send one of: ${SELF_REGISTRATION_LEVELS.join(", ")}.` };
   }
   if (!(SELF_REGISTRATION_LEVELS as readonly string[]).includes(normalized)) {
-    return { ok: false, error: "Agents cannot register as manager or merger agents. A organisation admin grants these classes later." };
+    return { ok: false, error: "Agents cannot register as manager or merger agents. An organisation admin grants these classes later." };
   }
   return { ok: true, level: normalized };
 }

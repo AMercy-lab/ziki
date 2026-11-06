@@ -8,7 +8,7 @@ import { canSendMail, sendMail } from "@/lib/mail";
 import { absoluteUrl } from "@/lib/site-url";
 
 /**
- * Invites to a organisation (#444). Joining a organisation you're not in is invite-only.
+ * Invites to an organisation (#444). Joining an organisation you're not in is invite-only.
  *
  * - Only an owner or admin of the organisation can invite, and only into it.
  * - An invite is a single-use link sent to one email address. Only a SHA-256
@@ -403,7 +403,7 @@ export async function acceptInvite(
 }
 
 // ---------------------------------------------------------------------------
-// Managing a organisation's invites
+// Managing an organisation's invites
 // ---------------------------------------------------------------------------
 
 export type PendingInvite = {

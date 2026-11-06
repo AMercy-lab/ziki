@@ -31,7 +31,7 @@ export async function canViewProfile(
  * Whether `viewer` may see `personId`'s wallet address (#618).
  *
  * The address is set by the person alone and only becomes useful to a
- * transfer, so it goes to them and to admins of a organisation they share — not to
+ * transfer, so it goes to them and to admins of an organisation they share — not to
  * everyone who can see the profile's name, points and issues. The site's
  * super admin counts as an admin everywhere; a site-wide `admin` does not.
  */

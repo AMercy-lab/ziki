@@ -43,7 +43,7 @@ export function dockVisibleOn(pathname: string | null | undefined, agentCount: n
 
 /**
  * Whether to show the Leaderboard link: "you can't be the only person on a
- * leaderboard", so not in a organisation of one member. When the count couldn't
+ * leaderboard", so not in an organisation of one member. When the count couldn't
  * be loaded the link stays, as it always was.
  */
 export function leaderboardVisible(memberCount: number | null | undefined): boolean {

@@ -100,7 +100,7 @@ export async function issueTypeScopeFor(user: {
 }
 
 /**
- * Ensures default issue types (Marketing, Design, Fix, Feat) exist for a organisation only when empty.
+ * Ensures default issue types (Marketing, Design, Fix, Feat) exist for an organisation only when empty.
  */
 export async function ensureDefaultIssueTypes(organisationId: string): Promise<void> {
   const count = await prisma.issueType.count({ where: { organisationId, ...PRODUCT_TRACK } });

@@ -11,7 +11,7 @@ import type { AgentLevel } from "@prisma/client";
  *   organisation admin, the person the issue is for (its reporter or
  *   beneficiary), or someone whose manager or merger agent works in the
  *   organisation: the people who review and merge.
- * - `merge`: a organisation admin, or someone whose merger agent works in the
+ * - `merge`: an organisation admin, or someone whose merger agent works in the
  *   organisation. Merging is the merger's step (lib/agents/levels.ts).
  */
 

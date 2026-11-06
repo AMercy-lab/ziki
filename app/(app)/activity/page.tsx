@@ -34,7 +34,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   if (!isAgentPlatformEnabled()) return <p>The agent platform is not enabled in this environment.</p>;
   const params = await searchParams;
   const data = await loadAgentCenter(user.id, await currentOrganisationIdFor(user.id), params);
-  if (!data) return <div className={panel}><h1 className="text-2xl font-bold">Activity</h1><p>Join a organisation to view agent activity.</p><Link className={link} href="/organisations">Organisations</Link></div>;
+  if (!data) return <div className={panel}><h1 className="text-2xl font-bold">Activity</h1><p>Join an organisation to view agent activity.</p><Link className={link} href="/organisations">Organisations</Link></div>;
   const filters = activityFilters(params);
 
   return <div className="mx-auto max-w-5xl space-y-6 text-zk-text">

@@ -76,8 +76,8 @@ async function guard(bugId: unknown, power: keyof GitHubStatusPowers): Promise<L
     return {
       ok: false,
       error: power === "merge"
-        ? "Only a organisation admin, or someone whose merger agent works here, can merge from Ziki."
-        : "Only a organisation admin, the person this issue is for, or someone whose manager or merger agent works here can do that.",
+        ? "Only an organisation admin, or someone whose merger agent works here, can merge from Ziki."
+        : "Only an organisation admin, the person this issue is for, or someone whose manager or merger agent works here can do that.",
     };
   }
   if (power !== "refresh") {

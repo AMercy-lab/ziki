@@ -84,7 +84,7 @@ export type NotificationEvent =
       proposalTitle: string;
     })
   | (AgentBase & {
-      /** Someone invited this person to a organisation (#444). */
+      /** Someone invited this person to an organisation (#444). */
       kind: "organisation_invite";
       inviteId: string;
       organisationName: string;

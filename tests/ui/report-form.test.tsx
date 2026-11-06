@@ -293,7 +293,7 @@ describe("marketing task types and the report form", () => {
     expect(issueTypes.findMany.mock.calls[0][0].where).toEqual({ organisationId: "t1", track: "product" });
   }, 15000);
 
-  it("still sets up the product types in a organisation that only has marketing types", async () => {
+  it("still sets up the product types in an organisation that only has marketing types", async () => {
     issueTypes.count.mockImplementation(async ({ where }: { where: { track?: string } }) => (where.track === "product" ? 0 : 4));
     const { ensureDefaultIssueTypes } = await import("@/lib/issue-types");
     await ensureDefaultIssueTypes("t1");

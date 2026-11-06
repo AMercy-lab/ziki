@@ -17,7 +17,7 @@ function withHint(hintId: string, errorAttrs: { "aria-invalid"?: true; "aria-des
 }
 
 /**
- * Create a organisation you own (#444). It starts with no projects: they are
+ * Create an organisation you own (#444). It starts with no projects: they are
  * created from the organisation's Projects page. `nameMax` comes
  * from the server, so this client file doesn't import the server-only rules.
  */

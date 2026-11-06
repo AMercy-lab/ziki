@@ -43,7 +43,7 @@ export async function listWebhooksAction(): Promise<ListWebhooksResult> {
   const user = await requireUser();
   const organisation = await organisationForOwner(user.id);
   if (!organisation) {
-    return { ok: false, error: "No organisation found. Create or join a organisation first." };
+    return { ok: false, error: "No organisation found. Create or join an organisation first." };
   }
 
   const agents = await prisma.agent.findMany({

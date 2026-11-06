@@ -419,7 +419,7 @@ export function AppHeader({
                   All agents
                 </MenuLink>
                 {/* The agents bar carries Leaderboard wherever it is drawn, so the menu offers it only elsewhere. And you
-                    can't be the only person on a leaderboard: a organisation of one has none. */}
+                    can't be the only person on a leaderboard: an organisation of one has none. */}
                 {leaderboardInMenu(pathname, agentCount, memberCount) && !earnQuiet ? (
                   <MenuLink href={LEADERBOARD_HREF} active={isNavItemActive(pathname, LEADERBOARD_HREF)}>
                     Leaderboard

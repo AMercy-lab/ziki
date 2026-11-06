@@ -183,7 +183,7 @@ async function runOffboard(
 /**
  * Self-service account deletion (#571).
  *
- * 1. Refuses while the user is a organisation's sole owner.
+ * 1. Refuses while the user is an organisation's sole owner.
  * 2. Revokes all agents and keys owned by the user.
  * 3. Removes organisation memberships.
  * 4. Reuses the safe offboarding path to anonymise authored content (issues, comments, activities),
@@ -214,7 +214,7 @@ async function runDeleteUserAccount(
     throw new Error(`User with ID "${userId}" not found.`);
   }
 
-  // Refuse while you're a organisation's only owner (#571)
+  // Refuse while you're an organisation's only owner (#571)
   if (client.membership?.findMany && client.membership?.count) {
     const ownedMemberships = await client.membership.findMany({
       where: { userId, role: "owner" },

@@ -38,7 +38,7 @@ describe("project notes access", () => {
   it("does not confer organisation authority from a site admin title", async () => {
     expect((await agentNotesActor({ ...agent, ownerRole: "admin" }, "project")).canEdit).toBe(false);
   });
-  it("gives no working agent edit rights, even one a organisation admin owns; only a merger agent (#notes-promote)", async () => {
+  it("gives no working agent edit rights, even one an organisation admin owns; only a merger agent (#notes-promote)", async () => {
     db.membership.findUnique.mockResolvedValue({ role: "admin" });
     expect((await agentNotesActor(agent, "project")).canEdit).toBe(false);
     expect((await agentNotesActor({ ...agent, level: "manager" }, "project")).canEdit).toBe(false);

@@ -61,7 +61,7 @@ export default async function PairAgentPage({
       <section className={`${agentsSurface} p-4 sm:p-6`}>
         {!organisationId ? (
           <p className="text-sm text-zk-text2">
-            Join or create a organisation before you can approve an agent.{" "}
+            Join or create an organisation before you can approve an agent.{" "}
             <Link href="/organisations" className={`font-semibold ${agentsLink}`}>
               Organisations
             </Link>

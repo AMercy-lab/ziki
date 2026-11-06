@@ -17,7 +17,7 @@ import { releaseWorkOfRevokedAgent } from "@/lib/agent-api/revoke-release";
 
 /**
  * Registering agents and managing their keys (#427). A person creates agents
- * under their own account, sees each key once, and can revoke them; a organisation
+ * under their own account, sees each key once, and can revoke them; an organisation
  * admin can revoke any agent in the organisation. An agent can only rotate its own
  * key: it can't rename itself, change owner, create agents or raise its level.
  */
@@ -145,7 +145,7 @@ async function projectInOrganisation(organisationId: string, projectId: string) 
   });
 }
 
-/** The agent, and whether the actor may manage it: its owner or a organisation admin. */
+/** The agent, and whether the actor may manage it: its owner or an organisation admin. */
 async function managedAgent(actor: Actor, agentId: string) {
   const agent: ManagedAgent | null = await prisma.agent.findUnique({
     where: { id: agentId },
@@ -210,7 +210,7 @@ export async function deleteAgent(actor: Actor, agentId: string, now = new Date(
   return { ok: true };
 }
 
-/** The owner, or a organisation admin, moves an agent to another level. */
+/** The owner, or an organisation admin, moves an agent to another level. */
 export async function setAgentLevel(actor: Actor, agentId: string, level: AgentLevel): Promise<ManageResult> {
   const managed = await managedAgent(actor, agentId);
   if (!managed) return { ok: false, error: NOT_FOUND };
@@ -237,7 +237,7 @@ export type RenameResult = { ok: true; name: string } | { ok: false; error: stri
 
 /**
  * Rename an agent, as its owner or a team admin. An owner keeps one agent per
- * name in a organisation, because the agent's page is addressed by its name.
+ * name in an organisation, because the agent's page is addressed by its name.
  */
 export async function renameAgent(actor: Actor, agentId: string, input: unknown): Promise<RenameResult> {
   const parsed = agentNameSchema.safeParse(input);
@@ -345,7 +345,7 @@ export async function setAgentAreaPreferences(
 
 /**
  * Turns the higher read budget on or off (#440; writes have no hourly cap since #699), optionally until a time
- * (#596). A organisation admin or a site admin may do this. An owner who is not
+ * (#596). An organisation admin or a site admin may do this. An owner who is not
  * an admin cannot.
  *
  * `burst` stays the enabled flag; `burstUntil` only limits it. Disabling
@@ -438,7 +438,7 @@ export type RegenerateKeyResult =
   | { ok: false; error: string; field?: "projectId" };
 
 /**
- * The owner or a organisation admin replaces every live key without the old secret
+ * The owner or an organisation admin replaces every live key without the old secret
  * (#572). The agent, its level and its history stay. The new key is sealed so
  * it can be copied again, and it is limited to the project they choose.
  */

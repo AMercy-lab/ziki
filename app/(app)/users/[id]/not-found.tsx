@@ -16,7 +16,7 @@ export default function PersonNotFound() {
         </Link>
       }
     >
-      <p>The link may be wrong, or you don&apos;t share a organisation with them.</p>
+      <p>The link may be wrong, or you don&apos;t share an organisation with them.</p>
     </StatusPage>
   );
 }

@@ -37,7 +37,7 @@ function fakeDb(multipliers: Record<string, number | string>, reporters: string[
 
 const base = { userId: "u1", bugId: "bug-1", role: "reviewer" as const };
 
-describe("a organisation's points multiplier (#points-multiplier)", () => {
+describe("an organisation's points multiplier (#points-multiplier)", () => {
   it("multiplies every award written in that organisation, and no other", async () => {
     const { db, rows } = fakeDb({ zedu: "20.00", other: 1 });
     await award(db, { ...base, organisationId: "zedu", points: 0.9, sourceKey: "a" });

@@ -29,8 +29,8 @@ const card = "rounded-[20px] border border-zk-border bg-zk-surface p-4 sm:p-6";
 
 /**
  * A person's own memberships (#444): pick the organisation to work in, accept an
- * invite or open an invite link, create a organisation, or restore an archived
- * one. Nothing here administers a organisation; that is /org, for the current one.
+ * invite or open an invite link, create an organisation, or restore an archived
+ * one. Nothing here administers an organisation; that is /org, for the current one.
  */
 export default async function OrganisationsPage({
   searchParams,
@@ -78,12 +78,12 @@ export default async function OrganisationsPage({
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-extrabold tracking-tight text-zk-text">
-          {hasOrganisations ? "Choose a organisation" : "Join or create a organisation"}
+          {hasOrganisations ? "Choose an organisation" : "Join or create an organisation"}
         </h1>
         <p className="text-sm text-zk-text2">
           {hasOrganisations
-            ? "A organisation is your team. A project is one product inside it."
-            : "You're not in a organisation yet. Accept an invite, or create a organisation of your own."}
+            ? "An organisation is your team. A project is one product inside it."
+            : "You're not in an organisation yet. Accept an invite, or create an organisation of your own."}
         </p>
       </div>
 
@@ -135,7 +135,7 @@ export default async function OrganisationsPage({
             </h2>
             <ul className="mt-2 space-y-1.5 text-sm text-zk-text2">
               <li>
-                <span className="font-medium">A organisation</span> is your team or company. Its people, projects,
+                <span className="font-medium">An organisation</span> is your team or company. Its people, projects,
                 and issues stay inside it.
               </li>
               <li>
@@ -258,7 +258,7 @@ export default async function OrganisationsPage({
       {hasOrganisations || inviteId ? (
         <section aria-labelledby="create-organisation" className={card}>
           <h2 id="create-organisation" className="text-base font-semibold text-zk-text">
-            Create a organisation
+            Create an organisation
           </h2>
           <CreateOrganisationForm nameMax={ORGANISATION_NAME_MAX} />
         </section>

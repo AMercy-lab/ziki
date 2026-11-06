@@ -261,7 +261,7 @@ describe("earn sign-ups through a link (#earn-outreach)", () => {
     return { db: db as never, contact };
   }
 
-  it("ticks Signed up for an account made after the link was opened, and Started once it owns a organisation", async () => {
+  it("ticks Signed up for an account made after the link was opened, and Started once it owns an organisation", async () => {
     const { db, contact } = fakeReferralDb({ userCreatedAt: new Date("2026-11-02T09:00:00Z"), owned: 1 });
     await syncReferral(db, "new-business", "abc1234", "organisation-earn");
     expect(contact).toMatchObject({ signedUpUserId: "new-business", signedUpAt: expect.any(Date), startedAt: expect.any(Date) });

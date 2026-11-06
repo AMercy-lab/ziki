@@ -21,7 +21,7 @@ vi.mock("@/lib/auth-helpers", () => ({ requireUser }));
 vi.mock("@/lib/agents/membership", () => ({ isAdminOfOrganisation }));
 vi.mock("@/lib/organisation-context", () => ({
   currentOrganisationIdFor,
-  NO_ORGANISATION_MESSAGE: "You're not a member of a organisation yet.",
+  NO_ORGANISATION_MESSAGE: "You're not a member of an organisation yet.",
 }));
 vi.mock("@/lib/workflow", () => ({
   invalidateWorkflow,
@@ -137,7 +137,7 @@ describe("Marketing settings core (M-API-6)", () => {
   });
 
   describe("assertMarketingSettingsAccess", () => {
-    it("allows a organisation owner or admin", async () => {
+    it("allows an organisation owner or admin", async () => {
       isAdminOfOrganisation.mockResolvedValue(true);
       await expect(assertMarketingSettingsAccess({ id: "user-1" }, "organisation-1", "change")).resolves.toBeUndefined();
     });
@@ -276,7 +276,7 @@ describe("Marketing settings API route (M-API-6)", () => {
     });
   });
 
-  it("GET returns 403 if agent owner is not a organisation admin", async () => {
+  it("GET returns 403 if agent owner is not an organisation admin", async () => {
     isAdminOfOrganisation.mockResolvedValue(false);
     const req = new NextRequest("http://localhost/api/v1/projects/proj-1/marketing/settings", {
       headers: { authorization: "Bearer ziki_test" },

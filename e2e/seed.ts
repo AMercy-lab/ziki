@@ -93,7 +93,7 @@ async function main() {
     })),
   });
   // The Demo organisation (scripts/dev/fixtures): realistic issues in every state,
-  // in a organisation of its own, so the suite runs against data like real Ziki's.
+  // in an organisation of its own, so the suite runs against data like real Ziki's.
   await loadFixtures({ db: prisma, quiet: true });
   console.log("e2e seed: database reset and seeded, with the Demo fixtures");
 }

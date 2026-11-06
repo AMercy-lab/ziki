@@ -2,7 +2,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { ZEDU_SLUG } from "@/lib/organisation";
 
 /**
- * A organisation's projects, and its default one (#426): the Zedu project, else
+ * An organisation's projects, and its default one (#426): the Zedu project, else
  * the oldest. Pages that show a project take it from their URL's slug
  * (lib/project-route.ts, #project-urls); nothing remembers a project in a
  * cookie. The default is for organisation-level work with no project in its

@@ -127,7 +127,7 @@ export const EARN_REF_MAX_AGE = 60 * 60 * 24 * 30;
  * Traces a new account back to the business link it came from (#earn-outreach): a signed-in person whose
  * browser carries a link's note, whose account was made after that link was first opened, and who isn't the
  * earner themselves, is that business signing up. Each account counts for one business, once. Then, once that
- * account owns a organisation of its own (not Ziki Earn), the business has started a project. Safe to call on every
+ * account owns an organisation of its own (not Ziki Earn), the business has started a project. Safe to call on every
  * page: it only writes the first time each thing happens.
  */
 export async function syncReferral(db: Db, userId: string, code: string | null, earnOrganisationId: string | null) {

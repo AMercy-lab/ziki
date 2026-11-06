@@ -48,7 +48,7 @@ type Db = Pick<PrismaClient, "bug"> | Prisma.TransactionClient;
 
 /**
  * Resolves a route reference to the issue's internal id and number inside
- * `scope`. A number needs a organisation: without one it is ambiguous across
+ * `scope`. A number needs an organisation: without one it is ambiguous across
  * organisations, so it resolves to nothing. An id keeps the old lookup, scope
  * included, so authorization is the same as before.
  */
@@ -65,7 +65,7 @@ export async function resolveIssueRef(
 }
 
 /**
- * The internal id a route's `{id}` names inside a organisation (#457): an id as it
+ * The internal id a route's `{id}` names inside an organisation (#457): an id as it
  * is, a readable number (`123`, `ZE-123`) looked up in the organisation. Null when
  * no issue there has that number. Every `/api/v1/issues/{id}` route takes
  * either; the caller still scopes its own read by organisation and project.

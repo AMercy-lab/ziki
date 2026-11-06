@@ -69,7 +69,7 @@ export function evidenceFileLines(files: readonly EvidenceFile[]): string {
   return files.map((file) => (file.lines ? `${file.path}:${file.lines}` : file.path)).join("\n");
 }
 
-/** Who is looking: a person, whether they are a organisation admin, and whether they have given their own entry. */
+/** Who is looking: a person, whether they are an organisation admin, and whether they have given their own entry. */
 export type EvidenceViewer = { userId: string; admin?: boolean; hasOwnEntry: boolean };
 
 /** Whether `viewer` may see the files of an entry given for `entryUserId`. */

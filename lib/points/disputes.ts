@@ -351,7 +351,7 @@ export async function disputesForMember(
   return rows.map(toView);
 }
 
-/** The open queue for a organisation, oldest first. */
+/** The open queue for an organisation, oldest first. */
 export async function openDisputes(db: Db, organisationId: string): Promise<DisputeView[]> {
   const rows = await db.pointDispute.findMany({
     where: { organisationId, status: "open" },

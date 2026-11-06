@@ -32,7 +32,7 @@ vi.mock("@/lib/agents/membership", () => ({
 }));
 vi.mock("@/lib/organisation-context", () => ({
   currentOrganisationIdFor,
-  NO_ORGANISATION_MESSAGE: "You're not a member of a organisation yet.",
+  NO_ORGANISATION_MESSAGE: "You're not a member of an organisation yet.",
 }));
 vi.mock("@/lib/workflow", () => ({ invalidateWorkflow }));
 vi.mock("@/lib/prisma", () => ({

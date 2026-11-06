@@ -4,7 +4,7 @@ import { pointsNumber } from "@/lib/points/rules";
 type Db = PrismaClient | Prisma.TransactionClient;
 
 /**
- * Lifetime points each agent earned in a organisation (#710): the sum of the point
+ * Lifetime points each agent earned in an organisation (#710): the sum of the point
  * entries its work wrote, corrections included (they carry the same agent).
  * Every entry is confirmed: Ziki writes points only once the work is
  * accepted, so there is no pending amount. Entries a person earned with no

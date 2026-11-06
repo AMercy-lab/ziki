@@ -16,7 +16,7 @@ export default function Forbidden() {
           </Link>
         }
       >
-        <p>Ask a organisation owner or admin if you need it.</p>
+        <p>Ask an organisation owner or admin if you need it.</p>
       </StatusPage>
     </main>
   );

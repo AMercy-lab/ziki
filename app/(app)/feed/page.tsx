@@ -51,7 +51,7 @@ export default async function FeedPage({ searchParams }: {
         </ul>
       ) : (
         <p className="rounded-[20px] border border-zk-border bg-zk-surface p-6 text-zk-muted">
-          {organisationId ? "No new tickets in this project yet." : "Join a organisation to see its new tickets."}{" "}
+          {organisationId ? "No new tickets in this project yet." : "Join an organisation to see its new tickets."}{" "}
           <Link href="/feed" className="font-semibold text-zk-accent hover:underline">Refresh the feed</Link>
           {" "}or{" "}
           <Link href="/home" className="font-semibold text-zk-accent hover:underline">browse issues</Link>.

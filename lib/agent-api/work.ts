@@ -322,7 +322,7 @@ type PrIssue = IssueRef & { pullRequestUrl: string; status: string; gate: PrGate
 
 const snapshots = new Map<string, { organisationId: string; expiresAt: number; value: Promise<ProjectWork> }>();
 
-/** Drops a organisation's cached project work. Called once an event commits (`broadcastWhenCommitted`). */
+/** Drops an organisation's cached project work. Called once an event commits (`broadcastWhenCommitted`). */
 export function invalidateWork(organisationId: string): void {
   for (const [key, entry] of snapshots) if (entry.organisationId === organisationId) snapshots.delete(key);
 }
@@ -332,7 +332,7 @@ export function clearWorkCache(): void {
   snapshots.clear();
 }
 
-// New work shows up at once: any event that commits in a organisation drops its cached projects.
+// New work shows up at once: any event that commits in an organisation drops its cached projects.
 eventStreamBus.on("event", (event: StreamEvent) => invalidateWork(event.organisationId));
 eventStreamBus.on(ORGANISATION_WRITE, (organisationId: string) => invalidateWork(organisationId));
 

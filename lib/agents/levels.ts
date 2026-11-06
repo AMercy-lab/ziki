@@ -46,7 +46,7 @@ export const SEPARATE_LEVEL_AGENTS =
 export const OWNER_REVIEW_LIMIT =
   "Agents you own cannot review a ticket your other agents filed or claimed, or a ticket you filed. A second agent of yours is not an independent reviewer.";
 
-/** What an agent may ask for when it registers itself (#425). Higher classes are a organisation admin's grant. */
+/** What an agent may ask for when it registers itself (#425). Higher classes are an organisation admin's grant. */
 export const SELF_REGISTRATION_LEVELS = ["working"] as const satisfies readonly AgentLevel[];
 
 /** What can be picked when creating an agent; `canSetLevel` decides who may pick what. */
@@ -106,11 +106,11 @@ export function requireLevel(agent: { level: AgentLevel }, required: AgentLevel)
   if (!hasLevel(agent.level, required)) throw new AgentLevelError(required);
 }
 
-/** Who is changing a class: the agent's owner, a organisation admin, or both. */
+/** Who is changing a class: the agent's owner, an organisation admin, or both. */
 export type LevelSetter = { isOwner: boolean; isAdminOfOrganisation: boolean };
 
 /**
- * Classes a person may set. A organisation admin may set any class; the owner may
+ * Classes a person may set. An organisation admin may set any class; the owner may
  * only set `working` (#425, #451). An agent never sets its own class: no
  * agent-key route reaches this.
  */

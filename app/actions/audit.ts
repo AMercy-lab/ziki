@@ -14,7 +14,7 @@ export type UndoAuditActionResult =
 /**
  * Reverse an audited agent action from the audit page (#450).
  *
- * Only a organisation admin may undo, and only within their own organisation. The undo
+ * Only an organisation admin may undo, and only within their own organisation. The undo
  * itself is audited, so nothing is ever silently erased. Failures carry the
  * human-readable message from `undoAuditEvent` so callers can show it directly.
  */
@@ -31,10 +31,10 @@ export async function undoAuditEventAction(
 
   const organisationId = await currentOrganisationIdFor(user.id);
   if (!organisationId) {
-    return { ok: false, error: "You're not a member of a organisation." };
+    return { ok: false, error: "You're not a member of an organisation." };
   }
   if (!(await isAdminOfOrganisation(user, organisationId))) {
-    return { ok: false, error: "Only a organisation admin can undo actions." };
+    return { ok: false, error: "Only an organisation admin can undo actions." };
   }
 
   const result = await undoAuditEvent(prisma, {

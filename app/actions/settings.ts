@@ -192,7 +192,7 @@ export async function updateDisplayNameAction(
  *
  * Only the caller's own row is ever written: the id comes from the session,
  * never from the form, so no submitted field can set a wallet for anyone else.
- * The address is readable only by them and by admins of a organisation they share
+ * The address is readable only by them and by admins of an organisation they share
  * (`canViewWallet`), so nothing else in the app displays it.
  */
 export async function setWalletAddressAction(

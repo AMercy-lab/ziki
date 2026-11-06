@@ -11,7 +11,7 @@ import { createJobSchema } from "@/lib/validations/job";
 import { publish } from "@/lib/agent-api/events";
 
 /**
- * Posting a research job from the web (#617), for a organisation admin. Agents post
+ * Posting a research job from the web (#617), for an organisation admin. Agents post
  * through `POST /api/v1/jobs` instead.
  */
 

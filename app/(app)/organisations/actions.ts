@@ -100,7 +100,7 @@ export async function switchOrganisationForIssueAction(formData: FormData): Prom
   redirect(bug ? issueHref(bug) : "/home");
 }
 
-/** Create a organisation owned by the person and enter it, on its Projects page to create the first project. */
+/** Create an organisation owned by the person and enter it, on its Projects page to create the first project. */
 export async function createOrganisationAction(
   _previous: OrganisationFormResult | undefined,
   formData: FormData,
@@ -130,7 +130,7 @@ export async function createOrganisationAction(
   return enterOrganisation(result.organisation.id);
 }
 
-/** Rename a organisation the person owns; the slug stays the same. */
+/** Rename an organisation the person owns; the slug stays the same. */
 export async function renameOrganisationAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const organisationId = String(formData.get("organisationId") ?? "");
@@ -147,7 +147,7 @@ export async function renameOrganisationAction(formData: FormData): Promise<void
 }
 
 /**
- * Archive or restore a organisation the person owns. Archiving happens in /org;
+ * Archive or restore an organisation the person owns. Archiving happens in /org;
  * an archived organisation can't be opened, so it is restored from /organisations.
  */
 export async function setOrganisationArchivedAction(formData: FormData): Promise<void> {

@@ -61,7 +61,7 @@ export async function decideRedesign(userId: string, organisationId: string, pro
   return prisma.$transaction(async (tx) => {
     const member = await tx.membership.findUnique({ where: { organisationId_userId: { organisationId, userId } }, select: { userId: true, role: true } });
     if (!member) throw new IssueApiError(403, "Organisation membership required.");
-    if (!isOrganisationAdminRole(member.role)) throw new IssueApiError(403, "A organisation admin must decide this proposal.");
+    if (!isOrganisationAdminRole(member.role)) throw new IssueApiError(403, "An organisation admin must decide this proposal.");
     const proposal = await tx.redesignProposal.findFirst({
       where: { id: proposalId, organisationId },
       include: { authorAgent: { select: { ownerUserId: true } } },

@@ -10,7 +10,7 @@ import { isSuperAdmin, type AppRole } from "@/lib/roles";
  * Until issues are scoped to the session's organisation (#425), a person's agents go
  * in the organisation they belong to, preferring Zedu. Someone with no membership
  * (a signup after the platform migration, #423) can't register agents until
- * they create or join a organisation (#444).
+ * they create or join an organisation (#444).
  */
 
 export type OwnerOrganisation = { organisationId: string; role: MembershipRole };
@@ -25,7 +25,7 @@ export async function organisationForOwner(userId: string): Promise<OwnerOrganis
   return chosen ? { organisationId: chosen.organisationId, role: chosen.role } : null;
 }
 
-/** Owners and admins of a organisation. The site's super admin counts everywhere. */
+/** Owners and admins of an organisation. The site's super admin counts everywhere. */
 export function isOrganisationAdminRole(
   membershipRole: MembershipRole | null | undefined,
   appRole?: AppRole | null,

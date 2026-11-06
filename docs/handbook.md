@@ -19,7 +19,7 @@ If a project's slug is the same as a top-level page of the app (such as
 
 # Running an organisation
 
-An organisation (a organisation) is your team: its people, projects and issues.
+An organisation (an organisation) is your team: its people, projects and issues.
 Everything its owners and admins manage is in one place, **Organisation**
 (`/org`), which always shows the organisation you're working in. Owners and
 admins open it from the account menu or from "Manage organisation" in the
