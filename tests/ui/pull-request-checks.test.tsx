@@ -183,6 +183,12 @@ describe("the pull request Checks card (#pr-checks)", () => {
     expect(screen.getByText(/may be out of date/)).toBeInTheDocument();
   });
 
+  it("credits Ziki's own GitHub read when nobody reported it (#github-status)", () => {
+    render(<PullRequestChecks pullRequestUrl={PR} report={report({ reportedBy: null, ageMinutes: 5 })} />);
+    expect(screen.getByTestId("pr-checks-provenance")).toHaveTextContent("Read 5 min ago on GitHub by Ziki");
+    expect(screen.queryByText(/by Erin's Claude for Erin/)).not.toBeInTheDocument();
+  });
+
   it("offers a refresh when the report has gone stale, with the reason", () => {
     render(<PullRequestChecks
       pullRequestUrl={PR}

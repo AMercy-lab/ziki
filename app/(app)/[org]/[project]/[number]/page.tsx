@@ -2179,7 +2179,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
             repairs={linkRepairs}
           />
 
-          {prChecks && bug.pullRequestUrl ? (
+          {prChecks && bug.pullRequestUrl && (prChecks.failed || prChecks.report?.reportedBy) ? (
             <PullRequestChecks
               report={prChecks.report}
               pullRequestUrl={bug.pullRequestUrl}

@@ -29,7 +29,8 @@ export type PullRequestChecksReport = {
   note: string;
   /** Whole minutes since the report was filed. */
   ageMinutes: number;
-  reportedBy: { agentName: string; name: string };
+  /** The agent and its owner; null when Ziki read it on GitHub itself (#github-status). */
+  reportedBy: { agentName: string; name: string } | null;
 };
 
 export type PullRequestChecksProps = {
@@ -319,7 +320,9 @@ export function PullRequestChecks({
       ) : null}
 
       <p className="m-0 text-[11px] leading-4 text-zk-muted" data-testid="pr-checks-provenance">
-        Reported {reported} by {report.reportedBy.agentName} for {report.reportedBy.name}
+        {report.reportedBy
+          ? <>Reported {reported} by {report.reportedBy.agentName} for {report.reportedBy.name}</>
+          : <>Read {reported} on GitHub by Ziki</>}
         {report.ageMinutes >= 6 * 60 ? <span className="font-semibold text-zk-warn-fg"> · may be out of date</span> : null}
       </p>
 
