@@ -36,11 +36,11 @@ vi.mock("@/lib/auth-helpers", () => ({ requireUser: section.requireUser }));
 
 import MarketingHomePage from "@/app/(app)/[project]/marketing/page";
 import MarketingPage from "@/app/(app)/marketing/page";
-import LibraryPage from "@/app/(app)/[project]/marketing/library/page";
-import { readLibrary } from "@/app/(app)/[project]/marketing/library/data";
+import LibraryPage from "@/app/(app)/[project]/marketing/output-box/page";
+import { readLibrary } from "@/app/(app)/[project]/marketing/output-box/data";
 import { readTasksBoard } from "@/app/(app)/[project]/marketing/data";
-import ProposalsPage from "@/app/(app)/[project]/marketing/proposals/page";
-import { readProposals } from "@/app/(app)/[project]/marketing/proposals/data";
+import RejectedIdeasPage from "@/app/(app)/[project]/marketing/ideas/rejected/page";
+import { readRejectedIdeas } from "@/app/(app)/[project]/marketing/ideas/rejected/data";
 import { parseTaskView } from "@/components/marketing/tasks/model";
 import { AgentProjectError } from "@/lib/agents/require-agent";
 import { marketingTabHref } from "@/lib/header-nav";
@@ -204,25 +204,12 @@ describe("the marketing tasks board", () => {
   });
 });
 
-describe("Proposals project isolation", () => {
+describe("Rejected marketing ideas project isolation", () => {
   const context = {
     tenantId: "tenant_zedu",
     project: { id: "project_web" },
     user: { id: "ada" },
-  } as Parameters<typeof readProposals>[0];
-
-  const row = {
-    id: "idea1", number: 7, title: "Write a launch post", summary: "A post about the launch.",
-    description: "Explain what changed and why.", rationale: "People keep asking what changed.",
-    status: "open", score: 1, createdAt: new Date("2026-11-04"),
-    rejectedAt: null, rejectedByAgentId: null, archivedAt: null, archivedByAgentId: null,
-    archiveReason: null, archiveDuplicateOf: null, reporterId: "someone", beneficiaryUserId: "someone",
-    type: { name: "Blog post" }, reporter: { name: "Ada" }, createdByAgent: { ownerUserId: "someone" },
-    verdicts: [{
-      id: "v1", opinion: "good", votes: 1, summary: "Worth doing.", description: "It serves the focus.",
-      updatedAt: new Date("2026-11-04"), onBehalfOf: { name: "Bola" }, agent: { name: "Bola's agent" },
-    }],
-  };
+  } as Parameters<typeof readRejectedIdeas>[0];
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -230,8 +217,6 @@ describe("Proposals project isolation", () => {
     proposalCount.mockResolvedValue(1);
     proposals.mockReset();
     proposals.mockResolvedValue([]);
-    myVerdicts.mockReset();
-    myVerdicts.mockResolvedValue([]);
     proposalAgents.mockReset();
     proposalAgents.mockResolvedValue([]);
   });
@@ -239,28 +224,13 @@ describe("Proposals project isolation", () => {
   it("refuses access before reading marketing ideas", async () => {
     section.requireProject.mockRejectedValue(new Error("NOT_FOUND"));
     await expect(
-      ProposalsPage({ params: Promise.resolve({ project: "private" }), searchParams: Promise.resolve({}) }),
+      RejectedIdeasPage({ params: Promise.resolve({ project: "private" }), searchParams: Promise.resolve({}) }),
     ).rejects.toThrow("NOT_FOUND");
     expect(proposals).not.toHaveBeenCalled();
   });
 
-  it("reads open marketing ideas only inside the authorized tenant and project", async () => {
-    proposals.mockResolvedValue([row]);
-    const result = await readProposals(context, "open");
-    expect(proposals).toHaveBeenCalledWith(expect.objectContaining({
-      where: { tenantId: "tenant_zedu", projectId: "project_web", isDeleted: false, track: "marketing", status: "open" },
-    }));
-    expect(result).toEqual(expect.objectContaining({
-      ok: true,
-      items: [expect.objectContaining({
-        id: "idea1", typeName: "Blog post", reporterName: "Ada",
-        votes: { good: 1, bad: 0, neutral: 0 }, own: false, mine: null,
-      })],
-    }));
-  });
-
-  it("reads rejected and archived marketing ideas for the rejected list", async () => {
-    await readProposals(context, "rejected");
+  it("reads rejected and archived marketing ideas only inside the authorized tenant and project", async () => {
+    await readRejectedIdeas(context);
     expect(proposals).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         tenantId: "tenant_zedu", projectId: "project_web", track: "marketing",

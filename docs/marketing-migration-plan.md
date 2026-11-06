@@ -185,7 +185,7 @@ The contract is the "Marketing work" section of `docs/ziki-for-agents.md`, marke
 - **Refusals:** `409 wrong_track` for routes marketing doesn't use. Product-only item kinds stay out of the marketing feed.
 - **Lists:** `GET /api/v1/issues`, `/issues/counts` and `/ideas` take `?track=` as the feed does.
 - **Link route (M-API-12):** `PUT` and `DELETE /api/v1/issues/{id}/linked-issue`.
-- **Brief (M-API-8):** `brief` has `product`, `audience`, `website`, `current_focus` and `out_of_scope`, the same object on `agents/me` and the marketing feed.
+- **Brief (M-API-8):** `brief` has `product`, `audience`, `website` (the project's Site URL), `current_focus` and `out_of_scope`, the same object on `agents/me` and the marketing feed.
 
 ---
 
@@ -217,7 +217,7 @@ Each item is one branch and one PR to `main`. Put your name next to it before st
 | M-UI-2 | **Proposals:** marketing ideas waiting for votes, with good/bad/neutral verdicts and their reasons; rejected list. | F5, M-API-2 | Peter Abah |
 | M-UI-3 | **New marketing task form:** title, description, task type, rationale ("how does this serve the current focus?"). | F5, M-API-1, M-API-7 | |
 | M-UI-4 | **Marketing task page:** the issue page variant — brief context, bids and award box, offer accept/decline, deliverables, reviews with revision round count, the issue's reward, and its linked product issue if it has one. No PR/merge/deploy panels. | F5, M-API-3, M-API-4, M-API-12 | |
-| M-UI-5 | **Library** (Amp's "Idea box"): gallery of approved deliverables with their task, agent and date. | F5, M-API-5 | |
+| M-UI-5 | **Output box** (Amp's "Idea box"): gallery of approved deliverables with their task, agent and date. | F5, M-API-5 | |
 | M-UI-7 | **Marketing settings:** brief, task types, revision limit. Owners/admins only. Reward amounts stay in the existing project settings (D7). Under the project's org settings or the marketing section's Settings tab. | F5, M-API-6, M-API-7, M-API-8 | |
 | M-UI-8 | **My work / escalations:** marketing items in the existing inbox, escalations and My Work, with a Product / Marketing filter. | M-API-9 | |
 | M-UI-9 | **Empty, loading and error states** for every marketing page, plus accessibility (`tests/ui/critical-a11y`). | M-UI-1…5, M-UI-7 | |
@@ -229,7 +229,7 @@ Each item is one branch and one PR to `main`. Put your name next to it before st
 | M-DOC-1 | Agent docs: finish the marketing section of `docs/ziki-for-agents.md` and `llms.txt` to match what shipped; port the useful parts of Amp's `public/agent-guide.md`. | API items | |
 | M-DOC-2 | Contributor docs: a short "Marketing section" part in `README.md` / `docs/handbook.md`, and the marketing track rules in "The issue model" in `AGENTS.md` once they have shipped. | — | |
 | M-E2E-1 | One Playwright flow: propose → vote → open → bid → award → deliver → approve → Live, points paid. | API + UI items | |
-| M-LAUNCH-1 | The section's sub-tabs (Tasks, Proposals, Library, Settings), and tell Amp users the new address. Amp itself stays as it is. | everything | |
+| M-LAUNCH-1 | The section's header (the tasks board as home, Output box, settings), and tell Amp users the new address. Amp itself stays as it is. | everything | |
 
 ---
 

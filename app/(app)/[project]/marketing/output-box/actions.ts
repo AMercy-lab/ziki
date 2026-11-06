@@ -7,7 +7,7 @@ import { readLibrary } from "./data";
 
 export async function refreshLibrary(slug: string): Promise<LibraryResult> {
   // Access failures must remain redirects/404s, never be disguised as an empty collection.
-  const context = await requireProject(slug, marketingPath(slug, "library"));
+  const context = await requireProject(slug, marketingPath(slug, "output-box"));
   try {
     return { ok: true, items: await readLibrary(context) };
   } catch (error) {

@@ -4,11 +4,11 @@ import { Library } from "@/components/marketing/library/library";
 import type { LibraryResult } from "@/components/marketing/library/model";
 import { readLibrary } from "./data";
 
-export const metadata = { title: "Library" };
+export const metadata = { title: "Output box" };
 
 export default async function LibraryPage({ params }: { params: Promise<{ project: string }> }) {
   const { project: slug } = await params;
-  const context = await requireProject(slug, marketingPath(slug, "library"));
+  const context = await requireProject(slug, marketingPath(slug, "output-box"));
   let result: LibraryResult;
   try {
     result = { ok: true, items: await readLibrary(context) };

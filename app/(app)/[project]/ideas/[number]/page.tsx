@@ -73,6 +73,7 @@ export default async function IdeaPage({ params, searchParams }: {
       stakes: { where: { status: "waiting" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true, beneficiaryUserId: true, expiresAt: true, agent: { select: { name: true } } } },
       summary: true,
       description: true,
+      rationale: true,
       status: true,
       track: true,
       projectId: true,
@@ -146,7 +147,7 @@ export default async function IdeaPage({ params, searchParams }: {
   const marketingIdea = idea.track === "marketing";
   const closedIdea = idea.status === "rejected" || idea.status === "archived";
   const backFallback = marketingIdea
-    ? marketingPath(slug, closedIdea ? "proposals/rejected" : "proposals")
+    ? marketingPath(slug, closedIdea ? "ideas/rejected" : "")
     : closedIdea ? ideasPath(slug, "rejected") : ideasPath(slug);
 
   return (
@@ -168,6 +169,12 @@ export default async function IdeaPage({ params, searchParams }: {
         <div className="flex min-w-0 flex-[999_1_600px] flex-col gap-5">
           <NextStepBar step={nextStep} />
           <ReportSummary summary={idea.summary} />
+          {marketingIdea && idea.rationale ? (
+            <section className="rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-6">
+              <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-zk-muted">Why it serves the focus</h2>
+              <p className="mt-3 text-sm text-zk-text">{idea.rationale}</p>
+            </section>
+          ) : null}
           {idea.status === "archived" && idea.archiveEvidence ? (
             <section className="rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-6" data-testid="idea-archive-evidence">
               <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-zk-muted">

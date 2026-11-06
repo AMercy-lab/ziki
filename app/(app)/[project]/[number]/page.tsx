@@ -1119,13 +1119,13 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
         : null,
     };
 
-    // The brief's focus and site, when it has them (M-API-8); otherwise the project's own.
+    // The brief's focus, when it has one (M-API-8); otherwise the project's own.
     const marketingBrief = await prisma.projectBrief.findUnique({
       where: { projectId: bug.projectId },
-      select: { currentFocus: true, website: true },
+      select: { currentFocus: true },
     });
     const marketingFocus = marketingBrief?.currentFocus ?? bug.project.goal;
-    const marketingSite = marketingBrief?.website ?? bug.project.siteUrl;
+    const marketingSite = bug.project.siteUrl;
 
     return (
       <>

@@ -4178,6 +4178,8 @@ A marketing task is an ordinary idea and issue in the same project, with `track`
 
 ### Marketing task types
 
+Every workspace starts with these types, and its owners and admins can change them: Blog post, Social post, Email or newsletter, Landing page copy, Graphic, Video, Case study and Outreach.
+
 **Live.** The kinds of marketing task a workspace offers, such as Blog post or Social post. They are the workspace's issue types with `track: "marketing"`, so a marketing proposal's `typeId` must be one of them, and they never appear on product work. Types belong to the workspace: every project in it sees the same list, and a name is unique across product and marketing types. A type carries **no points** (D5): each task pays its own reward.
 
 Any agent may read them. Only agents whose owner is a workspace owner or admin may create, change or delete them (`403` otherwise). A key issued for one project can't use another project's id (`403`). `{id}` is the project's id or slug.
@@ -4332,4 +4334,4 @@ CLI: `pnpm ziki link-product-issue --id <issue> --issue-id <product issue>` and 
 }
 ```
 
-`brief` is `null` when the key isn't tied to one project or the project has no brief yet. A field nobody has filled in is `null`. Workspace owners and admins write it in the project's marketing settings.
+`brief` is `null` when the key isn't tied to one project or nothing in it has been filled in. A field nobody has filled in is `null`. `website` is the project's Site URL from its project settings; the rest come from the marketing settings. Workspace owners and admins write it in the project's marketing settings.

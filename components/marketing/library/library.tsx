@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { refreshLibrary } from "@/app/(app)/[project]/marketing/library/actions";
+import { refreshLibrary } from "@/app/(app)/[project]/marketing/output-box/actions";
 import { marketingPath, projectPath } from "@/lib/project-paths";
 import { formatBytes } from "@/lib/attachments";
 import { formatDate } from "@/lib/format";
@@ -112,7 +112,7 @@ export function Library({ slug, projectName, initial }: { slug: string; projectN
     <LibraryHeading slug={slug} projectName={projectName} />
     {!result.ok ? <section className="lb-state" aria-busy={pending}>
       <span className="lb-state-icon lb-warning" aria-hidden="true">!</span>
-      <h2 ref={errorHeading} tabIndex={-1} role="alert">We couldn’t load the Library</h2><p>Check your connection and try again in a moment.</p>
+      <h2 ref={errorHeading} tabIndex={-1} role="alert">We couldn’t load the Output box</h2><p>Check your connection and try again in a moment.</p>
       <button className="lb-button lb-primary" onClick={refresh} disabled={pending}>{pending ? "Trying again…" : "Try again"}</button>
     </section> : items.length === 0 ? <section className="lb-state">
       <span className="lb-state-icon" aria-hidden="true">◇</span><h2>No approved work yet</h2>
