@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
 import { giveEarnVerdict, listEarnTasksToCheck } from "@/lib/earn/review";
-import { outreachProof, parseResearch, recordOpen, setSent } from "@/lib/earn/outreach";
+import { outreachProof, parseResearch, recordOpen, setSent, syncReferral } from "@/lib/earn/outreach";
 import { confirmTask, grantWelcome, isNewEarnAccount, paidCount, rejectTask, doneTasks, startTask, submitTask, taskStateFor } from "@/lib/earn/progress";
 
 type TaskRow = { userId: string; taskKey: string; status: string; proof?: string | null; note?: string | null };
@@ -242,5 +242,37 @@ describe("earn email task outreach (#earn-outreach)", () => {
       { name: "Not sent yet", contact: null, sentAt: null, opens: 0 },
     ]);
     expect(proof).toBe("Dainty Affairs, a@b.co (opened the link)");
+  });
+});
+
+/** A sign-up through a business's link (#earn-outreach): traced back once, only for a new account, then its first project. */
+describe("earn sign-ups through a link (#earn-outreach)", () => {
+  function fakeReferralDb(opts: { userCreatedAt: Date; owned: number }) {
+    const contact = { id: "c1", userId: "earner", code: "abc1234", signedUpUserId: null as string | null, signedUpAt: null as Date | null, startedAt: null as Date | null, openedAt: new Date("2026-11-01T10:00:00Z"), createdAt: new Date("2026-10-30T10:00:00Z") };
+    const db = {
+      earnContact: {
+        findUnique: vi.fn(async ({ where }: { where: { code?: string; signedUpUserId?: string } }) =>
+          where.code ? (where.code === contact.code ? contact : null) : contact.signedUpUserId === where.signedUpUserId ? contact : null),
+        update: vi.fn(async ({ data }: { data: Partial<typeof contact> }) => Object.assign(contact, data)),
+      },
+      user: { findUnique: vi.fn(async () => ({ createdAt: opts.userCreatedAt })) },
+      membership: { count: vi.fn(async () => opts.owned) },
+    };
+    return { db: db as never, contact };
+  }
+
+  it("ticks Signed up for an account made after the link was opened, and Started once it owns a workspace", async () => {
+    const { db, contact } = fakeReferralDb({ userCreatedAt: new Date("2026-11-02T09:00:00Z"), owned: 1 });
+    await syncReferral(db, "new-business", "abc1234", "tenant-earn");
+    expect(contact).toMatchObject({ signedUpUserId: "new-business", signedUpAt: expect.any(Date), startedAt: expect.any(Date) });
+  });
+
+  it("doesn't count an account that existed before the link was opened, or the earner themselves", async () => {
+    const old = fakeReferralDb({ userCreatedAt: new Date("2026-01-01T00:00:00Z"), owned: 1 });
+    await syncReferral(old.db, "old-user", "abc1234", "tenant-earn");
+    expect(old.contact.signedUpUserId).toBeNull();
+    const self = fakeReferralDb({ userCreatedAt: new Date("2026-11-02T09:00:00Z"), owned: 1 });
+    await syncReferral(self.db, "earner", "abc1234", "tenant-earn");
+    expect(self.contact.signedUpUserId).toBeNull();
   });
 });
