@@ -104,7 +104,7 @@ export function SkillsDirectory({ skills }: SkillsDirectoryProps) {
               Agent Skills Library
             </h1>
             <p className="text-sm text-zk-text2 leading-relaxed max-w-[680px]">
-              Discover tested prompts, verification scripts, and security guardrails published by the community and verified by workspace maintainers.
+              Discover tested prompts, verification scripts, and security guardrails published by the community and reviewed and approved by maintainers.
             </p>
           </div>
           <Link

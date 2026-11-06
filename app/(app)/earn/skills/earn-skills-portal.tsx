@@ -208,7 +208,7 @@ export function EarnSkillsPortal({ user, initialSubmissions = [] }: EarnSkillsPo
               Skill Contributions Hub
             </h1>
             <p className="text-sm text-zk-text2 leading-relaxed max-w-[640px]">
-              Engineer, test, and publish verified AI agent skills. Once reviewed and accepted by a maintainer, your skill is published to the official catalog.
+              Engineer, test, and publish AI agent skills. Once reviewed and accepted by a maintainer, your skill is published to the official catalog.
             </p>
           </div>
 
@@ -363,7 +363,7 @@ export function EarnSkillsPortal({ user, initialSubmissions = [] }: EarnSkillsPo
               {/* Verification Assertions */}
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-zk-text2">
-                  Verification Assertions <span className="text-zk-muted font-normal">(one per line)</span>
+                  Contributor's Checklist <span className="text-zk-muted font-normal">(one per line)</span>
                 </label>
                 <textarea
                   rows={3}
@@ -434,7 +434,7 @@ Confirm passing test suite`}
                 </li>
                 <li className="flex items-start gap-2.5">
                   <span className="text-zk-accent font-bold mt-0.5">•</span>
-                  <span><strong>Deterministic assertions:</strong> Provide actionable verification steps that can be run automatically.</span>
+                  <span><strong>Checklist items:</strong> Provide actionable checklist steps for maintainers to verify.</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <span className="text-zk-accent font-bold mt-0.5">•</span>
@@ -455,7 +455,7 @@ Confirm passing test suite`}
                 Your Submitted Skills ({submissions.length})
               </h2>
               <p className="text-xs text-zk-muted mt-0.5">
-                Click any submission to view verification progress, reviewer notes, and full specifications.
+                Click any submission to view review progress, maintainer feedback, and full specifications.
               </p>
             </div>
             <button
@@ -597,7 +597,7 @@ Confirm passing test suite`}
                   ✓
                 </span>
                 <div className="space-y-1 text-xs">
-                  <p className="font-bold text-zk-ok-fg text-sm">Verified &amp; Live in Catalog</p>
+                  <p className="font-bold text-zk-ok-fg text-sm">Approved &amp; Live in Catalog</p>
                   <p className="text-zk-text2 leading-relaxed">
                     {selectedSubmission.maintainerFeedback || "This skill was reviewed and approved by a superadmin. It is published live in the Skills Library."}
                   </p>
@@ -676,11 +676,11 @@ Confirm passing test suite`}
             {/* Verification Assertions */}
             {selectedSubmission.checklist && selectedSubmission.checklist.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-zk-muted">Verification Assertions</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-zk-muted">Contributor's Checklist</h4>
                 <ul className="space-y-1.5 rounded-xl border border-zk-border bg-zk-bg p-3.5 text-xs text-zk-text">
                   {selectedSubmission.checklist.map((item, idx) => (
                     <li key={idx} className="flex items-start gap-2">
-                      <span className="text-zk-accent font-bold mt-0.5">✓</span>
+                      <span className="text-zk-muted font-bold mt-0.5">•</span>
                       <span className="font-mono text-zk-text2">{item}</span>
                     </li>
                   ))}

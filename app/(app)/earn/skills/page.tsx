@@ -6,7 +6,7 @@ import { type SkillCategory } from "@/app/(app)/skills/skills-data";
 export const metadata = {
   title: "Contribute Skills — Ziki",
   description:
-    "Contribute verified AI agent skills, test harnesses, and security linters to Ziki. Submit skills for maintainer review and community adoption.",
+    "Contribute AI agent skills, test harnesses, and security linters to Ziki. Submit skills for maintainer review and community adoption.",
 };
 
 export default async function EarnSkillsPage() {

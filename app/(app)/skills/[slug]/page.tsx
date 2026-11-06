@@ -23,13 +23,13 @@ export async function generateMetadata({
     title: `${skill.title} — Skills Library — Ziki`,
     description: skill.description,
     openGraph: {
-      title: `${skill.title} — Ziki Verified Skill`,
+      title: `${skill.title} — Skills Library — Ziki`,
       description: skill.description,
       type: "article",
     },
     twitter: {
       card: "summary_large_image",
-      title: `${skill.title} — Ziki Verified Skill`,
+      title: `${skill.title} — Skills Library — Ziki`,
       description: skill.description,
     },
   };
@@ -76,8 +76,8 @@ export default async function SkillDetailPage({
         <div className="sm:flex sm:items-start sm:justify-between gap-4">
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                Verified Skill
+              <span className="inline-flex items-center rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
+                Approved Skill
               </span>
               <span className="rounded-md bg-zk-chip px-2.5 py-0.5 text-xs font-mono text-zk-muted">
                 #{skill.category}
@@ -135,16 +135,16 @@ export default async function SkillDetailPage({
             </p>
           </section>
 
-          {/* Verification Assertions (Checklist) */}
+          {/* Contributor's Checklist */}
           {skill.spec.checklist.length > 0 && (
             <section className="space-y-2.5">
               <h2 className="text-sm font-bold uppercase tracking-wider text-zk-muted">
-                Verification Assertions
+                Contributor's Checklist
               </h2>
               <div className="rounded-2xl border border-zk-border bg-zk-surface p-5 space-y-2.5">
                 {skill.spec.checklist.map((item, i) => (
                   <div key={i} className="flex items-start gap-2.5 text-xs text-zk-text leading-relaxed">
-                    <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                    <span className="text-zk-muted font-bold shrink-0">•</span>
                     <span>{item}</span>
                   </div>
                 ))}
@@ -191,7 +191,7 @@ export default async function SkillDetailPage({
               <div className="pt-2 flex justify-between">
                 <span className="text-zk-muted">Status</span>
                 <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                  Approved &amp; Verified
+                  Approved
                 </span>
               </div>
               <div className="pt-2 flex justify-between">
@@ -219,7 +219,7 @@ export default async function SkillDetailPage({
 
           <div className="rounded-2xl border border-zk-border bg-zk-surface p-5 text-center space-y-2">
             <p className="text-xs text-zk-muted">
-              Looking for other verified skills?
+              Looking for other approved skills?
             </p>
             <Link
               href="/skills"
