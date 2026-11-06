@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { BASE_PATH } from "@/lib/base-path";
 import { resolveSessionUserId } from "@/lib/session-user";
-import { setActiveTenantCookie } from "@/lib/tenants";
+import { setActiveOrganisationCookie } from "@/lib/organisations";
 import { projectPath, refOf } from "@/lib/project-paths";
 
 /** A relative Location, so the browser stays on the host it asked (see notifications/[id]/route.ts, #416). */
@@ -16,10 +16,10 @@ function safeNext(next: string | null, fallback: string): string {
 }
 
 /**
- * Opens a project in another of the viewer's workspaces (#project-urls): when
- * `/<org>/<project>/…` names a project outside the current workspace,
+ * Opens a project in another of the viewer's organisations (#project-urls): when
+ * `/<org>/<project>/…` names a project outside the current organisation,
  * lib/project-route.ts sends the request here. It checks the viewer belongs to
- * that workspace, is a direct project member, or the project is public, makes that workspace current, and
+ * that organisation, is a direct project member, or the project is public, makes that organisation current, and
  * goes back to `next`. The project itself always comes from the URL's slug.
  */
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
@@ -28,12 +28,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   if ("error" in resolved) return redirectTo("/login");
 
   const url = new URL(request.url);
-  const tenantId = url.searchParams.get("tenant") ?? "";
+  const organisationId = url.searchParams.get("organisation") ?? "";
   const user = await prisma.user.findUnique({ where: { id: resolved.userId }, select: { role: true } });
-
   const targetProject = await prisma.project.findFirst({
-    where: { tenantId, slug, archivedAt: null, tenant: { archivedAt: null } },
-    select: { id: true, slug: true, visibility: true, tenant: { select: { slug: true } } },
+    where: { organisationId, slug, archivedAt: null, organisation: { archivedAt: null } },
+    select: { id: true, slug: true, visibility: true, organisation: { select: { slug: true } } },
   });
 
   if (!targetProject) return redirectTo("/");
@@ -41,7 +40,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const isSuper = user?.role === "super_admin";
   const isOrgMember = Boolean(
     await prisma.membership.findUnique({
-      where: { tenantId_userId: { tenantId, userId: resolved.userId } },
+      where: { organisationId_userId: { organisationId, userId: resolved.userId } },
       select: { id: true },
     }),
   );
@@ -58,7 +57,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   }
 
   if (isOrgMember || isSuper) {
-    await setActiveTenantCookie(tenantId);
+    await setActiveOrganisationCookie(organisationId);
   }
   return redirectTo(safeNext(url.searchParams.get("next"), projectPath(refOf(targetProject))));
 }

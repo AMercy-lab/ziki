@@ -27,10 +27,10 @@ export async function requestToJoinProjectAction(formData: FormData): Promise<Jo
       id: true,
       slug: true,
       name: true,
-      tenantId: true,
+      organisationId: true,
       isOpenForContributors: true,
       visibility: true,
-      tenant: { select: { slug: true } },
+      organisation: { select: { slug: true } },
     },
   });
 
@@ -41,7 +41,7 @@ export async function requestToJoinProjectAction(formData: FormData): Promise<Jo
 
   // Check if already an org member or project member
   const [isOrgMember, isProjectMember] = await Promise.all([
-    prisma.membership.findUnique({ where: { tenantId_userId: { tenantId: project.tenantId, userId: user.id } } }),
+    prisma.membership.findUnique({ where: { organisationId_userId: { organisationId: project.organisationId, userId: user.id } } }),
     prisma.projectMembership.findUnique({ where: { projectId_userId: { projectId, userId: user.id } } }),
   ]);
 
@@ -82,16 +82,16 @@ export async function requestToJoinProjectAction(formData: FormData): Promise<Jo
 
   // Notify organization managers
   const managers = await prisma.membership.findMany({
-    where: { tenantId: project.tenantId, role: { in: ["owner", "admin"] } },
+    where: { organisationId: project.organisationId, role: { in: ["owner", "admin"] } },
     select: { userId: true },
   });
 
-  const pRef = projectRef(project.tenant.slug, project.slug);
+  const pRef = projectRef(project.organisation.slug, project.slug);
   if (managers.length > 0) {
     await prisma.notification.createMany({
       data: managers.map((m) => ({
         userId: m.userId,
-        tenantId: project.tenantId,
+        organisationId: project.organisationId,
         kind: "join_request",
         title: `${user.name || user.email} requested to join ${project.name}`,
         url: orgPath(pRef, "invites"),
@@ -121,8 +121,8 @@ export async function acceptJoinRequestAction(formData: FormData): Promise<void>
           id: true,
           slug: true,
           name: true,
-          tenantId: true,
-          tenant: { select: { slug: true } },
+          organisationId: true,
+          organisation: { select: { slug: true } },
         },
       },
     },
@@ -132,7 +132,7 @@ export async function acceptJoinRequestAction(formData: FormData): Promise<void>
     return;
   }
 
-  if (!(await canManageProject(user, joinRequest.project.tenantId))) {
+  if (!(await canManageProject(user, joinRequest.project.organisationId))) {
     return;
   }
 
@@ -154,12 +154,12 @@ export async function acceptJoinRequestAction(formData: FormData): Promise<void>
       update: {},
     });
 
-    const pRef = projectRef(joinRequest.project.tenant.slug, joinRequest.project.slug);
+    const pRef = projectRef(joinRequest.project.organisation.slug, joinRequest.project.slug);
     // 3. Notify the applicant
     await tx.notification.create({
       data: {
         userId: joinRequest.userId,
-        tenantId: null,
+        organisationId: null,
         kind: "join_request_accepted",
         title: `Your request to join ${joinRequest.project.name} was accepted!`,
         url: projectPath(pRef),
@@ -167,7 +167,7 @@ export async function acceptJoinRequestAction(formData: FormData): Promise<void>
     });
   });
 
-  const pRef = projectRef(joinRequest.project.tenant.slug, joinRequest.project.slug);
+  const pRef = projectRef(joinRequest.project.organisation.slug, joinRequest.project.slug);
   revalidatePath(orgPath(pRef, "invites"));
   revalidatePath(orgPath(pRef, "members"));
   revalidatePath("/[org]/[project]/org", "layout");
@@ -190,8 +190,8 @@ export async function rejectJoinRequestAction(formData: FormData): Promise<void>
           id: true,
           slug: true,
           name: true,
-          tenantId: true,
-          tenant: { select: { slug: true } },
+          organisationId: true,
+          organisation: { select: { slug: true } },
         },
       },
     },
@@ -201,7 +201,7 @@ export async function rejectJoinRequestAction(formData: FormData): Promise<void>
     return;
   }
 
-  if (!(await canManageProject(user, joinRequest.project.tenantId))) {
+  if (!(await canManageProject(user, joinRequest.project.organisationId))) {
     return;
   }
 
@@ -218,7 +218,7 @@ export async function rejectJoinRequestAction(formData: FormData): Promise<void>
     await tx.notification.create({
       data: {
         userId: joinRequest.userId,
-        tenantId: null,
+        organisationId: null,
         kind: "join_request_rejected",
         title: `Your request to join ${joinRequest.project.name} was not accepted`,
         url: "/discover",
@@ -226,7 +226,7 @@ export async function rejectJoinRequestAction(formData: FormData): Promise<void>
     });
   });
 
-  const pRef = projectRef(joinRequest.project.tenant.slug, joinRequest.project.slug);
+  const pRef = projectRef(joinRequest.project.organisation.slug, joinRequest.project.slug);
   revalidatePath(orgPath(pRef, "invites"));
   revalidatePath("/[org]/[project]/org", "layout");
   revalidatePath("/discover");
@@ -245,15 +245,15 @@ export async function removeProjectMemberAction(formData: FormData): Promise<voi
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: {
-      tenantId: true,
+      organisationId: true,
       slug: true,
-      tenant: { select: { slug: true } },
+      organisation: { select: { slug: true } },
     },
   });
 
   if (!project) return;
 
-  if (!(await canManageProject(user, project.tenantId))) {
+  if (!(await canManageProject(user, project.organisationId))) {
     return;
   }
 
@@ -261,7 +261,7 @@ export async function removeProjectMemberAction(formData: FormData): Promise<voi
     where: { projectId, userId: targetUserId },
   });
 
-  const pRef = projectRef(project.tenant.slug, project.slug);
+  const pRef = projectRef(project.organisation.slug, project.slug);
   revalidatePath(orgPath(pRef, "members"));
   revalidatePath("/[org]/[project]/org", "layout");
   revalidatePath("/discover");

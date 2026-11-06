@@ -41,24 +41,24 @@ vi.mock("@/lib/auth-helpers", () => ({ requireUser: vi.fn(async () => ({ id: "da
 vi.mock("@/lib/project-route", () => ({
   requireProject: vi.fn(async () => ({
     user: { id: "dave", role: "user" },
-    tenantId: "tenant-acme",
-    project: { id: "project-acme", slug: "acme", name: "Acme Web", goal: null, tenantId: "tenant-acme", orgSlug: "zedu", ref: "zedu/acme" },
+    organisationId: "organisation-acme",
+    project: { id: "project-acme", slug: "acme", name: "Acme Web", goal: null, organisationId: "organisation-acme", orgSlug: "zedu", ref: "zedu/acme" },
     isOrgMember: true,
     isOrgAdmin: false,
     isProjectMember: false,
     canContribute: true,
   })),
 }));
-vi.mock("@/lib/tenant-access", () => ({
-  currentTenantAccess: vi.fn(async () => ({ membershipRole: "member", admin: false })),
-  tenantAccessFor: vi.fn(async () => ({ membershipRole: "member", admin: false })),
+vi.mock("@/lib/organisation-access", () => ({
+  currentOrganisationAccess: vi.fn(async () => ({ membershipRole: "member", admin: false })),
+  organisationAccessFor: vi.fn(async () => ({ membershipRole: "member", admin: false })),
 }));
 vi.mock("@/lib/lookups", () => ({
   getIssueTypes: vi.fn(async () => []),
 }));
-vi.mock("@/lib/tenant-context", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/tenant-context")>()),
-  currentTenantIdFor: vi.fn(async () => "tenant-acme"),
+vi.mock("@/lib/organisation-context", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/organisation-context")>()),
+  currentOrganisationIdFor: vi.fn(async () => "organisation-acme"),
 }));
 vi.mock("@/lib/issue-stage", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/issue-stage")>()),
@@ -102,7 +102,7 @@ vi.mock("@/app/actions/issues", async (importOriginal) => ({ ...(await importOri
 vi.mock("@/lib/your-call", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/your-call")>()), loadYourCall: vi.fn(async () => []) }));
 import { IssuesList } from "@/app/(app)/[org]/[project]/issues/_list/issues-list";
 import { answerFrom, topShare, urgencyOf, yardsticksFor, type UrgencySignals } from "@/lib/your-call";
-import { currentTenantAccess } from "@/lib/tenant-access";
+import { currentOrganisationAccess } from "@/lib/organisation-access";
 import { addCommentAction } from "@/app/actions/issues";
 import { answerYourCallAction } from "@/app/actions/your-call";
 import { TasksBoard } from "@/components/marketing/tasks/tasks-board";
@@ -128,7 +128,7 @@ const BUG = {
   reporter: { name: "Rita Reporter", role: "user", image: null },
   assignee: { name: "Bob Builder", role: "user", image: null },
   area: null,
-  project: { slug: "acme", tenant: { slug: "zedu" } },
+  project: { slug: "acme", organisation: { slug: "zedu" } },
   votes: [],
   _count: { comments: 3, attachments: 1 },
 };
@@ -197,7 +197,7 @@ describe("issue list layout", () => {
   it("lists ideas under Ideas' New ideas, from the Idea table, with their score and no importance button (#idea-table)", async () => {
     const html = await renderList();
     expect(ideaFindMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ tenantId: "tenant-acme", projectId: "project-acme", status: "open", isDeleted: false }),
+      where: expect.objectContaining({ organisationId: "organisation-acme", projectId: "project-acme", status: "open", isDeleted: false }),
     }));
     expect(html).toContain('href="/zedu/acme/ideas/12"');
     expect(html).toContain("Idea #12");
@@ -216,7 +216,7 @@ describe("issue list layout", () => {
     expect(list).not.toContain("page=");
     expect(list).not.toContain("stage=");
     const statusCount = groupBy.mock.calls.find(([args]) => args?.by?.[0] === "status");
-    expect(statusCount?.[0].where).toMatchObject({ tenantId: "tenant-acme", projectId: "project-acme" });
+    expect(statusCount?.[0].where).toMatchObject({ organisationId: "organisation-acme", projectId: "project-acme" });
     expect(statusCount?.[0].where).not.toHaveProperty("status");
   });
 
@@ -235,17 +235,17 @@ describe("issue list layout", () => {
     expect(current(stages(html))).toEqual([]);
   });
 
-  it("uses Typesense for issue text hits and rechecks the current tenant-scoped rows in PostgreSQL", async () => {
+  it("uses Typesense for issue text hits and rechecks the current organisation-scoped rows in PostgreSQL", async () => {
     indexedSearch.mockResolvedValue({ found: 1, hits: [{ id: "bug-1", kind: "bug", score: 10 }] });
     await renderList({ q: "login", status: "all" });
     expect(indexedSearch).toHaveBeenCalledWith(expect.objectContaining({
-      kind: "bug", tenantId: "tenant-acme", projectId: "project-acme", track: "product",
+      kind: "bug", organisationId: "organisation-acme", projectId: "project-acme", track: "product",
       extraFilters: expect.arrayContaining(["isDeleted:=false"]),
     }));
     const rowQuery = findMany.mock.calls.at(-1)![0];
     expect(rowQuery.where.id).toEqual({ in: ["bug-1"] });
     expect(rowQuery.where).not.toHaveProperty("OR");
-    expect(rowQuery.where).toMatchObject({ tenantId: "tenant-acme", projectId: "project-acme", track: "product", isDeleted: false });
+    expect(rowQuery.where).toMatchObject({ organisationId: "organisation-acme", projectId: "project-acme", track: "product", isDeleted: false });
   });
 
   it("uses Typesense for Idea text hits while retaining project and track predicates", async () => {
@@ -253,12 +253,12 @@ describe("issue list layout", () => {
     indexedSearch.mockResolvedValue({ found: 1, hits: [{ id: "idea-1", kind: "idea", score: 10 }] });
     await renderList({ q: "export", status: "ideas" });
     expect(indexedSearch).toHaveBeenCalledWith(expect.objectContaining({
-      kind: "idea", tenantId: "tenant-acme", projectId: "project-acme", track: "product",
+      kind: "idea", organisationId: "organisation-acme", projectId: "project-acme", track: "product",
     }));
     const rowQuery = ideaFindMany.mock.calls.at(-1)![0];
     expect(rowQuery.where.id).toEqual({ in: ["idea-1"] });
     expect(rowQuery.where).not.toHaveProperty("OR");
-    expect(rowQuery.where).toMatchObject({ tenantId: "tenant-acme", projectId: "project-acme", track: "product", isDeleted: false });
+    expect(rowQuery.where).toMatchObject({ organisationId: "organisation-acme", projectId: "project-acme", track: "product", isDeleted: false });
   });
 
   it("falls back to PostgreSQL for issue text search when Typesense is unavailable", async () => {
@@ -266,7 +266,7 @@ describe("issue list layout", () => {
     expect(html).toContain("Issues");
     expect(indexedSearch).toHaveBeenCalled();
     const rowQuery = findMany.mock.calls.at(-1)![0];
-    expect(rowQuery.where).toMatchObject({ tenantId: "tenant-acme", projectId: "project-acme", track: "product" });
+    expect(rowQuery.where).toMatchObject({ organisationId: "organisation-acme", projectId: "project-acme", track: "product" });
     expect(rowQuery.where).toHaveProperty("OR");
   });
 
@@ -275,7 +275,7 @@ describe("issue list layout", () => {
     expect(html).toContain("Export activity as CSV");
     expect(indexedSearch).toHaveBeenCalled();
     const rowQuery = ideaFindMany.mock.calls.at(-1)![0];
-    expect(rowQuery.where).toMatchObject({ tenantId: "tenant-acme", projectId: "project-acme", track: "product" });
+    expect(rowQuery.where).toMatchObject({ organisationId: "organisation-acme", projectId: "project-acme", track: "product" });
     expect(rowQuery.where).toHaveProperty("OR");
     expect(ideaCount).toHaveBeenCalled();
   });
@@ -447,7 +447,7 @@ describe("Your call answers", () => {
     bugFindFirst.mockResolvedValue(issue({ reporterId: "ann", beneficiaryUserId: "ann" }));
     expect(await answerYourCallAction("bug-1", "confirm", "yes", "")).toEqual({ error: "Only the person this issue is for, or an admin, can answer for it." });
     expect(addCommentAction).not.toHaveBeenCalled();
-    vi.mocked(currentTenantAccess).mockResolvedValueOnce({ membershipRole: "admin" } as never);
+    vi.mocked(currentOrganisationAccess).mockResolvedValueOnce({ membershipRole: "admin" } as never);
     expect(await answerYourCallAction("bug-1", "confirm", "yes", "")).toEqual({ ok: true });
     bugFindFirst.mockResolvedValue(issue({ substatus: "open" }));
     expect(await answerYourCallAction("bug-1", "confirm", "yes", "")).toEqual({ error: "The agents are no longer split on this one." });
@@ -482,7 +482,7 @@ describe("Your call list", () => {
   const decision = (authorId: string, at: number) => ({ authorId, body: "**Decision from the owner:** Yes, the fix is ready. Please go ahead and merge it.", createdAt: T(at) });
   const issue = (over: Record<string, unknown> = {}) => ({
     id: "bug-9", number: 9, title: "Fix the header", summary: null, substatus: "requires_review", pullRequestUrl: PR, pullRequestHeadSha: "head2", updatedAt: T(0),
-    voteCount: 0, isBoosted: false, reporterId: "dave", beneficiaryUserId: "dave", milestone: null, project: { slug: "acme", tenant: { slug: "zedu" } },
+    voteCount: 0, isBoosted: false, reporterId: "dave", beneficiaryUserId: "dave", milestone: null, project: { slug: "acme", organisation: { slug: "zedu" } },
     deliveries: [{ beneficiaryUserId: "carl", pullRequestUrl: PR }], comments: [],
     testVerdicts: [verdict({}), verdict({ goodToMerge: false, agentId: "a2", onBehalfOfUserId: "ben", agent: { name: "Ben's agent", ownerUserId: "ben" }, createdAt: T(5), updatedAt: T(5) })],
     confirmations: [], ...over,
@@ -623,7 +623,7 @@ describe("the issue list's track filter (M-UI-8)", () => {
     indexedSearch.mockResolvedValue({ found: 1, hits: [{ id: "bug-1", kind: "bug", score: 10 }] });
     await renderList({ q: "launch", status: "all", track: "all" });
     expect(indexedSearch.mock.calls.at(-1)![0]).not.toHaveProperty("track");
-    expect(findMany.mock.calls[0]![0].where.tenantId).toBe("tenant-acme");
+    expect(findMany.mock.calls[0]![0].where.organisationId).toBe("organisation-acme");
     expect(findMany.mock.calls[0]![0].where).not.toHaveProperty("track");
   });
 });

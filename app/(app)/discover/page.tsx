@@ -22,7 +22,7 @@ export default async function DiscoverPage(props: DiscoverPageProps) {
   const openOnly = searchParams.open === "true";
 
   // 1. Fetch user's existing memberships and requests in parallel if logged in
-  let memberTenantIds = new Set<string>();
+  let memberOrgIds = new Set<string>();
   let memberProjectIds = new Set<string>();
   let requestStatusMap = new Map<string, string>();
 
@@ -30,7 +30,7 @@ export default async function DiscoverPage(props: DiscoverPageProps) {
     const [userOrgMemberships, userProjectMemberships, userJoinRequests] = await Promise.all([
       prisma.membership.findMany({
         where: { userId: user.id },
-        select: { tenantId: true },
+        select: { organisationId: true },
       }),
       prisma.projectMembership.findMany({
         where: { userId: user.id },
@@ -41,7 +41,7 @@ export default async function DiscoverPage(props: DiscoverPageProps) {
         select: { projectId: true, status: true },
       }),
     ]);
-    memberTenantIds = new Set(userOrgMemberships.map((m) => m.tenantId));
+    memberOrgIds = new Set(userOrgMemberships.map((m) => m.organisationId));
     memberProjectIds = new Set(userProjectMemberships.map((m) => m.projectId));
     requestStatusMap = new Map(userJoinRequests.map((r) => [r.projectId, r.status]));
   }
@@ -50,7 +50,7 @@ export default async function DiscoverPage(props: DiscoverPageProps) {
   const where: Prisma.ProjectWhereInput = {
     visibility: "public",
     archivedAt: null,
-    tenant: { archivedAt: null },
+    organisation: { archivedAt: null },
   };
 
   if (openOnly) {
@@ -61,7 +61,7 @@ export default async function DiscoverPage(props: DiscoverPageProps) {
     where.OR = [
       { name: { contains: query, mode: "insensitive" } },
       { goal: { contains: query, mode: "insensitive" } },
-      { tenant: { name: { contains: query, mode: "insensitive" } } },
+      { organisation: { name: { contains: query, mode: "insensitive" } } },
     ];
   }
 
@@ -77,8 +77,8 @@ export default async function DiscoverPage(props: DiscoverPageProps) {
       repoUrl: true,
       isOpenForContributors: true,
       contributorGuidelines: true,
-      tenantId: true,
-      tenant: {
+      organisationId: true,
+      organisation: {
         select: {
           id: true,
           name: true,
@@ -97,7 +97,7 @@ export default async function DiscoverPage(props: DiscoverPageProps) {
   const cardsData: DiscoverableProject[] = projects.map((p) => {
     let userStatus: "member" | "pending" | "rejected" | "none" | "guest" = !user ? "guest" : "none";
     if (user) {
-      if (memberTenantIds.has(p.tenantId) || memberProjectIds.has(p.id) || user.role === "super_admin") {
+      if (memberOrgIds.has(p.organisationId) || memberProjectIds.has(p.id) || user.role === "super_admin") {
         userStatus = "member";
       } else if (requestStatusMap.has(p.id)) {
         const status = requestStatusMap.get(p.id);
@@ -115,7 +115,7 @@ export default async function DiscoverPage(props: DiscoverPageProps) {
       repoUrl: p.repoUrl,
       isOpenForContributors: p.isOpenForContributors,
       contributorGuidelines: p.contributorGuidelines,
-      tenant: p.tenant,
+      organisation: p.organisation,
       _count: p._count,
       userStatus,
     };
@@ -134,10 +134,10 @@ export default async function DiscoverPage(props: DiscoverPageProps) {
         </div>
         {user ? (
           <Link
-            href="/tenants"
+            href="/organisations"
             className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-zk-accent hover:underline"
           >
-            ← Back to Workspaces
+            ← Back to Organisations
           </Link>
         ) : (
           <Link

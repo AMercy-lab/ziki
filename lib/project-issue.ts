@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { resolveSessionUserId } from "@/lib/session-user";
-import { viewerBugScope } from "@/lib/tenant-viewer";
+import { viewerBugScope } from "@/lib/organisation-viewer";
 import { isReservedProjectSlug } from "@/lib/project-slug";
 import { refOf, type ProjectRef } from "@/lib/project-paths";
 
@@ -28,9 +28,9 @@ export type ProjectIssueLookup =
   /** Another organisation the viewer belongs to has it (#519): offer the switch. */
   | { kind: "elsewhere"; issueId: string };
 
-const select = { id: true, number: true, isDeleted: true, project: { select: { slug: true, tenant: { select: { slug: true } } } } } as const;
+const select = { id: true, number: true, isDeleted: true, project: { select: { slug: true, organisation: { select: { slug: true } } } } } as const;
 
-function toIssue(row: { id: string; number: number; isDeleted: boolean; project: { slug: string; tenant: { slug: string } } }): ProjectIssue {
+function toIssue(row: { id: string; number: number; isDeleted: boolean; project: { slug: string; organisation: { slug: string } } }): ProjectIssue {
   return { id: row.id, number: row.number, ref: refOf(row.project), isDeleted: row.isDeleted };
 }
 
@@ -54,7 +54,7 @@ export const findProjectIssue = cache(async (orgParam: string, projectParam: str
   const orgSlug = decodeURIComponent(orgParam);
   const projectSlug = decodeURIComponent(projectParam);
   if (isReservedProjectSlug(orgSlug)) return null;
-  const inUrl = { slug: projectSlug, tenant: { slug: orgSlug } };
+  const inUrl = { slug: projectSlug, organisation: { slug: orgSlug } };
   const scope = await viewerBugScope();
   const resolved = await resolveSessionUserId();
   const userId = "userId" in resolved ? resolved.userId : undefined;
@@ -66,11 +66,11 @@ export const findProjectIssue = cache(async (orgParam: string, projectParam: str
         project: {
           ...inUrl,
           archivedAt: null,
-          tenant: { archivedAt: null },
+          organisation: { archivedAt: null },
           OR: [
             { visibility: "public" },
             { memberships: { some: { userId } } },
-            { tenant: { memberships: { some: { userId } } } },
+            { organisation: { memberships: { some: { userId } } } },
           ],
         },
       },
@@ -79,13 +79,13 @@ export const findProjectIssue = cache(async (orgParam: string, projectParam: str
     if (inUrlRow) return { kind: "found", issue: toIssue(inUrlRow) };
   }
 
-  if (!("tenantId" in scope)) {
+  if (!("organisationId" in scope)) {
     const rows = await prisma.bug.findMany({ where: { number, project: inUrl }, select, take: 2 });
     return rows.length === 1 ? { kind: "found", issue: toIssue(rows[0]) } : null;
   }
 
   const row = await prisma.bug.findFirst({ where: { number, ...scope }, select });
-  if (row && row.project.slug === projectSlug && row.project.tenant.slug === orgSlug) return { kind: "found", issue: toIssue(row) };
+  if (row && row.project.slug === projectSlug && row.project.organisation.slug === orgSlug) return { kind: "found", issue: toIssue(row) };
 
   if (userId) {
     const other = await prisma.bug.findFirst({
@@ -93,8 +93,8 @@ export const findProjectIssue = cache(async (orgParam: string, projectParam: str
         number,
         isDeleted: false,
         project: inUrl,
-        ...(typeof scope.tenantId === "string" ? { tenantId: { not: scope.tenantId } } : {}),
-        tenant: { memberships: { some: { userId } } },
+        ...(typeof scope.organisationId === "string" ? { organisationId: { not: scope.organisationId } } : {}),
+        organisation: { memberships: { some: { userId } } },
       },
       select: { id: true },
     });

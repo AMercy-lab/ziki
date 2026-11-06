@@ -16,7 +16,7 @@ export type DiscoverableProject = {
   repoUrl: string | null;
   isOpenForContributors: boolean;
   contributorGuidelines: string | null;
-  tenant: {
+  organisation: {
     id: string;
     name: string;
     slug: string;
@@ -39,10 +39,10 @@ export function DiscoverProjectCard({ project }: { project: DiscoverableProject 
           <div className="flex items-start justify-between gap-3">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-zk-muted">
-                {project.tenant.name}
+                {project.organisation.name}
               </span>
               <h3 className="text-lg font-bold text-zk-text">
-                <Link href={projectPath(projectRef(project.tenant.slug, project.slug))} className="hover:text-zk-accent hover:underline">
+                <Link href={projectPath(projectRef(project.organisation.slug, project.slug))} className="hover:text-zk-accent hover:underline">
                   {project.name}
                 </Link>
               </h3>
@@ -134,7 +134,7 @@ export function DiscoverProjectCard({ project }: { project: DiscoverableProject 
                 </Button>
               )
             ) : currentStatus === "member" ? (
-              <Link href={projectPath(projectRef(project.tenant.slug, project.slug))}>
+              <Link href={projectPath(projectRef(project.organisation.slug, project.slug))}>
                 <Button variant="secondary" className="text-xs font-medium">
                   Open Project →
                 </Button>

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { revalidateIssue } from "@/lib/revalidate-issue";
 import { prisma } from "@/lib/prisma";
-import { bugInTenant, currentTenantIdFor } from "@/lib/tenant-context";
+import { bugInOrganisation, currentOrganisationIdFor } from "@/lib/organisation-context";
 import { requireUser } from "@/lib/auth-helpers";
 import { finishedWatchedWhere } from "@/lib/watching";
 
@@ -15,7 +15,7 @@ export async function setWatchingAction(
   const user = await requireUser();
   const bug = await prisma.bug.findUnique({
     where: { id: bugId },
-    select: { id: true, isDeleted: true, tenantId: true, projectId: true, project: { select: { visibility: true } } },
+    select: { id: true, isDeleted: true, organisationId: true, projectId: true, project: { select: { visibility: true } } },
   });
   if (!bug || bug.isDeleted) return { error: "Issue not found" };
 
@@ -28,7 +28,7 @@ export async function setWatchingAction(
         select: { id: true },
       }) ||
       await prisma.membership.findFirst({
-        where: { tenantId: bug.tenantId, userId: user.id },
+        where: { organisationId: bug.organisationId, userId: user.id },
         select: { id: true },
       })
     );
@@ -65,7 +65,7 @@ export async function unwatchFinishedAction(): Promise<{
     where: {
       ...finishedWatchedWhere(user.id),
       OR: [
-        { tenant: { memberships: { some: { userId: user.id } } } },
+        { organisation: { memberships: { some: { userId: user.id } } } },
         { project: { memberships: { some: { userId: user.id } } } },
         { project: { visibility: "public" } },
       ],

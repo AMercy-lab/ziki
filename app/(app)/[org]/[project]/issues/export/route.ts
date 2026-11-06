@@ -1,11 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { bugInTenant } from "@/lib/tenant-context";
+import { bugInOrganisation, currentOrganisationIdFor } from "@/lib/organisation-context";
 import { getIssueTypes } from "@/lib/lookups";
 import { auth } from "@/auth";
 import { requireUser } from "@/lib/auth-helpers";
 import { canDeleteTicket } from "@/lib/ticket-deletion";
-import { tenantAccessFor } from "@/lib/tenant-access";
+import { organisationAccessFor } from "@/lib/organisation-access";
 import { getBugOrderBy } from "@/lib/issues-sort";
 import { parseBugListFilters, type RawParams } from "@/lib/issue-list-filters";
 import { CSV_EOL, csvRow } from "@/lib/csv";
@@ -42,7 +42,7 @@ function exportFormat(params: URLSearchParams): ExportFormat {
   return params.get("format") === "json" ? "json" : "csv";
 }
 
-/** `/<slug>/issues/export` (#project-urls): this project's issues, in the viewer's workspace. */
+/** `/<slug>/issues/export` (#project-urls): this project's issues, in the viewer's organisation. */
 export async function GET(request: NextRequest, { params: routeParams }: { params: Promise<{ org: string; project: string }> }) {
   const session = await auth();
   if (!session?.user) {
@@ -60,27 +60,27 @@ export async function GET(request: NextRequest, { params: routeParams }: { param
     where: {
       slug: decodeURIComponent(slug),
       archivedAt: null,
-      tenant: { slug: decodeURIComponent(org), archivedAt: null },
+      organisation: { slug: decodeURIComponent(org), archivedAt: null },
       ...(user.role !== "super_admin"
         ? {
             OR: [
               { visibility: "public" },
               { memberships: { some: { userId: user.id } } },
-              { tenant: { memberships: { some: { userId: user.id } } } },
+              { organisation: { memberships: { some: { userId: user.id } } } },
             ],
           }
         : {}),
     },
-    select: { id: true, tenantId: true },
+    select: { id: true, organisationId: true },
   });
   if (!routeProject) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const tenantId = routeProject.tenantId;
+  const organisationId = routeProject.organisationId;
   const projectId = routeProject.id;
-  const access = await tenantAccessFor(user.id, tenantId, user.role);
+  const access = await organisationAccessFor(user.id, organisationId, user.role);
   const [tagTypes, milestones, areas] = await Promise.all([
-    getIssueTypes(tenantId),
-    tenantId
-      ? prisma.milestone.findMany({ where: { tenantId }, select: { id: true } })
+    getIssueTypes(organisationId),
+    organisationId
+      ? prisma.milestone.findMany({ where: { organisationId }, select: { id: true } })
       : Promise.resolve([]),
     params.area && projectId
       ? prisma.projectArea.findMany({ where: { projectId }, select: { id: true, name: true } })
@@ -98,10 +98,10 @@ export async function GET(request: NextRequest, { params: routeParams }: { param
     milestones,
   });
 
-  // #425: only the viewer's tenant, exactly as on the list.
+  // #425: only the viewer's organisation, exactly as on the list.
   const where = {
     ...filters,
-    ...bugInTenant(tenantId),
+    ...bugInOrganisation(organisationId),
     ...(projectId ? { projectId } : {}),
   };
   const orderBy = getBugOrderBy(sort, { boostFirst: mine !== "watching" });
