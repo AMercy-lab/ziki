@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
+import { useMarketingArea } from "@/components/marketing/marketing-area";
 import { ideasPath, orgPath } from "@/lib/project-paths";
 import { SignOutButton } from "@/components/sign-out-button";
 import { WorkspaceSwitcher, type WorkspaceChoice } from "@/components/workspace-switcher";
@@ -121,7 +122,8 @@ function TopNav({ pathname, projectSlug }: { pathname: string | null; projectSlu
   const productHref = projectSlug ? ideasPath(projectSlug) : "/tenants";
   const marketingHref = marketingTabHref(projectSlug);
   // The section's address starts with the project's slug, but it isn't Your App.
-  const inMarketing = isNavItemActive(pathname, marketingHref);
+  const onMarketingWork = useMarketingArea();
+  const inMarketing = isNavItemActive(pathname, marketingHref) || onMarketingWork;
   return (
     <nav
       aria-label="Workspace"

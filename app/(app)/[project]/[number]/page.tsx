@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ideaPath, issuesPath } from "@/lib/project-paths";
+import { MarketingAreaMarker } from "@/components/marketing/marketing-area";
 import { MarketingTaskDetail } from "@/components/marketing/marketing-task-detail";
 import { entryReplySelect, toEntryReplies } from "@/lib/agent-api/entry-fields";
 import Image from "next/image";
@@ -1123,6 +1124,8 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     const marketingSite = marketingBrief?.website ?? bug.project.siteUrl;
 
     return (
+      <>
+      <MarketingAreaMarker />
       <MarketingTaskDetail
         bug={{
           id: bug.id,
@@ -1531,6 +1534,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
         }
         canReply={!bug.isDeleted}
       />
+      </>
     );
   }
 
