@@ -6,6 +6,7 @@ import { type SkillItem } from "./skills-data";
 
 interface SkillsDirectoryProps {
   skills: SkillItem[];
+  loadError?: string;
 }
 
 /**

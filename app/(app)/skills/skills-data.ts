@@ -54,7 +54,7 @@ function mapSubmissionToSkill(sub: {
   sampleCommand?: string | null;
   documentationUrl?: string | null;
   createdAt: Date;
-  submittedBy?: { name: string | null; email: string | null } | null;
+  submittedBy?: { name: string | null } | null;
 }): SkillItem {
   const authorName = sub.submittedBy?.name || "Contributor";
   const handle = "@" + authorName.toLowerCase().replace(/[^a-z0-9]/g, "");
