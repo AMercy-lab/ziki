@@ -132,7 +132,7 @@ export function WithdrawWindow({ earned, className, children }: { earned: number
             </button>
           </div>
           <p className="mt-1 text-sm text-zk-text2">
-            {ready ? "Your money is ready. We’re still working out how payouts will work, and we’ll tell you as soon as you can take it out." : `You have ${money(available)}. ${money(left)} to go.`}
+            {ready ? "Your money is ready. We’re still working out how payouts will work, and we’ll tell you as soon as you can take it out." : `You have ${money(available)} in total, across all your workspaces. ${money(left)} to go.`}
           </p>
 
           <p className="mt-5 flex flex-wrap items-baseline gap-x-2">

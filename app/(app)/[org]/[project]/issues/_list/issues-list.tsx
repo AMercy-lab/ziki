@@ -1121,6 +1121,11 @@ export async function IssuesList({
     </>
   );
 
+  // Earnings (#earnings): once someone has joined a project from Discover, they've found the way in; the notice goes.
+  const hasJoinedProject = isIdeasView && userId
+    ? Boolean(await prisma.projectMembership.findFirst({ where: { userId }, select: { id: true } }).catch(() => null))
+    : false;
+
   const listContent = (
     <div className="space-y-4">
         {statusParam === "resolved" && !isDeletedView ? <LiveRefresh /> : null}
@@ -1129,7 +1134,7 @@ export async function IssuesList({
         <div id={PROJECT_LINKS_SLOT_ID} className="empty:hidden" />
 
         {/* Earnings (#earnings): the way to earn, on the page everyone lands on, closed with × like the panel above. */}
-        {isIdeasView && !isDeletedView ? <EarnPanel /> : null}
+        {isIdeasView && !isDeletedView && !hasJoinedProject ? <EarnPanel /> : null}
 
         <AgentSetupNotice agents={unconfiguredAgents} />
         {nextStep && organisationId ? <OrganisationNextStepCard step={nextStep} organisationId={organisationId} /> : null}

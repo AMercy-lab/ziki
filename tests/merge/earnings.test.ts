@@ -62,3 +62,14 @@ describe("who sees $ and Withdraw in the header (#earnings)", () => {
     expect(await headerEarnings(db(true, true), "earner")).toBe(4.5);
   });
 });
+
+/** Per workspace (#earnings, Chloe's call): the header shows what you earned where you are. */
+describe("earnings in one workspace (#earnings)", () => {
+  it("adds up only that workspace's rows when one is given, and every row when not", async () => {
+    const aggregate = vi.fn(async () => ({ _sum: { points: 2 } }));
+    await totalEarned({ pointEntry: { aggregate } } as never, "earner", "org-ziki");
+    expect(aggregate).toHaveBeenLastCalledWith({ where: { userId: "earner", organisationId: "org-ziki" }, _sum: { points: true } });
+    await totalEarned({ pointEntry: { aggregate } } as never, "earner");
+    expect(aggregate).toHaveBeenLastCalledWith({ where: { userId: "earner" }, _sum: { points: true } });
+  });
+});
