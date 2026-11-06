@@ -196,7 +196,7 @@ export async function reEnableWebhookAction(webhookId: unknown): Promise<ReEnabl
   const subscription = await prisma.webhookSubscription.findFirst({
     where: {
       id: webhookId,
-      agent: { ownerUserId: user.id, organisationId: organisation.organisationId },
+      agent: { ownerUserId: user.id, ...activeIn(organisation.organisationId) },
     },
     select: { id: true, enabled: true },
   });
@@ -226,7 +226,7 @@ export async function deleteWebhookAction(webhookId: unknown): Promise<DeleteWeb
   const subscription = await prisma.webhookSubscription.findFirst({
     where: {
       id: webhookId,
-      agent: { ownerUserId: user.id, organisationId: organisation.organisationId },
+      agent: { ownerUserId: user.id, ...activeIn(organisation.organisationId) },
     },
     select: { id: true },
   });

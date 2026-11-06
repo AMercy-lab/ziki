@@ -104,8 +104,8 @@ export default async function AuditLogPage({ searchParams }: Props) {
     prisma.agent.findMany({
       where:
         access.kind === "all"
-          ? { organisationId: access.organisationId }
-          : { organisationId: access.organisationId, id: { in: [...access.agentIds] } },
+          ? activeIn(access.organisationId)
+          : { ...activeIn(access.organisationId), id: { in: [...access.agentIds] } },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
