@@ -39,17 +39,21 @@ export function isPublicPath(
     pathWithoutBase === "/for-agents" ||
     pathWithoutBase === "/developers" ||
     pathWithoutBase === "/earn" ||
+    // A business's own link from an earner's email (#earn-outreach): opened by people who aren't signed in.
+    /^\/r\/[a-z0-9]{4,16}$/.test(pathWithoutBase) ||
     isAuthPage ||
     isPasswordResetPage ||
     isPublicAgentPath(pathWithoutBase) ||
     isIssuePreview ||
     pathWithoutBase === "/" ||
     pathWithoutBase.startsWith("/session-expired") ||
-    // Shareable invite links (#444). Guests must see the organization and
+    // Shareable invite links (#444). Guests must see the organisation and
     // sign in with Google before the link is used; the page itself never
     // spends a use.
     pathWithoutBase === "/join" ||
     pathWithoutBase.startsWith("/join/") ||
+    pathWithoutBase === "/discover" ||
+    pathWithoutBase.startsWith("/discover?") ||
     pathWithoutBase.startsWith("/api/auth") ||
     pathWithoutBase.startsWith("/api/health") ||
     // The scheduler calls the platform sweeps with Bearer CRON_SECRET and no

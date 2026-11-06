@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { MAX_ACTIVE_AGENTS_PER_OWNER } from "@/lib/agents/registry-limits";
 import { projectContextFor } from "@/lib/project-context";
-import { currentTenantIdFor } from "@/lib/tenant-context";
+import { currentOrganisationIdFor } from "@/lib/organisation-context";
 import { openSecret } from "@/lib/secret-box";
 import { materializeApprovedPairings } from "@/lib/agents/pairing";
 import { isAgentPlatformEnabled } from "@/lib/feature-flags";
@@ -12,6 +12,7 @@ import { ManageAgentsList, type ManageAgentItem } from "@/app/(app)/settings/age
 import {
   agentsMutedClass,
   agentsPrimaryBtn,
+  agentsSecondaryBtn,
   agentsSurface,
 } from "@/app/(app)/settings/agents/agents-ui";
 
@@ -34,6 +35,9 @@ export const metadata = { title: "My agents" };
  */
 const CREATE_AGENT_HREF = "/settings/connect";
 
+/** Standing instructions every agent here follows (#838); the first child route under /agents/mine. */
+const PREFERENCES_HREF = "/agents/mine/preferences";
+
 /**
  * My agents: the signed-in person's own agents and nothing else (creating agents and the team list live on their own pages).
  * Its own top-level page, the "Manage agents" entry in the header's Agents menu; /settings/agents redirects here.
@@ -51,20 +55,20 @@ export default async function AgentsPage() {
   }
 
   const user = await requireUser();
-  const tenantId = await currentTenantIdFor(user.id);
-  const { projects } = await projectContextFor(prisma, tenantId);
+  const organisationId = await currentOrganisationIdFor(user.id);
+  const { projects } = await projectContextFor(prisma, organisationId);
   const now = new Date();
 
-  if (tenantId) {
+  if (organisationId) {
     try {
-      await materializeApprovedPairings(user.id, tenantId);
+      await materializeApprovedPairings(user.id, organisationId);
     } catch (error) {
       console.error("[agents] approved agents were not listed", error);
     }
   }
-  const mine = tenantId
+  const mine = organisationId
     ? await prisma.agent.findMany({
-        where: { ownerUserId: user.id, tenantId },
+        where: { ownerUserId: user.id, organisationId },
         orderBy: [{ revokedAt: { sort: "desc", nulls: "first" } }, { createdAt: "desc" }],
         select: {
           id: true,
@@ -96,10 +100,10 @@ export default async function AgentsPage() {
   // Until one of their agents has called Ziki with its key, show how to connect one.
   const connected = mine.some((agent) => !agent.revokedAt && agent.apiKeys.some((key) => key.lastUsedAt));
   const recentCutoff = now.getTime() - 24 * 60 * 60 * 1000;
-  // A key made in the Connect modal works in the agent's current key's project, else the workspace's default.
-  const defaultProject = tenantId
-    ? (await prisma.project.findFirst({ where: { tenantId, archivedAt: null, slug: "web" }, select: { id: true, name: true } }))
-      ?? (await prisma.project.findFirst({ where: { tenantId, archivedAt: null }, orderBy: { createdAt: "asc" }, select: { id: true, name: true } }))
+  // A key made in the Connect modal works in the agent's current key's project, else the organisation's default.
+  const defaultProject = organisationId
+    ? (await prisma.project.findFirst({ where: { organisationId, archivedAt: null, slug: "web" }, select: { id: true, name: true } }))
+      ?? (await prisma.project.findFirst({ where: { organisationId, archivedAt: null }, orderBy: { createdAt: "asc" }, select: { id: true, name: true } }))
     : null;
 
   const manageItems: ManageAgentItem[] = mine.map((agent) => {
@@ -131,7 +135,7 @@ export default async function AgentsPage() {
   });
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto w-full max-w-5xl space-y-8">
       <div className="space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-1">
@@ -141,6 +145,9 @@ export default async function AgentsPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Link href={PREFERENCES_HREF} className={agentsSecondaryBtn}>
+              Preferences
+            </Link>
             <Link href={CREATE_AGENT_HREF} className={agentsPrimaryBtn}>
               Create agent
             </Link>
@@ -148,14 +155,14 @@ export default async function AgentsPage() {
         </div>
       </div>
 
-      {!tenantId ? (
+      {!organisationId ? (
         <div className={`${agentsSurface} border-dashed p-6 text-sm text-zk-text2`}>
           <p>
-            You aren&apos;t in a workspace yet, so you can&apos;t register agents. Join a workspace via an invite from your team, or create your own workspace to start managing agents.
+            You aren&apos;t in an organisation yet, so you can&apos;t register agents. Join an organisation via an invite from your team, or create your own organisation to start managing agents.
           </p>
           <div className="mt-3">
-            <Link href="/tenants" className={agentsPrimaryBtn}>
-              Create or join a workspace →
+            <Link href="/organisations" className={agentsPrimaryBtn}>
+              Create or join an organisation →
             </Link>
           </div>
         </div>
