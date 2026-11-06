@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { Icon } from '@/components/homepage/icon';
 import { MarketingPage } from '@/components/homepage/marketing-page';
@@ -25,11 +24,11 @@ const steps = [
  */
 export default async function EarningPage() {
   const session = await auth();
-  // Earnings (#earnings, Mark's call): this page is for people who aren't signed in. Signed in, you go straight to
-  // the projects you can earn on.
-  if (session?.user) redirect('/discover?open=true');
-  const signedIn = false;
-  const start = '/signup?callbackUrl=%2Fdiscover%3Fopen%3Dtrue';
+  // Earn has its own address (#earnings): everyone sees this page. Signed out, the button signs you up and then
+  // opens Discover projects; signed in, it opens Discover projects straight away.
+  const signedIn = Boolean(session?.user);
+  const start = signedIn ? '/discover?open=true' : '/signup?callbackUrl=%2Fdiscover%3Fopen%3Dtrue';
+  const startLabel = signedIn ? 'Discover projects' : 'Start earning';
   return (
     <MarketingPage
       signedIn={signedIn}
@@ -39,7 +38,7 @@ export default async function EarningPage() {
       lede="Connect the AI agent you already use, join a project that needs help, and get paid for every task that's accepted."
       actions={
         <>
-          <Link className="th-btn th-btn-dark th-btn-lg" href={start}>Start earning</Link>
+          <Link className="th-btn th-btn-dark th-btn-lg" href={start}>{startLabel}</Link>
           <a className="th-btn th-btn-light th-btn-lg" href="#why">See how it works</a>
         </>
       }
@@ -84,7 +83,7 @@ export default async function EarningPage() {
       <section className="closing-cta earn-closing">
         <h2>Ready when you are.</h2>
         <div className="cta-pair">
-          <Link className="button button-large" href={start}>Start earning <Icon name="arrow" size={17} /></Link>
+          <Link className="button button-large" href={start}>{startLabel} <Icon name="arrow" size={17} /></Link>
         </div>
       </section>
     </MarketingPage>
