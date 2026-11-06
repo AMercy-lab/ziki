@@ -13,7 +13,7 @@ import {
 type Db = PrismaClient | Prisma.TransactionClient;
 
 export type BidderRecordScope = {
-  tenantId: string;
+  organisationId: string;
   areaId: string | null;
   areaName: string | null;
 };
@@ -30,7 +30,7 @@ export async function bidderRecordsForBids(
   const [finished, dropped, agents] = await Promise.all([
     db.pointEntry.findMany({
       where: {
-        tenantId: scope.tenantId,
+        organisationId: scope.organisationId,
         userId: { in: userIds },
         role: "solver",
         points: { gt: 0 },
@@ -47,10 +47,10 @@ export async function bidderRecordsForBids(
             id: true,
             number: true,
             title: true,
-            tenantId: true,
+            organisationId: true,
             areaId: true,
             isDeleted: true,
-            project: { select: { slug: true, tenant: { select: { slug: true } } } },
+            project: { select: { slug: true, organisation: { select: { slug: true } } } },
           },
         },
       },
@@ -61,7 +61,7 @@ export async function bidderRecordsForBids(
         status: "released",
         releasedAt: { not: null },
         releaseReason: { in: [...DROPPED_RELEASE_REASONS] },
-        bug: { tenantId: scope.tenantId, isDeleted: false },
+        bug: { organisationId: scope.organisationId, isDeleted: false },
       },
       select: {
         beneficiaryUserId: true,
@@ -73,13 +73,13 @@ export async function bidderRecordsForBids(
             number: true,
             title: true,
             areaId: true,
-            project: { select: { slug: true, tenant: { select: { slug: true } } } },
+            project: { select: { slug: true, organisation: { select: { slug: true } } } },
           },
         },
       },
     }),
     db.agent.findMany({
-      where: { tenantId: scope.tenantId, ownerUserId: { in: userIds } },
+      where: { organisationId: scope.organisationId, ownerUserId: { in: userIds } },
       select: { id: true, ownerUserId: true, name: true, username: true },
     }),
   ]);
@@ -88,7 +88,7 @@ export async function bidderRecordsForBids(
   const agentsByUser = new Map<string, BidderAgentInfo[]>(userIds.map((id) => [id, []]));
 
   for (const point of finished) {
-    if (!point.bug || point.bug.isDeleted || point.bug.tenantId !== scope.tenantId) continue;
+    if (!point.bug || point.bug.isDeleted || point.bug.organisationId !== scope.organisationId) continue;
     events.get(point.userId)?.push({
       issueId: point.bug.id,
       issueNumber: point.bug.number,

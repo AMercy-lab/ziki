@@ -22,7 +22,7 @@ vi.mock("@/lib/agent-api/confirmations", () => ({ isConfirmed: vi.fn(async () =>
 vi.mock("@/lib/redesigns", () => ({ assertRedesignOpen: vi.fn(async () => undefined) }));
 vi.mock("@/lib/agent-api/events", () => ({ publish: vi.fn(async () => ({ id: "evt" })) }));
 vi.mock("@/lib/watch", () => ({ ensureWatching: vi.fn(async () => undefined) }));
-vi.mock("@/lib/agents/membership", () => ({ isTenantAdmin: vi.fn(async () => false) }));
+vi.mock("@/lib/agents/membership", () => ({ isAdminOfOrganisation: vi.fn(async () => false) }));
 vi.mock("@/lib/agent-notifications", () => ({ notifyClaimOffered: vi.fn() }));
 vi.mock("@/lib/agent-api/offer", async (original) => ({
   ...await original<typeof import("@/lib/agent-api/offer")>(),
@@ -40,7 +40,7 @@ const caller = {
   agentId: "agent1",
   name: "Ada's Claude",
   ownerId: "ada",
-  tenantId: "tenant",
+  organisationId: "organisation",
   level: "working" as const,
   burst: false,
   keyId: "key1",
@@ -129,9 +129,9 @@ describe("placeBid", () => {
 
   it("still refuses a rebid while the awarded offer or claim is live (#745)", async () => {
     db.issueBid.findUnique.mockResolvedValue({ id: "bid1", awardedAt: new Date(), claimId: "claim", withdrawnAt: null });
-    db.issueClaim.findFirst.mockResolvedValue({ id: "claim", status: "active", offeredAt: null, bug: { tenantId: "tenant", projectId: "project" } });
+    db.issueClaim.findFirst.mockResolvedValue({ id: "claim", status: "active", offeredAt: null, bug: { organisationId: "organisation", projectId: "project" } });
     await expect(placePlan(caller, "project", "issue1")).rejects.toMatchObject({ status: 409 });
-    db.issueClaim.findFirst.mockResolvedValue({ id: "claim", status: "offered", offeredAt: new Date(), bug: { tenantId: "tenant", projectId: "project" } });
+    db.issueClaim.findFirst.mockResolvedValue({ id: "claim", status: "offered", offeredAt: new Date(), bug: { organisationId: "organisation", projectId: "project" } });
     await expect(placePlan(caller, "project", "issue1")).rejects.toMatchObject({ status: 409 });
     expect(db.issueBid.update).not.toHaveBeenCalled();
     expect(db.bidVote.deleteMany).not.toHaveBeenCalled();
@@ -142,9 +142,9 @@ describe("placeBid", () => {
     await expect(placePlan(caller, "project", "issue1")).resolves.toMatchObject({ replaced: false });
     db.issueBid.create.mockClear();
     vi.mocked(isConfirmed).mockResolvedValue(true);
-    db.issueClaim.findFirst.mockResolvedValue({ id: "claim", status: "active", offeredAt: null, bug: { tenantId: "tenant", projectId: "project" } });
+    db.issueClaim.findFirst.mockResolvedValue({ id: "claim", status: "active", offeredAt: null, bug: { organisationId: "organisation", projectId: "project" } });
     await expect(placePlan(caller, "project", "issue1")).rejects.toMatchObject({ status: 409 });
-    db.issueClaim.findFirst.mockResolvedValue({ id: "offer", status: "offered", offeredAt: new Date(), bug: { tenantId: "tenant", projectId: "project" } });
+    db.issueClaim.findFirst.mockResolvedValue({ id: "offer", status: "offered", offeredAt: new Date(), bug: { organisationId: "organisation", projectId: "project" } });
     await expect(placePlan(caller, "project", "issue1")).rejects.toMatchObject({
       status: 409,
       message: expect.stringContaining("pending offer"),
@@ -181,7 +181,7 @@ describe("withdrawBid", () => {
       id: "bid1",
       awardedAt: null,
       withdrawnAt: null,
-      bug: { tenantId: "tenant", projectId: "project", isDeleted: false },
+      bug: { organisationId: "organisation", projectId: "project", isDeleted: false },
     });
     await withdrawBid(caller, "project", "issue1");
     expect(db.issueBid.updateMany.mock.calls[0][0].data.withdrawnAt).toBeInstanceOf(Date);
@@ -249,19 +249,19 @@ describe("bidder records (#825)", () => {
     expect(record.newHere).toBe(true);
   });
 
-  it("loads every bid owner's record in tenant-scoped batched queries", async () => {
+  it("loads every bid owner's record in organisation-scoped batched queries", async () => {
     db.pointEntry.findMany.mockResolvedValue([
       {
         userId: "ada",
         agentId: "agent1",
         createdAt: at(3),
-        bug: { id: "bug1", number: 1, title: "Fix login", tenantId: "tenant", areaId: "area-auth", isDeleted: false, project: { slug: "ziki", tenant: { slug: "zedu" } } },
+        bug: { id: "bug1", number: 1, title: "Fix login", organisationId: "organisation", areaId: "area-auth", isDeleted: false, project: { slug: "ziki", organisation: { slug: "zedu" } } },
       },
       {
         userId: "ada",
         agentId: "agent1",
         createdAt: at(2),
-        bug: { id: "foreign", number: 9, title: "Elsewhere", tenantId: "other", areaId: null, isDeleted: false, project: { slug: "ziki", tenant: { slug: "other" } } },
+        bug: { id: "foreign", number: 9, title: "Elsewhere", organisationId: "other", areaId: null, isDeleted: false, project: { slug: "ziki", organisation: { slug: "other" } } },
       },
     ]);
     db.issueClaim.findMany.mockResolvedValue([
@@ -269,7 +269,7 @@ describe("bidder records (#825)", () => {
         beneficiaryUserId: "ada",
         agentId: "agent1",
         releasedAt: at(4),
-        bug: { id: "bug2", number: 2, title: "Old task", areaId: "area-auth", project: { slug: "ziki", tenant: { slug: "zedu" } } },
+        bug: { id: "bug2", number: 2, title: "Old task", areaId: "area-auth", project: { slug: "ziki", organisation: { slug: "zedu" } } },
       },
     ]);
     db.agent.findMany.mockResolvedValue([
@@ -277,7 +277,7 @@ describe("bidder records (#825)", () => {
     ]);
 
     const records = await bidderRecordsForBids(
-      { tenantId: "tenant", areaId: "area-auth", areaName: "Auth" },
+      { organisationId: "organisation", areaId: "area-auth", areaName: "Auth" },
       [{ beneficiaryUserId: "ada" }, { beneficiaryUserId: "ada" }],
     );
 
@@ -286,7 +286,7 @@ describe("bidder records (#825)", () => {
     expect(db.agent.findMany).toHaveBeenCalledTimes(1);
     expect(db.pointEntry.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
-        tenantId: "tenant",
+        organisationId: "organisation",
         userId: { in: ["ada"] },
         role: "solver",
         points: { gt: 0 },
@@ -297,7 +297,7 @@ describe("bidder records (#825)", () => {
     expect(db.issueClaim.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         releaseReason: { in: ["silence", "deadline", "abandoned"] },
-        bug: { tenantId: "tenant", isDeleted: false },
+        bug: { organisationId: "organisation", isDeleted: false },
       }),
     }));
 

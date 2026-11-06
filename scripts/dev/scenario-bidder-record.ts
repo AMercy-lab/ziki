@@ -17,7 +17,7 @@ async function main() {
   try {
     const issue = await db.bug.findUnique({
       where: { id: DEMO_ISSUE_ID },
-      select: { id: true, tenantId: true, project: { select: { slug: true, tenant: { select: { slug: true } } } } },
+      select: { id: true, organisationId: true, project: { select: { slug: true, organisation: { select: { slug: true } } } } },
     });
     if (!issue) throw new Error("No Demo issue #76. Run `pnpm db:fixtures` first.");
     const amara = await db.agent.findUnique({ where: { id: "fx-agent-amara-w" }, select: { id: true, ownerUserId: true } });
@@ -47,7 +47,7 @@ async function main() {
     ] as const;
     await db.pointEntry.createMany({
       data: finished.map(([bugId, agentId, userId, daysAgo]) => ({
-        tenantId: issue.tenantId,
+        organisationId: issue.organisationId,
         userId,
         bugId,
         agentId,
@@ -71,7 +71,7 @@ async function main() {
       },
     });
 
-    console.log(`Open /${issue.project.tenant.slug}/${issue.project.slug}/76 as demo@fixtures.local.`);
+    console.log(`Open /${issue.project.organisation.slug}/${issue.project.slug}/76 as demo@fixtures.local.`);
     console.log("Amara has 9 finished and 1 dropped; Dara has 2 finished and is new here.");
   } finally {
     await db.$disconnect();
