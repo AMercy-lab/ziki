@@ -9,6 +9,9 @@ import { IDEA_SUMMARY_MAX_CHARS, listIdeaVerdicts } from "@/lib/agent-api/idea-v
 import { IdeaVerdictsPanel, type IdeaVerdictBlock } from "@/components/idea-verdicts";
 import { AttachmentList } from "@/components/attachment-list";
 import { RichText } from "@/components/rich-text";
+import { SecurityFindingPanel } from "@/components/security-finding-panel";
+import { findingForIdea, findingView } from "@/lib/security-findings";
+import { tenantAccessFor } from "@/lib/tenant-access";
 import { LocalTime } from "@/components/local-time";
 import { ReportSummary } from "@/components/report-summary";
 import { NextStepBar } from "@/components/next-step-bar";
@@ -101,10 +104,16 @@ export default async function IdeaPage({ params, searchParams }: {
     : new Map<string, { id: string; name: string | null; image: string | null }>();
   if (!idea) notFound();
 
-  const [verdicts, workflow] = await Promise.all([
+  const [verdicts, workflow, securityFinding] = await Promise.all([
     listIdeaVerdicts({ tenantId, projectId: idea.projectId }, idea.id),
     workflowFor(idea.projectId),
+    findingForIdea(idea.id),
   ]);
+  // #security-findings: the private details, shown only to who may see them.
+  const securityAdmin = securityFinding ? (await tenantAccessFor(user.id, tenantId, user.role)).admin : false;
+  const securityView = securityFinding
+    ? findingView(securityFinding, { kind: "person", userId: user.id, tenantId, tenantAdmin: securityAdmin })
+    : null;
   const own = idea.reporterId === user.id || idea.beneficiaryUserId === user.id || idea.createdByAgent?.ownerUserId === user.id;
   // Anyone may give a verdict on their own idea.
   const block: IdeaVerdictBlock = idea.status !== "open" ? "closed" : null;
@@ -157,6 +166,7 @@ export default async function IdeaPage({ params, searchParams }: {
         {/* MAIN COLUMN */}
         <div className="flex min-w-0 flex-[999_1_600px] flex-col gap-5">
           <NextStepBar step={nextStep} />
+          {securityView ? <SecurityFindingPanel view={securityView} canDisclose={securityAdmin} kind="idea" /> : null}
           <ReportSummary summary={idea.summary} />
           {idea.status === "archived" && idea.archiveEvidence ? (
             <section className="rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-6" data-testid="idea-archive-evidence">

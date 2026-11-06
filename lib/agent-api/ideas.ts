@@ -16,7 +16,7 @@ import {
   toPage,
   type IssueCursor,
 } from "@/lib/agent-api/create-policy";
-import { issueJson, issueProject } from "@/lib/agent-api/issues";
+import { issueJson, issueProject, securityJson } from "@/lib/agent-api/issues";
 import { createBugSchema } from "@/lib/validations/issue";
 import { attachmentIdsInMarkdown, linkAttachments } from "@/lib/attachment-link";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_ITEM, checkAttachment } from "@/lib/attachments";
@@ -29,6 +29,7 @@ import { workflowFor } from "@/lib/workflow";
 import { ideaVoteTotals, NO_VOTES } from "@/lib/idea-vote-totals";
 import { agentAttachmentUrl } from "@/lib/agent-api/attachment-read";
 import { convertVettedIdea } from "@/lib/agent-api/idea-verdicts";
+import { agentFindingViewer, createFinding, findingForIdea, placeholderTitle, type FindingViewer, PLACEHOLDER_DESCRIPTION, PLACEHOLDER_SUMMARY, SECURITY_SEVERITIES } from "@/lib/security-findings";
 
 /** How many ideas one person's agents may file as already vetted in 24 hours. */
 export const VETTED_IDEAS_PER_DAY = 5;
@@ -60,6 +61,12 @@ export const createIdeaSchema = createBugSchema
     attachmentIds: attachmentIdsSchema,
     // Up to three plain lines a person can read at a glance (#report-summary).
     summary: reportSummarySchema,
+    /**
+     * #security-findings: file it as a private security finding. The idea and its issue show a
+     * placeholder; the title, summary, description and files are readable only by the owner,
+     * workspace owners and admins and security-cleared agents until the fix is live.
+     */
+    security: z.object({ severity: z.enum(SECURITY_SEVERITIES) }).strict().optional(),
   })
   .strict();
 
@@ -164,7 +171,7 @@ export async function findIdea(scope: Scope, ref: string) {
   });
 }
 
-export async function readAgentIdea(scope: Scope, ref: string) {
+export async function readAgentIdea(scope: Scope, ref: string, viewer: FindingViewer | null = null) {
   const found = await findIdea(scope, ref);
   if (!found) throw new IssueApiError(404, "Idea not found.");
   const [idea, { ideaThreshold }] = await Promise.all([
@@ -183,7 +190,13 @@ export async function readAgentIdea(scope: Scope, ref: string) {
   const votes = (await ideaVoteTotals(prisma, [idea.id])).get(idea.id) ?? NO_VOTES;
   const json = ideaJson(idea, ideaThreshold) as ReturnType<typeof ideaJson> & { attachments: typeof idea.attachments };
   // #722: each file with the URL an agent reads it from, with its key.
-  return { ...json, attachments: idea.attachments.map((file) => ({ ...file, url: agentAttachmentUrl(file.id) })), votes };
+  return {
+    ...json,
+    attachments: idea.attachments.map((file) => ({ ...file, url: agentAttachmentUrl(file.id) })),
+    votes,
+    // #security-findings: null for an ordinary idea.
+    security: securityJson(await findingForIdea(idea.id), viewer),
+  };
 }
 
 async function normalizeTenantMentions(db: Prisma.TransactionClient, tenantId: string, body: string) {
@@ -198,18 +211,19 @@ async function normalizeTenantMentions(db: Prisma.TransactionClient, tenantId: s
 async function linkAgentIdeaAttachments(
   tx: Prisma.TransactionClient,
   agent: AgentContext,
-  input: { requested?: string[]; text: string; ideaId: string },
+  input: { requested?: string[]; text: string } & ({ ideaId: string } | { securityFindingId: string }),
 ): Promise<void> {
+  const target = "securityFindingId" in input ? { securityFindingId: input.securityFindingId } : { ideaId: input.ideaId };
   const requested = [...new Set(input.requested ?? [])];
   if (requested.length > 0) {
-    const linked = await linkAttachments(tx, { ids: requested, uploaderId: agent.ownerId, ideaId: input.ideaId });
+    const linked = await linkAttachments(tx, { ids: requested, uploaderId: agent.ownerId, ...target });
     if (linked !== requested.length) {
       throw new IssueApiError(422, "One or more attachmentIds weren't found, belong to someone else, or are already attached.");
     }
   }
   const referenced = attachmentIdsInMarkdown(input.text).filter((id) => !requested.includes(id));
   if (referenced.length > 0) {
-    await linkAttachments(tx, { ids: referenced, uploaderId: agent.ownerId, ideaId: input.ideaId });
+    await linkAttachments(tx, { ids: referenced, uploaderId: agent.ownerId, ...target });
   }
 }
 
@@ -303,7 +317,9 @@ async function createIdeaFromBody(agent: AgentContext, request: NextRequest, bod
       : {}),
     ...(digests.length ? { files: [...digests].sort() } : {}),
     ...(input.areaId ? { areaId: input.areaId } : {}),
+    ...(input.security ? { security: input.security.severity } : {}),
   });
+  const severity = input.security?.severity ?? null;
   const result = await createIdeaWithPolicy({
     agent,
     projectId: scope.projectId,
@@ -311,7 +327,8 @@ async function createIdeaFromBody(agent: AgentContext, request: NextRequest, bod
     requestHash,
     title: input.title,
     typeId: input.typeId,
-    acknowledgeSimilar: input.acknowledgeSimilar,
+    // Every private finding shows the same placeholder title, so the title check would only match other findings.
+    acknowledgeSimilar: severity ? true : input.acknowledgeSimilar,
     insert: async (tx, policy) => {
       const member = await tx.membership.findUnique({
         where: { tenantId_userId: { tenantId: scope.tenantId, userId: beneficiaryUserId } },
@@ -329,23 +346,41 @@ async function createIdeaFromBody(agent: AgentContext, request: NextRequest, bod
         data: {
           ...scope,
           typeId: policy.typeId,
-          title: input.title,
-          summary: input.summary,
-          description,
+          title: severity ? placeholderTitle(severity) : input.title,
+          summary: severity ? PLACEHOLDER_SUMMARY : input.summary,
+          description: severity ? PLACEHOLDER_DESCRIPTION : description,
           areaId,
-          proofLinks: input.proofLinks,
+          // Proof links can point at the exploit, so a private finding keeps them in its description.
+          proofLinks: severity ? [] : input.proofLinks,
           reporterId: beneficiaryUserId,
           beneficiaryUserId,
           createdByAgentId: agent.agentId,
         },
         select: { id: true, number: true },
       });
-      await linkAgentIdeaAttachments(tx, agent, { requested: input.attachmentIds, text: description, ideaId: idea.id });
+      const finding = severity
+        ? await createFinding(tx, {
+            ...scope,
+            ideaId: idea.id,
+            reporterId: beneficiaryUserId,
+            severity,
+            title: input.title,
+            summary: input.summary,
+            description: input.proofLinks.length
+              ? `${description}\n\n**Proof links**\n${input.proofLinks.map((link) => `- ${link}`).join("\n")}`
+              : description,
+          })
+        : null;
+      await linkAgentIdeaAttachments(tx, agent, {
+        requested: input.attachmentIds,
+        text: description,
+        ...(finding ? { securityFindingId: finding.id } : { ideaId: idea.id }),
+      });
       await audit(agent, "idea.created", `idea:${idea.id}`, { beneficiaryUserId, number: idea.number }, { db: tx });
       await publish(tx, {
         tenantId: scope.tenantId,
         type: "idea.created",
-        payload: { ideaId: idea.id, ideaNumber: idea.number, projectId: scope.projectId, beneficiaryUserId },
+        payload: { ideaId: idea.id, ideaNumber: idea.number, projectId: scope.projectId, beneficiaryUserId, ...(severity ? { security: { severity } } : {}) },
         actorAgentId: agent.agentId,
         projectId: scope.projectId,
       });
@@ -360,7 +395,7 @@ async function createIdeaFromBody(agent: AgentContext, request: NextRequest, bod
   });
   if (result.status !== 200 && result.status !== 201) return NextResponse.json(result, { status: result.status });
   // A reused key can refer to another project; never return an out-of-scope idea.
-  const idea = await readAgentIdea(scope, result.ideaId);
+  const idea = await readAgentIdea(scope, result.ideaId, await agentFindingViewer(agent));
   return NextResponse.json({ idea, replayed: result.replayed, ...(input.alreadyVetted ? { converted: converted ?? (idea.issueId && idea.issueNumber ? { issueId: idea.issueId, issueNumber: idea.issueNumber } : null) } : {}) }, { status: result.status });
 }
 

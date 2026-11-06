@@ -106,6 +106,7 @@ import {
 } from "@/lib/agent-mentions";
 import { ideaPath, refOf } from "@/lib/project-paths";
 import { ENTRY_SUBSTATUS, moveTo } from "@/lib/issue-substatus";
+import { createFinding, isSecuritySeverity, placeholderTitle, PLACEHOLDER_DESCRIPTION, PLACEHOLDER_SUMMARY, isPrivateFinding, PRIVATE_FINDING_EDIT_MESSAGE } from "@/lib/security-findings";
 
 export type ActionResult = {
   error?: string;
@@ -261,9 +262,18 @@ export async function createBugAction(
   const areaId = parsed.data.areaId && parsed.data.areaId.length > 0
     ? parsed.data.areaId
     : null;
+  // #security-findings: a private security report. Its details go to SecurityFinding and
+  // the idea keeps a placeholder, so nothing else in Ziki can show them before the fix is live.
+  const security = formData.get("security") === "on" || formData.get("security") === "true";
+  const rawSeverity = formData.get("severity");
+  if (security && !isSecuritySeverity(rawSeverity)) {
+    return fieldError("severity", "Choose how serious it is: Critical, High, Medium or Low.");
+  }
+  const severity = security && isSecuritySeverity(rawSeverity) ? rawSeverity : null;
   // #idea-intake: Claude writes what they typed up as a clear idea (title and the standard
   // headings) before it is saved. Without the key, or if that fails, it is saved as typed.
-  const structured = await structureIdea({ title: parsed.data.title, description: parsed.data.description });
+  // A security report is saved as typed: its details are not sent to any outside service.
+  const structured = severity ? null : await structureIdea({ title: parsed.data.title, description: parsed.data.description });
   const ideaTitle = structured?.title ?? parsed.data.title;
   // #502: mentions resolve only to members of the idea's tenant.
   const description = await resolveTenantMentions(prisma, tenantId, structured?.description ?? parsed.data.description);
@@ -285,16 +295,31 @@ export async function createBugAction(
           projectId,
           beneficiaryUserId: userId,
           reporterId: userId,
-          title: ideaTitle,
-          description,
+          title: severity ? placeholderTitle(severity) : ideaTitle,
+          description: severity ? PLACEHOLDER_DESCRIPTION : description,
+          ...(severity ? { summary: PLACEHOLDER_SUMMARY } : {}),
           typeId,
-          proofLinks: parsed.data.proofLinks,
+          // Proof links can point at the exploit, so a private finding keeps them in its description.
+          proofLinks: severity ? [] : parsed.data.proofLinks,
           areaId,
         },
         select: { id: true, number: true },
       });
+      const finding = severity
+        ? await createFinding(tx, {
+            tenantId,
+            projectId,
+            ideaId: created.id,
+            reporterId: userId,
+            severity,
+            title: ideaTitle,
+            description: parsed.data.proofLinks.length
+              ? `${description}\n\n**Proof links**\n${parsed.data.proofLinks.map((link) => `- ${link}`).join("\n")}`
+              : description,
+          })
+        : null;
       // Files uploaded while writing the report (#215), and images pasted
-      // or dropped into the description (#305).
+      // or dropped into the description (#305). A finding's files stay with the finding.
       await linkAttachments(tx, {
         ids: [
           ...new Set([
@@ -303,7 +328,7 @@ export async function createBugAction(
           ]),
         ],
         uploaderId: userId,
-        ideaId: created.id,
+        ...(finding ? { securityFindingId: finding.id } : { ideaId: created.id }),
       });
       // #600 / #534: agents hear about ideas people file.
       await publish(tx, {
@@ -317,6 +342,7 @@ export async function createBugAction(
           reporterId: userId,
           beneficiaryUserId: userId,
           isReport,
+          ...(severity ? { security: { severity } } : {}),
           actor: { kind: "user", id: userId, name: user.name ?? null },
         },
       });
@@ -932,6 +958,10 @@ export async function editBugContentAction(
 
   if (!existing || existing.isDeleted) {
     return { error: TICKET_EDIT_ERRORS.notFound };
+  }
+  // #security-findings: the shared row of a private finding only ever holds the placeholder.
+  if (await isPrivateFinding({ bugId: existing.id })) {
+    return { error: PRIVATE_FINDING_EDIT_MESSAGE };
   }
 
   if (

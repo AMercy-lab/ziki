@@ -91,6 +91,8 @@ import { canAssignTicket } from "@/lib/ticket-assignment";
 import { SelfAssignButton } from "@/components/self-assign-button";
 import { IssueActionsMenu } from "@/components/issue-actions-menu";
 import { EditableIssueDescription } from "@/components/editable-issue-description";
+import { SecurityFindingPanel } from "@/components/security-finding-panel";
+import { findingForBug, findingView } from "@/lib/security-findings";
 import { IssueLinks } from "@/components/issue-links";
 import { NextStepBar } from "@/components/next-step-bar";
 import { liveCheck, liveConfirmLabel, liveFactLabel, liveNextStep, liveStepState } from "@/lib/live-check";
@@ -404,6 +406,11 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     return issueLoadError(loadedBug.reference);
   }
   const bug = loadedBug.bug;
+  // #security-findings: the private details, shown only to who may see them.
+  const securityFinding = bug ? await findingForBug(bug.id) : null;
+  const securityView = bug && securityFinding
+    ? findingView(securityFinding, { kind: "person", userId: user.id, tenantId: bug.tenantId, tenantAdmin: access.admin })
+    : null;
 
   if (!bug || (bug.isDeleted && !canDelete)) {
     notFound();
@@ -1232,12 +1239,13 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
         <div className="flex min-w-0 flex-[999_1_600px] flex-col gap-5">
           {/* #1446: the progress report's stage filters the Conversation (#186). */}
           <IssueStageProvider initialStage={currentStage}>
+          {securityView ? <SecurityFindingPanel view={securityView} canDisclose={access.admin} kind="issue" /> : null}
           <EditableIssueDescription
             bugId={bug.id}
             initialTitle={bug.title}
             initialDescription={bug.description}
             summary={bug.summary}
-            canEdit={canEdit}
+            canEdit={canEdit && !(securityView && !securityView.disclosed)}
             users={users}
             lastEditedAt={lastRevision?.editedAt ?? null}
             historyHref={issueHref(bug, "/history")}

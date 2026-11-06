@@ -92,6 +92,7 @@ export const AGENT_EVENT_TYPES = [
   "redesign.proposed",
   "review.completed",
   "review.requested",
+  "security.disclosed",
 ] as const;
 
 export type AgentEventType = (typeof AGENT_EVENT_TYPES)[number];

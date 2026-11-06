@@ -215,6 +215,7 @@ enum GoalAllocationTarget {
 
 model User {
   id                        String                  @id @default(cuid())
+  securityFindingsReported  SecurityFinding[]       @relation("SecurityFindingReporter")
   name                      String
   email                     String                  @unique
   /// Null for Google-only accounts; required for credentials login/signup.
@@ -328,6 +329,8 @@ model IssueType {
 
 model Bug {
   pullRequestLinkRepairs    PullRequestLinkRepair[]
+  /// The private details when this issue is a security finding (#security-findings).
+  securityFinding           SecurityFinding?
   id                        String                  @id @default(cuid())
   /// Human-readable reference (#1, #2, ...), counted per tenant (#517). The
   /// database trigger `Bug_assign_tenant_number` replaces the sequence value
@@ -594,11 +597,15 @@ model Attachment {
   comment            Comment?           @relation(fields: [commentId], references: [id], onDelete: Cascade)
   confirmation       IssueConfirmation? @relation(fields: [confirmationId], references: [id], onDelete: Cascade)
   redesignProposal   RedesignProposal?  @relation(fields: [redesignProposalId], references: [id], onDelete: Cascade)
+  /// Evidence filed with a private security finding (#security-findings): readable only by who may see the finding.
+  securityFindingId  String?
+  securityFinding    SecurityFinding?   @relation(fields: [securityFindingId], references: [id], onDelete: Cascade)
 
   @@index([bugId])
   @@index([ideaId])
   @@index([commentId])
   @@index([confirmationId])
+  @@index([securityFindingId])
   @@index([redesignProposalId])
   @@index([uploaderId, createdAt])
 }
@@ -685,6 +692,8 @@ model RateLimitHit {
 /// An organisation on Ziki. Zedu is the first.
 model Tenant {
   id                 String              @id @default(cuid())
+  /// Private security findings reported in this organisation (#security-findings).
+  securityFindings   SecurityFinding[]
   slug               String              @unique
   name               String
   description        String?             @db.VarChar(500)
@@ -726,6 +735,7 @@ model Tenant {
 /// Organisations hold projects and nothing in between (#no-platforms).
 model Project {
   agentNotes            AgentNote[]
+  securityFindings      SecurityFinding[]
   id                    String                @id @default(cuid())
   tenantId              String
   slug                  String
@@ -983,6 +993,8 @@ model Agent {
   /// The robot avatar its owner picked, a key from lib/agents/avatars.ts.
   /// Null means the automatic one drawn from the agent's id.
   avatar               String?
+  /// A workspace owner or admin cleared it to read private security findings (#security-findings).
+  securityCleared      Boolean               @default(false)
   /// Global standing (#agent-reputation): down for each penalty on its confirmations, up for each upvote on its comments.
   reputation           Int                   @default(0)
   /// Its handle and slug (#agent-profile): shown as @username and the address of
@@ -1386,6 +1398,8 @@ enum IdeaStatus {
 /// apart from issues, per tenant.
 model Idea {
   id                 String           @id @default(cuid())
+  /// The private details when this idea is a security finding (#security-findings).
+  securityFinding    SecurityFinding?
   /// Idea #1, #2, ... per tenant. The trigger `Idea_assign_tenant_number`
   /// replaces the sequence value with `Tenant.nextIdeaNumber`.
   number             Int              @default(autoincrement())
@@ -2513,4 +2527,46 @@ model AgentPicture {
   data        Bytes
   updatedAt   DateTime @updatedAt
   agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+/// How serious a security finding is (#security-findings), worst first.
+enum SecuritySeverity {
+  critical
+  high
+  medium
+  low
+}
+
+/// The private half of a security finding (#security-findings). The idea and
+/// the issue it becomes carry only a placeholder title and description, so
+/// lists, search, the work feed, events and webhooks never see the details.
+/// They live here, readable by the reporter, workspace owners and admins and
+/// security-cleared agents, until the fix is live and the finding is disclosed:
+/// then the real title and description are copied onto the idea and issue.
+model SecurityFinding {
+  id            String           @id @default(cuid())
+  tenantId      String
+  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId     String
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ideaId        String?          @unique
+  idea          Idea?            @relation(fields: [ideaId], references: [id], onDelete: SetNull)
+  bugId         String?          @unique
+  bug           Bug?             @relation(fields: [bugId], references: [id], onDelete: SetNull)
+  reporterId    String
+  reporter      User             @relation("SecurityFindingReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  severity      SecuritySeverity
+  title         String
+  summary       String?
+  description   String
+  /// When the details were made public; null while the finding is private.
+  disclosedAt   DateTime?
+  /// Who disclosed it early, or null when it was disclosed because the fix went live.
+  disclosedById String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  attachments   Attachment[]
+
+  @@index([tenantId, disclosedAt])
+  @@index([projectId])
 }
