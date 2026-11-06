@@ -4,6 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { projectFirstTarget, requireOrg } from "@/lib/project-route";
 import { ideasPath, orgHomePath, projectRef } from "@/lib/project-paths";
 import { ProjectBreadcrumb } from "@/components/project-breadcrumb";
+import { isTenantAdmin } from "@/lib/agents/membership";
 import { HEALTH_LABEL, projectHealthFor, type CheckState, type HealthStatus } from "@/lib/project-health";
 
 type Props = {
@@ -52,6 +53,7 @@ export default async function OrganisationProjectsPage({ params, searchParams }:
     notFound();
   }
   const tenantId = tenant.id;
+  const canManage = await isTenantAdmin(user, tenantId);
   const rawFilter = (await searchParams).health;
   const filter = FILTERS.find((f) => f.value && f.value === (Array.isArray(rawFilter) ? rawFilter[0] : rawFilter))?.value ?? null;
 
@@ -69,11 +71,21 @@ export default async function OrganisationProjectsPage({ params, searchParams }:
     <>
     <ProjectBreadcrumb project={{ orgSlug: tenant.slug }} />
     <div className="mx-auto w-full max-w-6xl space-y-5">
-      <header>
-        <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">Projects</h1>
-        <p className="mt-1 text-sm text-zk-text2">
-          {tenant.name}: health is scored from 0 to 100 from six checks on each project&apos;s work, as of now.
-        </p>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">Projects</h1>
+          <p className="mt-1 text-sm text-zk-text2">
+            {tenant.name}: health is scored from 0 to 100 from six checks on each project&apos;s work, as of now.
+          </p>
+        </div>
+        {canManage ? (
+          <Link
+            href={`/${tenant.slug}/projects/new`}
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-electric-blue-strong px-4 text-xs font-bold text-white shadow-sm transition hover:brightness-110"
+          >
+            + Create Project
+          </Link>
+        ) : null}
       </header>
 
       <nav aria-label="Filter by health" className="grid grid-cols-2 gap-3 lg:grid-cols-4">

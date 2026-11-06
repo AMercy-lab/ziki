@@ -107,8 +107,16 @@ export default async function AppLayout({
     tenantId = await currentTenantIdFor(user.id);
     activeTenantId = tenantId;
     const memberships = await tenantsForUser(prisma, user.id, user.role);
-    membershipRole = memberships.find((tenant) => tenant.id === tenantId)?.role ?? null;
     const activeWorkspaces = memberships.filter((tenant) => tenant.archivedAt === null);
+
+    const pathSegments = requestPath.split("/").filter(Boolean);
+    const routeOrg = pathSegments[0] ? decodeURIComponent(pathSegments[0]) : null;
+    const matchedOrg = routeOrg ? activeWorkspaces.find((t) => t.slug === routeOrg) : null;
+    if (matchedOrg) {
+      tenantId = matchedOrg.id;
+      activeTenantId = matchedOrg.id;
+    }
+    membershipRole = memberships.find((tenant) => tenant.id === tenantId)?.role ?? null;
     const workspaceTenantIds = activeWorkspaces.map((t) => t.id);
 
     const [workspaceProjects, userProjectMemberships] = await Promise.all([
@@ -123,7 +131,6 @@ export default async function AppLayout({
           project: {
             archivedAt: null,
             tenant: { archivedAt: null },
-            ...(tenantId ? { tenantId: { not: tenantId } } : {}),
           },
         },
         select: {
@@ -141,7 +148,9 @@ export default async function AppLayout({
     ]);
 
     const projectsByTenant = new Map<string, Array<{ id: string; name: string; slug: string }>>();
+    const workspaceProjectIds = new Set<string>();
     for (const p of workspaceProjects) {
+      workspaceProjectIds.add(p.id);
       const list = projectsByTenant.get(p.tenantId) ?? [];
       list.push({ id: p.id, name: p.name, slug: p.slug });
       projectsByTenant.set(p.tenantId, list);
@@ -154,14 +163,16 @@ export default async function AppLayout({
       projects: projectsByTenant.get(tenant.id) ?? [],
     }));
 
-    externalProjects = userProjectMemberships.map((m) => ({
-      id: m.project.id,
-      name: m.project.name,
-      slug: m.project.slug,
-      tenantId: m.project.tenantId,
-      tenantName: m.project.tenant.name,
-      tenantSlug: m.project.tenant.slug,
-    }));
+    externalProjects = userProjectMemberships
+      .filter((m) => !workspaceProjectIds.has(m.project.id))
+      .map((m) => ({
+        id: m.project.id,
+        name: m.project.name,
+        slug: m.project.slug,
+        tenantId: m.project.tenantId,
+        tenantName: m.project.tenant.name,
+        tenantSlug: m.project.tenant.slug,
+      }));
   } catch (error) {
     console.error("[layout] workspace context failed", error);
   }

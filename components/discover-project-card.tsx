@@ -48,12 +48,12 @@ export function DiscoverProjectCard({ project }: { project: DiscoverableProject 
               </h3>
             </div>
             {project.isOpenForContributors ? (
-              <Badge className="shrink-0 rounded-full border border-zk-accent/30 bg-zk-tint text-[11px] font-semibold text-zk-accent">
+              <Badge className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-[11px] font-semibold text-emerald-400">
                 Open for Contributors
               </Badge>
             ) : (
-              <Badge className="shrink-0 rounded-full border border-zk-border bg-zk-chip text-[11px] text-zk-text2">
-                Public View
+              <Badge className="shrink-0 rounded-full border border-zk-border bg-zk-chip text-[11px] font-medium text-zk-text2">
+                Not open for now
               </Badge>
             )}
           </div>
@@ -115,20 +115,27 @@ export function DiscoverProjectCard({ project }: { project: DiscoverableProject 
 
           <div>
             {currentStatus === "guest" ? (
-              <Link href={`/login?callbackUrl=${encodeURIComponent("/discover")}`}>
+              project.isOpenForContributors ? (
+                <Link href={`/login?callbackUrl=${encodeURIComponent("/discover")}`}>
+                  <Button
+                    variant="primary"
+                    className="text-xs font-semibold"
+                  >
+                    Sign in to Join
+                  </Button>
+                </Link>
+              ) : (
                 <Button
-                  className={`text-xs ${
-                    project.isOpenForContributors
-                      ? "bg-electric-blue-strong text-white hover:brightness-110 font-bold"
-                      : "border border-zk-border bg-zk-surface text-zk-text hover:bg-zk-chip font-medium"
-                  }`}
+                  variant="secondary"
+                  disabled
+                  className="text-xs font-medium opacity-60"
                 >
-                  {project.isOpenForContributors ? "Sign in to Join" : "Sign in to View"}
+                  Not open for now
                 </Button>
-              </Link>
+              )
             ) : currentStatus === "member" ? (
               <Link href={projectPath(projectRef(project.tenant.slug, project.slug))}>
-                <Button className="border border-zk-border bg-zk-surface text-zk-text hover:bg-zk-chip text-xs font-medium">
+                <Button variant="secondary" className="text-xs font-medium">
                   Open Project →
                 </Button>
               </Link>
@@ -152,17 +159,20 @@ export function DiscoverProjectCard({ project }: { project: DiscoverableProject 
               </span>
             ) : project.isOpenForContributors ? (
               <Button
+                variant="primary"
                 onClick={() => setModalOpen(true)}
-                className="bg-electric-blue-strong text-white hover:brightness-110 text-xs font-bold shadow-sm"
+                className="text-xs font-bold"
               >
                 {currentStatus === "rejected" ? "Re-apply to Join" : "Request to Join"}
               </Button>
             ) : (
-              <Link href={projectPath(projectRef(project.tenant.slug, project.slug))}>
-                <Button className="border border-zk-border bg-zk-surface text-zk-text hover:bg-zk-chip text-xs font-medium">
-                  Browse Issues
-                </Button>
-              </Link>
+              <Button
+                variant="secondary"
+                disabled
+                className="text-xs font-medium opacity-60"
+              >
+                Not open for now
+              </Button>
             )}
           </div>
         </div>

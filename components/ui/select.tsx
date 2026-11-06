@@ -7,7 +7,7 @@ export function Select({
 }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`w-full rounded-lg border border-slate-300 bg-card px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20 ${className}`}
+      className={`w-full cursor-pointer rounded-lg border border-zk-border bg-zk-surface px-3 py-2 text-sm text-zk-text shadow-sm focus:border-zk-accent focus:outline-none focus:ring-2 focus:ring-zk-accent/20 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
       {...props}
     >
       {children}

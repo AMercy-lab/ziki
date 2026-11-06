@@ -219,11 +219,32 @@ export async function createProjectAction(
   formData: FormData,
 ): Promise<ProjectActionResult> {
   const user = await requireUser();
-  const tenantId = await currentTenantIdFor(user.id);
+  const requestedOrgSlug = (formData.get("orgSlug") as string | null)?.trim();
+  let tenantId = await currentTenantIdFor(user.id);
+  if (requestedOrgSlug) {
+    const tenantBySlug = await prisma.tenant.findUnique({
+      where: { slug: requestedOrgSlug },
+      select: { id: true, slug: true },
+    });
+    if (tenantBySlug) {
+      tenantId = tenantBySlug.id;
+    }
+  }
   if (!tenantId) return { error: NO_TENANT_MESSAGE };
+  if (!(await isTenantAdmin(user, tenantId))) {
+    return { error: "Only organization owners and admins can create projects." };
+  }
 
   const parsed = projectNameSchema.safeParse({ name: formData.get("name") });
   if (!parsed.success) return fromZodError(parsed.error, "Invalid project name");
+
+  const goal = (formData.get("goal") as string | null)?.trim() || null;
+  const repoUrl = (formData.get("repoUrl") as string | null)?.trim() || null;
+  const siteUrl = (formData.get("siteUrl") as string | null)?.trim() || null;
+  const stagingUrl = (formData.get("stagingUrl") as string | null)?.trim() || null;
+  const visibilityRaw = (formData.get("visibility") as string | null)?.trim();
+  const visibility: "public" | "private" = visibilityRaw === "public" ? "public" : "private";
+  const isOpenForContributors = formData.get("isOpenForContributors") === "true" || formData.get("isOpenForContributors") === "on";
 
   const existing = await prisma.project.findMany({
     where: { tenantId },
@@ -244,6 +265,12 @@ export async function createProjectAction(
         tenantId,
         name: parsed.data.name,
         slug,
+        goal,
+        repoUrl,
+        siteUrl,
+        stagingUrl,
+        visibility,
+        isOpenForContributors,
         rewardConfig: rewardConfig ?? undefined,
         workflow: { create: {} },
       },

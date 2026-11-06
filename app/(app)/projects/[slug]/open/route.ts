@@ -57,6 +57,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     return redirectTo("/");
   }
 
-  await setActiveTenantCookie(tenantId);
+  if (isOrgMember || isSuper) {
+    await setActiveTenantCookie(tenantId);
+  }
   return redirectTo(safeNext(url.searchParams.get("next"), projectPath(refOf(targetProject))));
 }

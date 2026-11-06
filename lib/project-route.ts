@@ -116,7 +116,7 @@ export const requireProject = cache(async (orgParam: string, projectParam: strin
   const canContribute = isOrgMember || isProjectMember || user.role === "super_admin";
 
   const ref = projectRef(orgSlug, project.slug);
-  if (project.tenantId !== (await currentTenantIdFor(user.id))) {
+  if (isOrgMember && project.tenantId !== (await currentTenantIdFor(user.id))) {
     // Switch to the project's organisation first, then come back to this page.
     switchTo(project.tenantId, project.slug, await requestPath(projectPath(ref)));
   }

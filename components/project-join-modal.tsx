@@ -61,7 +61,7 @@ export function ProjectJoinModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1 text-zk-muted hover:bg-zk-chip hover:text-zk-text"
+            className="cursor-pointer rounded-full p-1 text-zk-muted hover:bg-zk-chip hover:text-zk-text"
             aria-label="Close"
           >
             ✕

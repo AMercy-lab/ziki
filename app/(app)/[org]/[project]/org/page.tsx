@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { fetchDashboard } from "@/lib/dashboard-queries";
 import { formatDateParam, formatDuration, parseDateRange } from "@/lib/dashboard-range";
@@ -47,7 +48,19 @@ export default async function OrgOverviewPage({
 
   return (
     <div className="space-y-6">
-      <OrgPageHeader title="Overview">
+      <OrgPageHeader
+        title="Overview"
+        actions={
+          org.admin ? (
+            <Link
+              href={`/${(await routeParams).org}/projects/new`}
+              className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-electric-blue-strong px-4 text-xs font-bold text-white shadow-sm transition hover:brightness-110"
+            >
+              + Create Project
+            </Link>
+          ) : null
+        }
+      >
         Issues in {org.name} created between{" "}
         <span className="font-medium text-zk-text">{formatDateParam(range.from)}</span> and{" "}
         <span className="font-medium text-zk-text">

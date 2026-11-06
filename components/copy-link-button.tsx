@@ -59,7 +59,7 @@ export function CopyLinkButton({
         onClick={copy}
         aria-label={`Copy link to this ${label}`}
         title={`Copy link to this ${label}`}
-        className="rounded-sm p-0.5 text-slate-400 transition hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 print:hidden"
+        className="cursor-pointer rounded-sm p-0.5 text-zk-muted transition hover:text-zk-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zk-accent disabled:cursor-not-allowed disabled:opacity-50 print:hidden"
       >
         <LinkIcon className="h-3.5 w-3.5" />
       </button>
@@ -71,7 +71,7 @@ export function CopyLinkButton({
       type="button"
       disabled={pending}
       onClick={copy}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-card px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 print:hidden"
+      className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-zk-border bg-zk-surface px-2.5 py-1 text-xs font-semibold text-zk-text transition hover:bg-zk-chip focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zk-accent disabled:cursor-not-allowed disabled:opacity-50 print:hidden"
     >
       <LinkIcon className="h-3.5 w-3.5" />
       <span>{copied ? "Copied" : "Copy link"}</span>

@@ -52,7 +52,6 @@ async function loadManagers(tenantId: string) {
   );
 }
 
-
 async function loadPendingJoinRequests(tenantId: string) {
   try {
     return await prisma.projectJoinRequest.findMany({
@@ -115,7 +114,9 @@ export default async function OrgInvitesPage() {
               {managers.map((manager) => (
                 <li key={manager.user.id} className="flex items-center gap-2 text-sm text-zk-text">
                   <span className="truncate">{manager.user.name ?? manager.user.email}</span>
-                  <Badge className="rounded-full bg-zk-chip text-zk-text2">{MEMBERSHIP_ROLE_LABELS[manager.role]}</Badge>
+                  <Badge className="rounded-full border border-zk-border bg-zk-chip text-xs font-medium text-zk-text2">
+                    {MEMBERSHIP_ROLE_LABELS[manager.role]}
+                  </Badge>
                 </li>
               ))}
             </ul>
@@ -143,7 +144,7 @@ export default async function OrgInvitesPage() {
             Project Join Requests
           </h3>
           {pendingRequests.length > 0 ? (
-            <Badge className="rounded-full bg-zk-tint text-xs font-semibold text-zk-accent">
+            <Badge className="rounded-full border border-amber-500/30 bg-amber-500/10 text-xs font-semibold text-amber-400">
               {pendingRequests.length} pending
             </Badge>
           ) : null}
@@ -170,7 +171,7 @@ export default async function OrgInvitesPage() {
                       Applied to collaborate on{" "}
                       <Link
                         href={projectPath(projectRef(req.project.tenant.slug, req.project.slug))}
-                        className="font-medium text-zk-accent hover:underline"
+                        className="font-medium text-zk-accent hover:underline cursor-pointer"
                       >
                         {req.project.name}
                       </Link>{" "}
@@ -182,7 +183,7 @@ export default async function OrgInvitesPage() {
                       <input type="hidden" name="requestId" value={req.id} />
                       <button
                         type="submit"
-                        className="inline-flex items-center justify-center rounded-full bg-teal-700 px-3.5 py-1.5 text-xs font-medium text-white transition hover:bg-teal-800"
+                        className="inline-flex cursor-pointer items-center justify-center rounded-full bg-electric-blue-strong px-4 py-1.5 text-xs font-bold text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Accept
                       </button>
@@ -214,7 +215,6 @@ export default async function OrgInvitesPage() {
           </ul>
         )}
       </section>
-
 
       <section aria-labelledby="invite-someone" className={orgCard}>
         <h3 id="invite-someone" className="text-base font-semibold text-zk-text">
@@ -284,10 +284,10 @@ export default async function OrgInvitesPage() {
               const who = joinedSummary(link.joinedNames, link.useCount);
               const statusClass =
                 link.state === "open"
-                  ? "bg-zk-tint text-zk-accent ring-1 ring-zk-border"
+                  ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-semibold"
                   : link.state === "revoked"
-                    ? "bg-zk-bad-bg text-zk-bad-fg"
-                    : "bg-zk-chip text-zk-text2";
+                    ? "border border-zk-bad-bd bg-zk-bad-bg text-zk-bad-fg font-semibold"
+                    : "border border-zk-border bg-zk-chip text-zk-text2 font-semibold";
               const name = link.label || "Invite link";
               return (
                 <li key={link.id} className="flex flex-wrap items-start gap-3 py-3">

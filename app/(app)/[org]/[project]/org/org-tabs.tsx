@@ -40,7 +40,7 @@ export function OrgTabs({ pendingJoinCount = 0 }: { pendingJoinCount?: number })
               <Link
                 href={href}
                 aria-current={on ? "page" : undefined}
-                className={`inline-flex min-h-9 items-center whitespace-nowrap rounded-full px-3.5 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue ${
+                className={`inline-flex min-h-9 cursor-pointer items-center whitespace-nowrap rounded-full px-3.5 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue ${
                   on
                     ? "bg-zk-surface font-bold text-zk-text shadow-[0_1px_3px_rgba(21,18,31,0.12)]"
                     : "font-medium text-zk-text2 hover:text-zk-text"
@@ -48,7 +48,7 @@ export function OrgTabs({ pendingJoinCount = 0 }: { pendingJoinCount?: number })
               >
                 {tab.label}
                 {tab.section === "invites" && pendingJoinCount > 0 ? (
-                  <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-zk-accent px-1 text-[10px] font-bold text-white">
+                  <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-electric-blue-strong px-1 text-[10px] font-bold text-white">
                     {pendingJoinCount}
                   </span>
                 ) : null}

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { optionalUser } from "@/lib/auth-helpers";
 import { DiscoverProjectCard, type DiscoverableProject } from "@/components/discover-project-card";
+import { DiscoverFilters } from "@/components/discover-filters";
 
 export const metadata: Metadata = { title: "Discover Projects" };
 
@@ -130,54 +131,25 @@ export default async function DiscoverPage(props: DiscoverPageProps) {
             Explore open projects, find products to contribute to, and collaborate with teams.
           </p>
         </div>
-        <Link
-          href="/tenants"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-zk-accent hover:underline"
-        >
-          ← Back to Workspaces
-        </Link>
+        {user ? (
+          <Link
+            href="/tenants"
+            className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-zk-accent hover:underline"
+          >
+            ← Back to Workspaces
+          </Link>
+        ) : (
+          <Link
+            href={`/login?callbackUrl=${encodeURIComponent("/discover")}`}
+            className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-zk-accent hover:underline"
+          >
+            Sign In →
+          </Link>
+        )}
       </div>
 
       {/* Search and Filters */}
-      <form method="GET" className="flex flex-col gap-3 rounded-[16px] border border-zk-border bg-zk-surface p-4 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <input
-            type="search"
-            name="q"
-            defaultValue={query}
-            placeholder="Search projects by name, goal, or organization..."
-            className="w-full rounded-xl border border-zk-border bg-zk-card py-2 pl-9 pr-3 text-sm text-zk-text placeholder:text-zk-muted focus:border-zk-accent focus:outline-none focus:ring-1 focus:ring-zk-accent"
-          />
-          <svg
-            className="absolute left-3 top-2.5 h-4 w-4 text-zk-muted"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.35-4.35" />
-          </svg>
-        </div>
-
-        <label className="flex cursor-pointer items-center gap-2 whitespace-nowrap text-sm text-zk-text2">
-          <input
-            type="checkbox"
-            name="open"
-            value="true"
-            defaultChecked={openOnly}
-            className="h-4 w-4 rounded border-zk-border text-zk-accent focus:ring-zk-accent"
-          />
-          Open for contributors only
-        </label>
-
-        <button
-          type="submit"
-          className="rounded-xl bg-electric-blue-strong px-5 py-2 text-sm font-bold text-white shadow-sm transition hover:brightness-110 focus:outline-none"
-        >
-          Search
-        </button>
-      </form>
+      <DiscoverFilters initialQuery={query} initialOpenOnly={openOnly} />
 
       {/* Project Grid */}
       {cardsData.length === 0 ? (
