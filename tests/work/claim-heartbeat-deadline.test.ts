@@ -10,7 +10,7 @@ const db = vi.hoisted(() => ({
   issueClaim: { findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), count: vi.fn(), create: vi.fn(), groupBy: vi.fn() },
   membership: { findMany: vi.fn() },
   agentQuestion: { findFirst: vi.fn(), updateMany: vi.fn() },
-  bug: { updateMany: vi.fn(), findFirst: vi.fn() }, $queryRaw: vi.fn(), $transaction: vi.fn(),
+  bug: { updateMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn() }, $queryRaw: vi.fn(), $transaction: vi.fn(),
 }));
 const mocks = vi.hoisted(() => ({ admin: vi.fn(), budget: vi.fn(), notifyLater: vi.fn(), workflow: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
@@ -162,6 +162,15 @@ describe("stale claim release", () => {
     expect(db.issueClaim.update).not.toHaveBeenCalled();
   });
 
+});
+
+describe("reopen alerts from the in-process cron", () => {
+  it("delivers without a request instead of throwing and ending the sweep", async () => {
+    const { notifyLater } = await vi.importActual<typeof import("@/lib/notify")>("@/lib/notify");
+    db.bug.findUnique.mockResolvedValue(null);
+    expect(() => notifyLater({ kind: "status_changed", actorId: "ziki-system", actorName: "Ziki", bugId: "issue", bugTitle: "Bug", reporterId: "reporter", from: "in_progress", to: "open" })).not.toThrow();
+    await vi.waitFor(() => expect(db.bug.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "issue" } })));
+  });
 });
 
 describe("claim release countdown", () => {

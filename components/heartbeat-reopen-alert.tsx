@@ -85,7 +85,8 @@ export function HeartbeatReopenAlert({
           <p className="m-0 text-sm font-semibold text-zk-text">
             {paused ? (isIssueOwner ? "Waiting for your answer" : "Waiting for the issue owner") : expired ? "Checking for reopening..." : "Bidding may reopen in"}
           </p>
-          {deadline !== null && !expired && !paused ? (
+          {/* `now` is 0 until the first tick: no countdown in the server HTML. */}
+          {deadline !== null && !expired && !paused && now > 0 ? (
             <time className="mt-0.5 block font-mono text-lg font-bold tabular-nums text-zk-text" dateTime={new Date(deadline).toISOString()}>
               {formatCountdown(deadline - now)}
             </time>
