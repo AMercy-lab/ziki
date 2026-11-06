@@ -31,6 +31,7 @@ import { POST as acknowledge } from "@/app/api/v1/issues/[id]/steer/[steerId]/ac
 import { setAgentPaused, sendIssueSteer } from "@/app/actions/agent-steering";
 import { agentIssueRequest } from "@/lib/agent-api/issues";
 import { currentHold } from "@/lib/issue-holders";
+import { staleHold } from "@/lib/agent-api/stale-hold";
 import { classifyAgentStatus, isClaimStalled } from "@/lib/dashboard-overview";
 
 const now = new Date("2026-10-19T12:00:00Z");
@@ -329,6 +330,7 @@ describe("owner pause and steering", () => {
     expect(await setAgentPaused("agent", true)).toEqual({ ok: true });
     expect(db.issueClaim.updateMany).toHaveBeenCalledWith({ where: { agentId: "agent", status: "offered", releasedAt: null },
       data: { status: "released", releasedAt: now, releaseReason: "paused" } });
+    expect(db.agentEvent.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ type: "claim.released", bugId: "issue", tenantId: "tenant" }) }));
     expect(db.issueClaim.update).not.toHaveBeenCalled();
     db.agent.findFirst.mockResolvedValue({ id: "agent", pausedAt: now });
     db.agent.update.mockClear();
@@ -346,11 +348,20 @@ describe("owner pause and steering", () => {
   });
 
   it("keeps owner identity and pause metadata out of the shared holder API view", async () => {
-    db.issueClaim.findFirst.mockResolvedValue({ ...claim, agent: { id: "agent", name: "Agent", ownerUserId: "private", pausedAt: now },
-      beneficiary: { name: "Owner" }, dispatcher: null, awardedBid: null, offeredAt: null, deliverBy: null });
+    db.issueClaim.findFirst.mockResolvedValue({ ...claim, agent: { name: "Agent", ownerUserId: "private", pausedAt: now },
+      beneficiary: { name: "Owner" }, dispatcher: null, awardedBid: null, offeredAt: null, deliverBy: null, bug: { projectId: "project", pullRequestUrl: null } });
     const holder = await currentHold("issue");
     expect(holder).toMatchObject({ agentName: "Agent", status: "active" });
     expect(holder).not.toHaveProperty("ownerUserId");
     expect(holder).not.toHaveProperty("pausedAt");
+    expect(holder).not.toHaveProperty("agentId");
+  });
+
+  it("does not report a paused agent's silent claim as stale", async () => {
+    const silent = { ...claim, status: "active", offeredAt: null, deliverBy: null, waitingOnOwnerSince: null, bug: { projectId: "project", pullRequestUrl: null, status: "in_progress" } };
+    db.issueClaim.findFirst.mockResolvedValue({ ...silent, agent: { pausedAt: now } });
+    await expect(staleHold("issue", now)).resolves.toBeNull();
+    db.issueClaim.findFirst.mockResolvedValue({ ...silent, agent: { pausedAt: null } });
+    await expect(staleHold("issue", now)).resolves.toMatchObject({ kind: "silent" });
   });
 });

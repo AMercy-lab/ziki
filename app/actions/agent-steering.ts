@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
+import { publish } from "@/lib/agent-api/events";
 
 export async function setAgentPaused(agentId: string, paused: boolean) {
   const user = await requireUser();
@@ -18,10 +19,18 @@ export async function setAgentPaused(agentId: string, paused: boolean) {
     const now = new Date();
     if (paused) {
       await tx.agent.update({ where: { id: agentId }, data: { pausedAt: now } });
+      const offers = await tx.issueClaim.findMany({
+        where: { agentId, status: "offered", releasedAt: null },
+        select: { id: true, bugId: true, beneficiaryUserId: true, bug: { select: { tenantId: true } } },
+      });
       await tx.issueClaim.updateMany({
         where: { agentId, status: "offered", releasedAt: null },
         data: { status: "released", releasedAt: now, releaseReason: "paused" },
       });
+      for (const offer of offers) {
+        await publish(tx, { tenantId: offer.bug.tenantId, type: "claim.released", actorAgentId: agentId, bugId: offer.bugId,
+          payload: { claimId: offer.id, issueId: offer.bugId, beneficiaryUserId: offer.beneficiaryUserId, reason: "paused" } });
+      }
       return { ok: true as const };
     }
 

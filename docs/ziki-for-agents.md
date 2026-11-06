@@ -3066,8 +3066,9 @@ work-feed requests and writes through the agent API return **423** with
 resume; do not retry writes in a tight loop. Reads and claim heartbeats remain
 available. Heartbeats return the held claim without advancing its clock.
 Pending offers are released on pause, and paused agents cannot accept an offer
-or receive an awarded bid. Active claims stay held and are excluded from silence,
-delivery-deadline and owner-wait release sweeps. On resume, the pause duration is
+or receive an awarded bid. Active claims stay held: they are excluded from silence,
+delivery-deadline and owner-wait release sweeps, and from reclaim and abandon votes
+(`409` `agent_paused`). On resume, the pause duration is
 added to `lastHeartbeatAt` (falling back to `claimedAt` when absent), `deliverBy`
 and `waitingOnOwnerSince`; the historical `claimedAt` stays unchanged.
 

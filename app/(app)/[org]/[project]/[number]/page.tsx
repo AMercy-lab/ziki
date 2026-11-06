@@ -910,13 +910,23 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
 
   // Comments on the issue itself, at every stage (lib/comment-placement.ts).
   const takesComments = !bug.isDeleted;
-  // Owner-only controls use a separate lookup; holder is also an API view.
-  const steeringAgent = hold?.status === "active" && hold.agentId
-    ? await loadOptional("steering agent", null, () => prisma.agent.findFirst({
-        where: { id: hold.agentId, tenantId: bug.tenantId, ownerUserId: user.id, revokedAt: null },
-        select: { id: true, pausedAt: true },
+  // Looked up here, not on `hold`: holder is also what agents read through the API.
+  const workingAgent = hold?.status === "active"
+    ? await loadOptional("working agent", null, () => prisma.agent.findFirst({
+        where: { tenantId: bug.tenantId, claims: { some: { bugId: bug.id, status: "active", releasedAt: null } } },
+        select: { id: true, ownerUserId: true, revokedAt: true, pausedAt: true },
       }))
     : null;
+  // Owner-only: steering, and what the agent answered.
+  const steeringAgent = workingAgent && workingAgent.ownerUserId === user.id && !workingAgent.revokedAt ? workingAgent : null;
+  const steerNotes = steeringAgent
+    ? await loadOptional("steer notes", [], () => prisma.agentInboxItem.findMany({
+        where: { agentId: steeringAgent.id, bugId: bug.id, eventType: "agent.steer" },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: { id: true, payload: true },
+      }))
+    : [];
   const commentCount = comments.shownThreads + comments.hiddenThreads;
   // #489: the Admin label follows each person's role in this issue's
   // organization, not their account-wide role, the same rule as admin powers.
@@ -1377,7 +1387,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
           {githubPanel ? <GitHubStatusPanel {...githubPanel} /> : null}
 
               {/* Who has the issue, while it is the latest thing (In progress); the timeline below keeps the award after that. */}
-              {hold?.status === "active" && bug.status === "in_progress" ? <AwardBox hold={hold} bugId={bug.id} isWatching={isWatchingIssue} isIssueOwner={bug.reporterId === user.id} /> : null}
+              {hold?.status === "active" && bug.status === "in_progress" ? <AwardBox hold={hold} agentPaused={Boolean(workingAgent?.pausedAt)} bugId={bug.id} isWatching={isWatchingIssue} isIssueOwner={bug.reporterId === user.id} /> : null}
 
               {conversationHasContent ? (
                 <section
@@ -1448,7 +1458,15 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                   className="scroll-mt-24 rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-[22px]"
                 >
                   {steeringAgent ? (
-                    <AgentSteerPanel agentId={steeringAgent.id} issueId={bug.id} paused={steeringAgent.pausedAt !== null} />
+                    <AgentSteerPanel
+                      agentId={steeringAgent.id}
+                      issueId={bug.id}
+                      paused={steeringAgent.pausedAt !== null}
+                      notes={steerNotes.map((note) => {
+                        const payload = (note.payload ?? {}) as { body?: unknown; plan?: unknown };
+                        return { id: note.id, body: String(payload.body ?? ""), plan: typeof payload.plan === "string" ? payload.plan : null };
+                      })}
+                    />
                   ) : null}
                   <IssueComments
                     count={commentCount}

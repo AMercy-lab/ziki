@@ -3,7 +3,13 @@
 import { useState, useTransition } from "react";
 import { sendIssueSteer, setAgentPaused } from "@/app/actions/agent-steering";
 
-export function AgentSteerPanel({ agentId, issueId, paused }: { agentId: string; issueId: string; paused: boolean }) {
+export function AgentSteerPanel({ agentId, issueId, paused, notes }: {
+  agentId: string;
+  issueId: string;
+  paused: boolean;
+  /** Notes already sent, newest first, each with the plan the agent answered with. */
+  notes: { id: string; body: string; plan: string | null }[];
+}) {
   const [body, setBody] = useState("");
   const [notice, setNotice] = useState("");
   const [pending, startTransition] = useTransition();
@@ -26,6 +32,16 @@ export function AgentSteerPanel({ agentId, issueId, paused }: { agentId: string;
           <button disabled={pending} className="rounded-full bg-electric-blue-strong px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Sending…" : "Send steer"}</button>
         </div>
       </form>
+      {notes.length ? (
+        <ul className="mt-3 space-y-2 border-t border-zk-border pt-3 text-sm">
+          {notes.map((note) => (
+            <li key={note.id}>
+              <p className="whitespace-pre-wrap break-words text-zk-text">{note.body}</p>
+              <p className="mt-0.5 whitespace-pre-wrap break-words text-zk-muted">{note.plan ? `Agent's plan: ${note.plan}` : "Not acknowledged yet."}</p>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <button type="button" disabled={pausePending} onClick={() => startPauseTransition(async () => {
         const result = await setAgentPaused(agentId, !paused);
         setNotice(result.ok ? (paused ? "Agent resumed." : "Agent paused.") : result.error);
