@@ -59,29 +59,29 @@ export function median(values: number[]): number | null {
   return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
 }
 
-export async function loadSecurityDashboard(tenantId: string, viewer: FindingViewer, now: Date = new Date()): Promise<SecurityDashboard> {
+export async function loadSecurityDashboard(organisationId: string, viewer: FindingViewer, now: Date = new Date()): Promise<SecurityDashboard> {
   // A finding whose fix went live since the last sweep is published before the page reads it.
-  await discloseLiveFindings({ tenantId });
+  await discloseLiveFindings({ organisationId });
   const [rows, projects] = await Promise.all([
     prisma.securityFinding.findMany({
       where: {
-        tenantId,
+        organisationId,
         // A deleted issue or idea takes its finding off the page.
         OR: [{ bug: { isDeleted: false } }, { bugId: null, idea: { isDeleted: false } }],
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 500,
       select: {
-        id: true, tenantId: true, reporterId: true, severity: true, title: true, createdAt: true, disclosedAt: true, disclosedById: true,
-        project: { select: { name: true, slug: true, tenant: { select: { slug: true } } } },
+        id: true, organisationId: true, reporterId: true, severity: true, title: true, createdAt: true, disclosedAt: true, disclosedById: true,
+        project: { select: { name: true, slug: true, organisation: { select: { slug: true } } } },
         bug: { select: { number: true, status: true, substatus: true } },
         idea: { select: { number: true, status: true } },
       },
     }),
     prisma.project.findMany({
-      where: { tenantId, archivedAt: null },
+      where: { organisationId, archivedAt: null },
       orderBy: [{ name: "asc" }],
-      select: { name: true, slug: true, tenant: { select: { slug: true } } },
+      select: { name: true, slug: true, organisation: { select: { slug: true } } },
     }),
   ]);
 

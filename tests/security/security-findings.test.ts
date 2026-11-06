@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * live (or an admin publishes them early).
  */
 const db = vi.hoisted(() => ({
-  agent: { findUnique: vi.fn() },
+  agentActivation: { findUnique: vi.fn() },
   agentEvent: { create: vi.fn<(args: unknown) => Promise<{ id: string }>>(async () => ({ id: "event1" })) },
   attachment: { updateMany: vi.fn() },
   bug: { update: vi.fn() },
@@ -37,13 +37,13 @@ import { median } from "@/lib/security-dashboard";
 import { createIdeaSchema } from "@/lib/agent-api/ideas";
 import { securityJson } from "@/lib/agent-api/issues";
 
-const TENANT = "tenant_zedu";
+const ORG = "org_zedu";
 const REPORTER = "user-reporter";
 
 function row(overrides: Partial<FindingRow> = {}): FindingRow {
   return {
     id: "finding1",
-    tenantId: TENANT,
+    organisationId: ORG,
     projectId: "project1",
     ideaId: "idea1",
     bugId: null,
@@ -60,8 +60,8 @@ function row(overrides: Partial<FindingRow> = {}): FindingRow {
   };
 }
 
-const person = (userId: string, tenantAdmin = false, tenantId: string | null = TENANT): FindingViewer => ({ kind: "person", userId, tenantId, tenantAdmin });
-const agent = (ownerId: string, securityCleared = false, tenantId = TENANT): FindingViewer => ({ kind: "agent", ownerId, tenantId, securityCleared });
+const person = (userId: string, organisationAdmin = false, organisationId: string | null = ORG): FindingViewer => ({ kind: "person", userId, organisationId, organisationAdmin });
+const agent = (ownerId: string, securityCleared = false, organisationId = ORG): FindingViewer => ({ kind: "agent", ownerId, organisationId, securityCleared });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -85,8 +85,8 @@ describe("who may read a private finding", () => {
   });
 
   it("never lets another workspace's admin or cleared agent in", () => {
-    expect(canViewFinding(row(), person("user-admin", true, "tenant_other"))).toBe(false);
-    expect(canViewFinding(row(), agent("user-x", true, "tenant_other"))).toBe(false);
+    expect(canViewFinding(row(), person("user-admin", true, "org_other"))).toBe(false);
+    expect(canViewFinding(row(), agent("user-x", true, "org_other"))).toBe(false);
     expect(canViewFinding(row(), person(REPORTER, false, null))).toBe(false);
   });
 
@@ -117,11 +117,11 @@ describe("what a viewer is shown", () => {
     expect(securityJson(null, agent("user-member", true))).toBeNull();
   });
 
-  it("reads an agent's clearance from its row", async () => {
-    db.agent.findUnique.mockResolvedValueOnce({ securityCleared: true });
-    expect(await agentFindingViewer({ agentId: "agent1", ownerId: "owner1", tenantId: TENANT })).toEqual(agent("owner1", true));
-    db.agent.findUnique.mockResolvedValueOnce(null);
-    expect(await agentFindingViewer({ agentId: "gone", ownerId: "owner1", tenantId: TENANT })).toEqual(agent("owner1", false));
+  it("reads an agent's clearance from its activation in the organisation", async () => {
+    db.agentActivation.findUnique.mockResolvedValueOnce({ securityCleared: true });
+    expect(await agentFindingViewer({ agentId: "agent1", ownerId: "owner1", organisationId: ORG })).toEqual(agent("owner1", true));
+    db.agentActivation.findUnique.mockResolvedValueOnce(null);
+    expect(await agentFindingViewer({ agentId: "gone", ownerId: "owner1", organisationId: ORG })).toEqual(agent("owner1", false));
   });
 });
 
@@ -154,7 +154,7 @@ describe("agents filing a finding", () => {
 
 describe("disclosing a finding", () => {
   const stored = {
-    id: "finding1", tenantId: TENANT, projectId: "project1", ideaId: "idea1", bugId: "bug1", severity: "high",
+    id: "finding1", organisationId: ORG, projectId: "project1", ideaId: "idea1", bugId: "bug1", severity: "high",
     title: "Real title", summary: "Real summary", description: "Real steps", disclosedAt: null,
   };
 
@@ -190,9 +190,9 @@ describe("disclosing a finding", () => {
     db.securityFinding.findMany.mockResolvedValueOnce([{ id: "finding1" }]);
     db.securityFinding.findUnique.mockResolvedValueOnce(stored);
     db.$transaction.mockImplementation(async (run: (tx: typeof db) => Promise<unknown>) => run(db));
-    expect(await discloseLiveFindings({ tenantId: TENANT }, db as never)).toBe(1);
+    expect(await discloseLiveFindings({ organisationId: ORG }, db as never)).toBe(1);
     expect(db.securityFinding.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { disclosedAt: null, tenantId: TENANT, bug: { status: "resolved", isDeleted: false } },
+      where: { disclosedAt: null, organisationId: ORG, bug: { status: "resolved", isDeleted: false } },
     }));
   });
 

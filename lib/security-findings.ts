@@ -45,29 +45,32 @@ export const PLACEHOLDER_SUMMARY = "Private security finding. The details are re
 
 /** Who is asking. A person in the web app, or an agent through the API. */
 export type FindingViewer =
-  | { kind: "person"; userId: string; tenantId: string | null; tenantAdmin: boolean }
-  | { kind: "agent"; ownerId: string; tenantId: string; securityCleared: boolean };
+  | { kind: "person"; userId: string; organisationId: string | null; organisationAdmin: boolean }
+  | { kind: "agent"; ownerId: string; organisationId: string; securityCleared: boolean };
 
-export type FindingAccessFields = { tenantId: string; reporterId: string; disclosedAt: Date | null };
+export type FindingAccessFields = { organisationId: string; reporterId: string; disclosedAt: Date | null };
 
 /** The one rule for who may read a finding's details. */
 export function canViewFinding(finding: FindingAccessFields, viewer: FindingViewer | null): boolean {
   if (finding.disclosedAt) return true;
   if (!viewer) return false;
-  if (viewer.tenantId !== finding.tenantId) return false;
-  if (viewer.kind === "person") return viewer.userId === finding.reporterId || viewer.tenantAdmin;
+  if (viewer.organisationId !== finding.organisationId) return false;
+  if (viewer.kind === "person") return viewer.userId === finding.reporterId || viewer.organisationAdmin;
   return viewer.securityCleared || viewer.ownerId === finding.reporterId;
 }
 
-/** An agent as a finding viewer: its owner and whether it is cleared. */
-export async function agentFindingViewer(agent: { agentId: string; ownerId: string; tenantId: string }, db: Db = prisma): Promise<FindingViewer> {
-  const row = await db.agent.findUnique({ where: { id: agent.agentId }, select: { securityCleared: true } });
-  return { kind: "agent", ownerId: agent.ownerId, tenantId: agent.tenantId, securityCleared: row?.securityCleared ?? false };
+/** An agent as a finding viewer: its owner and whether it is cleared in this organisation. */
+export async function agentFindingViewer(agent: { agentId: string; ownerId: string; organisationId: string }, db: Db = prisma): Promise<FindingViewer> {
+  const row = await db.agentActivation.findUnique({
+    where: { agentId_organisationId: { agentId: agent.agentId, organisationId: agent.organisationId } },
+    select: { securityCleared: true },
+  });
+  return { kind: "agent", ownerId: agent.ownerId, organisationId: agent.organisationId, securityCleared: row?.securityCleared ?? false };
 }
 
 const findingSelect = {
   id: true,
-  tenantId: true,
+  organisationId: true,
   projectId: true,
   ideaId: true,
   bugId: true,
@@ -126,7 +129,7 @@ export async function findingForIdea(ideaId: string, db: Db = prisma): Promise<F
 }
 
 export type NewFinding = {
-  tenantId: string;
+  organisationId: string;
   projectId: string;
   ideaId: string;
   reporterId: string;
@@ -140,7 +143,7 @@ export type NewFinding = {
 export async function createFinding(db: Db, input: NewFinding): Promise<{ id: string }> {
   return db.securityFinding.create({
     data: {
-      tenantId: input.tenantId,
+      organisationId: input.organisationId,
       projectId: input.projectId,
       ideaId: input.ideaId,
       reporterId: input.reporterId,
@@ -162,7 +165,7 @@ export async function createFinding(db: Db, input: NewFinding): Promise<{ id: st
 export async function discloseFinding(db: Prisma.TransactionClient, findingId: string, byUserId: string | null): Promise<boolean> {
   const finding = await db.securityFinding.findUnique({
     where: { id: findingId },
-    select: { id: true, tenantId: true, projectId: true, ideaId: true, bugId: true, severity: true, title: true, summary: true, description: true, disclosedAt: true },
+    select: { id: true, organisationId: true, projectId: true, ideaId: true, bugId: true, severity: true, title: true, summary: true, description: true, disclosedAt: true },
   });
   if (!finding || finding.disclosedAt) return false;
   const text = { title: finding.title, summary: finding.summary, description: finding.description };
@@ -175,7 +178,7 @@ export async function discloseFinding(db: Prisma.TransactionClient, findingId: s
   await db.securityFinding.update({ where: { id: finding.id }, data: { disclosedAt: new Date(), disclosedById: byUserId } });
   // Agents and webhooks hear that the details are public now (the text itself is on the issue).
   await publish(db, {
-    tenantId: finding.tenantId,
+    organisationId: finding.organisationId,
     type: "security.disclosed",
     bugId: finding.bugId,
     projectId: finding.bugId ? null : finding.projectId,
@@ -196,9 +199,9 @@ export async function discloseFinding(db: Prisma.TransactionClient, findingId: s
  * Runs with the platform sweeps and whenever the Security page loads, so a
  * finding goes public soon after its fix is live, whichever route made it Live.
  */
-export async function discloseLiveFindings(options: { tenantId?: string } = {}, db: PrismaClient = prisma): Promise<number> {
+export async function discloseLiveFindings(options: { organisationId?: string } = {}, db: PrismaClient = prisma): Promise<number> {
   const due = await db.securityFinding.findMany({
-    where: { disclosedAt: null, ...(options.tenantId ? { tenantId: options.tenantId } : {}), bug: { status: "resolved", isDeleted: false } },
+    where: { disclosedAt: null, ...(options.organisationId ? { organisationId: options.organisationId } : {}), bug: { status: "resolved", isDeleted: false } },
     select: { id: true },
     take: 200,
   });

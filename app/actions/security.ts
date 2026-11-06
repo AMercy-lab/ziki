@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
-import { tenantAccessFor } from "@/lib/tenant-access";
+import { currentOrganisationAccess, organisationAccessFor } from "@/lib/organisation-access";
 import { discloseFinding } from "@/lib/security-findings";
 
 /**
@@ -21,10 +21,10 @@ export async function discloseFindingAction(findingId: string): Promise<Security
   const user = await requireUser();
   const finding = await prisma.securityFinding.findUnique({
     where: { id: findingId },
-    select: { id: true, tenantId: true, bugId: true, ideaId: true, disclosedAt: true },
+    select: { id: true, organisationId: true, bugId: true, ideaId: true, disclosedAt: true },
   });
   if (!finding) return { error: "That finding no longer exists." };
-  const access = await tenantAccessFor(user.id, finding.tenantId, user.role);
+  const access = await organisationAccessFor(user.id, finding.organisationId, user.role);
   if (!access.admin) return { error: NOT_ALLOWED };
   if (finding.disclosedAt) return { ok: true };
   await prisma.$transaction((tx) => discloseFinding(tx, finding.id, user.id));
@@ -32,14 +32,17 @@ export async function discloseFindingAction(findingId: string): Promise<Security
   return { ok: true };
 }
 
-/** Lets an agent of this workspace read private findings, or takes that away. */
+/** Lets an agent active in this organisation read its private findings, or takes that away. */
 export async function setAgentSecurityClearanceAction(agentId: string, cleared: boolean): Promise<SecurityActionResult> {
   const user = await requireUser();
-  const agent = await prisma.agent.findUnique({ where: { id: agentId }, select: { id: true, tenantId: true, revokedAt: true } });
-  if (!agent || agent.revokedAt) return { error: "That agent no longer exists." };
-  const access = await tenantAccessFor(user.id, agent.tenantId, user.role);
-  if (!access.admin) return { error: NOT_ALLOWED };
-  await prisma.agent.update({ where: { id: agent.id }, data: { securityCleared: cleared } });
+  const access = await currentOrganisationAccess(user.id, user.role);
+  if (!access.organisationId || !access.admin) return { error: NOT_ALLOWED };
+  const activation = await prisma.agentActivation.findUnique({
+    where: { agentId_organisationId: { agentId, organisationId: access.organisationId } },
+    select: { id: true, deactivatedAt: true, agent: { select: { revokedAt: true } } },
+  });
+  if (!activation || activation.deactivatedAt || activation.agent.revokedAt) return { error: "That agent is not active in this organisation." };
+  await prisma.agentActivation.update({ where: { id: activation.id }, data: { securityCleared: cleared } });
   revalidatePath("/security");
   return { ok: true };
 }

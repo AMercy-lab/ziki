@@ -3,15 +3,16 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireProject } from "@/lib/project-route";
-import { ideasPath } from "@/lib/project-paths";
+import { ideasPath, marketingPath } from "@/lib/project-paths";
 import { issueHref, parseIssueRef } from "@/lib/issue-ref";
 import { IDEA_SUMMARY_MAX_CHARS, listIdeaVerdicts } from "@/lib/agent-api/idea-verdicts";
 import { IdeaVerdictsPanel, type IdeaVerdictBlock } from "@/components/idea-verdicts";
+import { MarketingAreaMarker } from "@/components/marketing/marketing-area";
 import { AttachmentList } from "@/components/attachment-list";
 import { RichText } from "@/components/rich-text";
 import { SecurityFindingPanel } from "@/components/security-finding-panel";
 import { findingForIdea, findingView } from "@/lib/security-findings";
-import { tenantAccessFor } from "@/lib/tenant-access";
+import { organisationAccessFor } from "@/lib/organisation-access";
 import { LocalTime } from "@/components/local-time";
 import { ReportSummary } from "@/components/report-summary";
 import { NextStepBar } from "@/components/next-step-bar";
@@ -62,11 +63,11 @@ export default async function IdeaPage({ params, searchParams }: {
 }) {
   const { org, project: slugParam, number: id } = await params;
   const query = await searchParams;
-  const { user, tenantId, project } = await requireProject(org, slugParam);
+  const { user, organisationId, project } = await requireProject(org, slugParam);
   const slug = project.ref;
   const ref = parseIssueRef(id);
   const idea = await prisma.idea.findFirst({
-    where: { tenantId, projectId: project.id, isDeleted: false, ...(ref.kind === "number" ? { number: ref.number } : { id: ref.id }) },
+    where: { organisationId, projectId: project.id, isDeleted: false, ...(ref.kind === "number" ? { number: ref.number } : { id: ref.id }) },
     select: {
       id: true,
       number: true,
@@ -75,7 +76,9 @@ export default async function IdeaPage({ params, searchParams }: {
       stakes: { where: { status: "waiting" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true, beneficiaryUserId: true, expiresAt: true, agent: { select: { name: true } } } },
       summary: true,
       description: true,
+      rationale: true,
       status: true,
+      track: true,
       projectId: true,
       createdAt: true,
       convertedAt: true,
@@ -92,7 +95,7 @@ export default async function IdeaPage({ params, searchParams }: {
       createdByAgent: { select: { name: true, ownerUserId: true } },
       type: { select: { name: true } },
       area: { select: { name: true } },
-      issue: { select: { number: true, title: true, project: { select: { slug: true, tenant: { select: { slug: true } } } } } },
+      issue: { select: { number: true, title: true, project: { select: { slug: true, organisation: { select: { slug: true } } } } } },
       attachments: {
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         select: { id: true, filename: true, contentType: true, size: true },
@@ -105,14 +108,14 @@ export default async function IdeaPage({ params, searchParams }: {
   if (!idea) notFound();
 
   const [verdicts, workflow, securityFinding] = await Promise.all([
-    listIdeaVerdicts({ tenantId, projectId: idea.projectId }, idea.id),
+    listIdeaVerdicts({ organisationId, projectId: idea.projectId }, idea.id),
     workflowFor(idea.projectId),
     findingForIdea(idea.id),
   ]);
   // #security-findings: the private details, shown only to who may see them.
-  const securityAdmin = securityFinding ? (await tenantAccessFor(user.id, tenantId, user.role)).admin : false;
+  const securityAdmin = securityFinding ? (await organisationAccessFor(user.id, organisationId, user.role)).admin : false;
   const securityView = securityFinding
-    ? findingView(securityFinding, { kind: "person", userId: user.id, tenantId, tenantAdmin: securityAdmin })
+    ? findingView(securityFinding, { kind: "person", userId: user.id, organisationId, organisationAdmin: securityAdmin })
     : null;
   const own = idea.reporterId === user.id || idea.beneficiaryUserId === user.id || idea.createdByAgent?.ownerUserId === user.id;
   // Anyone may give a verdict on their own idea.
@@ -136,7 +139,7 @@ export default async function IdeaPage({ params, searchParams }: {
     governance: { thresholdOnly: isThresholdOnly(workflow), managerVoteWeight: workflow.managerVoteWeight },
   });
   // What this person can do from the Actions box, through their highest-level agent.
-  const actingAgent = idea.status === "open" && (rejectable || verdicts.convertible) ? await awardingAgentOf(user.id, tenantId) : null;
+  const actingAgent = idea.status === "open" && (rejectable || verdicts.convertible) ? await awardingAgentOf(user.id, organisationId) : null;
   const canApprove = idea.status === "open" && verdicts.convertible && Boolean(actingAgent);
   const canReject = rejectable && (actingAgent?.level === "manager" || actingAgent?.level === "merger");
   const canWithdraw = own && idea.status === "open";
@@ -149,13 +152,20 @@ export default async function IdeaPage({ params, searchParams }: {
       )
     : new Map<string, string | null>();
 
+  const marketingIdea = idea.track === "marketing";
+  const closedIdea = idea.status === "rejected" || idea.status === "archived";
+  const backFallback = marketingIdea
+    ? marketingPath(slug, closedIdea ? "ideas/rejected" : "")
+    : closedIdea ? ideasPath(slug, "rejected") : ideasPath(slug);
+
   return (
     <div className="flex flex-col gap-5 pb-10">
+      {marketingIdea ? <MarketingAreaMarker /> : null}
       {/* Header like an issue's: back to the Ideas tab, number + title. */}
       <div className="flex flex-col gap-3">
         <div className="flex items-start gap-2">
           {/* Back to the list it was opened from; otherwise New ideas or Rejected ideas. */}
-          <BackToList fallback={idea.status === "rejected" || idea.status === "archived" ? ideasPath(slug, "rejected") : ideasPath(slug)} label="Back to ideas" />
+          <BackToList fallback={backFallback} label={marketingIdea ? "Back to proposals" : "Back to ideas"} />
           <h1 className="min-w-0 break-words text-[28px] font-extrabold leading-tight tracking-[-0.02em] text-zk-text">
             <span className="font-bold tabular-nums text-zk-muted">Idea #{idea.number}</span> {idea.title}
           </h1>
@@ -168,6 +178,12 @@ export default async function IdeaPage({ params, searchParams }: {
           <NextStepBar step={nextStep} />
           {securityView ? <SecurityFindingPanel view={securityView} canDisclose={securityAdmin} kind="idea" /> : null}
           <ReportSummary summary={idea.summary} />
+          {marketingIdea && idea.rationale ? (
+            <section className="rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-6">
+              <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-zk-muted">Why it serves the focus</h2>
+              <p className="mt-3 text-sm text-zk-text">{idea.rationale}</p>
+            </section>
+          ) : null}
           {idea.status === "archived" && idea.archiveEvidence ? (
             <section className="rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-6" data-testid="idea-archive-evidence">
               <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-zk-muted">
@@ -188,7 +204,7 @@ export default async function IdeaPage({ params, searchParams }: {
             </section>
           ) : null}
 
-          <IdeaVerdictsPanel ideaId={idea.id} data={verdicts} viewerId={user.id} block={block} summaryMaxChars={IDEA_SUMMARY_MAX_CHARS} />
+          <IdeaVerdictsPanel ideaId={idea.id} track={idea.track} data={verdicts} viewerId={user.id} block={block} summaryMaxChars={IDEA_SUMMARY_MAX_CHARS} />
 
           {earlier.length > 0 ? (
             <section className="rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-6" aria-labelledby="earlier-comments">

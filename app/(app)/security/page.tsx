@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth-helpers";
-import { currentTenantAccess } from "@/lib/tenant-access";
+import { currentOrganisationAccess } from "@/lib/organisation-access";
 import { prisma } from "@/lib/prisma";
 import { loadSecurityDashboard, type DashboardFinding } from "@/lib/security-dashboard";
 import { SECURITY_SEVERITIES, SEVERITY_GUIDE } from "@/lib/security-severity";
@@ -19,8 +19,8 @@ export const metadata = { title: "Security" };
  */
 export default async function SecurityPage() {
   const user = await requireUser();
-  const access = await currentTenantAccess(user.id, user.role);
-  if (!access.tenantId) {
+  const access = await currentOrganisationAccess(user.id, user.role);
+  if (!access.organisationId) {
     return (
       <section className="mx-auto max-w-xl rounded-[24px] border border-zk-border bg-zk-surface p-8 text-center">
         <h1 className="text-[28px] font-extrabold text-zk-text">Security</h1>
@@ -28,15 +28,17 @@ export default async function SecurityPage() {
       </section>
     );
   }
-  const tenantId = access.tenantId;
-  const dashboard = await loadSecurityDashboard(tenantId, { kind: "person", userId: user.id, tenantId, tenantAdmin: access.admin });
+  const organisationId = access.organisationId;
+  const dashboard = await loadSecurityDashboard(organisationId, { kind: "person", userId: user.id, organisationId, organisationAdmin: access.admin });
   const agents = access.admin
-    ? await prisma.agent.findMany({
-        where: { tenantId, revokedAt: null },
-        orderBy: [{ securityCleared: "desc" }, { name: "asc" }],
-        take: 200,
-        select: { id: true, name: true, level: true, securityCleared: true, owner: { select: { name: true } } },
-      })
+    ? (
+        await prisma.agentActivation.findMany({
+          where: { organisationId, deactivatedAt: null, agent: { revokedAt: null } },
+          orderBy: [{ securityCleared: "desc" }, { agent: { name: "asc" } }],
+          take: 200,
+          select: { level: true, securityCleared: true, agent: { select: { id: true, name: true, owner: { select: { name: true } } } } },
+        })
+      ).map(({ agent, level, securityCleared }) => ({ ...agent, level, securityCleared }))
     : [];
   const openCount = dashboard.open.length;
   const severe = dashboard.openBySeverity.critical + dashboard.openBySeverity.high;

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import "./create-issue.css";
 import { CreateIssueForm } from "@/components/create-issue-form";
 import { loadReportFormData } from "./load-form-data";
@@ -18,8 +19,9 @@ export default async function NewBugPage({
   const { org, project } = await params;
   // #security-findings: the Security page's "Report a vulnerability" opens the form with it ticked.
   const security = (await searchParams).security === "1";
-  const { user, admin, users, assigneeUsers, types, projectId, projectSlug } =
+  const { user, admin, users, assigneeUsers, types, projectId, projectSlug, canContribute } =
     await loadReportFormData(org, project);
+  if (!canContribute) notFound();
 
   return (
     <div className="create-issue-page mx-auto w-full min-w-0 space-y-6 pb-10">
