@@ -71,7 +71,7 @@ describe("lib/points/ledger", () => {
     const res = await getDetailedPointLedger(
       mockDb as unknown as PrismaClient,
       {
-        tenantId: "tenant-1",
+        organisationId: "org-1",
         userId: "user-1",
       },
     );

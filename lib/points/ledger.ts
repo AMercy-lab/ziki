@@ -44,7 +44,8 @@ function toNumber(val: unknown): number {
 export async function getDetailedPointLedger(
   db: Db,
   args: {
-    tenantId: string;
+    organisationId?: string;
+    tenantId?: string;
     userId: string;
     role?: PointRole;
     limit?: number;
@@ -55,8 +56,9 @@ export async function getDetailedPointLedger(
   summary: PointLedgerSummary;
   total: number;
 }> {
+  const organisationId = args.organisationId ?? args.tenantId ?? "";
   const where: Prisma.PointEntryWhereInput = {
-    tenantId: args.tenantId,
+    organisationId,
     userId: args.userId,
     ...(args.role ? { role: args.role } : {}),
   };
@@ -92,7 +94,7 @@ export async function getDetailedPointLedger(
       },
     }),
     db.pointEntry.findMany({
-      where: { tenantId: args.tenantId, userId: args.userId },
+      where: { organisationId, userId: args.userId },
       select: { points: true },
     }),
   ]);
