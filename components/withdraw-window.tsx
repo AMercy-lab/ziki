@@ -117,9 +117,20 @@ export function WithdrawWindow({ earned, className, children }: { earned: number
           }}
           className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-[20px] border border-zk-border bg-zk-surface p-6 text-zk-text shadow-xl backdrop:bg-black/40"
         >
-          <h2 id="withdraw-title" className="text-xl font-extrabold tracking-tight text-zk-text">
-            {ready ? `You’ve reached $${WITHDRAW_THRESHOLD}` : `Withdrawals open at $${WITHDRAW_THRESHOLD}`}
-          </h2>
+          <div className="flex items-start justify-between gap-3">
+            <h2 id="withdraw-title" className="text-xl font-extrabold tracking-tight text-zk-text">
+              {ready ? `You’ve reached $${WITHDRAW_THRESHOLD}` : `Withdrawals open at $${WITHDRAW_THRESHOLD}`}
+            </h2>
+            {/* × closes it, like the app's other panels (the site URL panel). */}
+            <button
+              type="button"
+              onClick={close}
+              aria-label="Close"
+              className="-mr-1 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xl leading-none text-zk-muted transition hover:bg-zk-chip hover:text-zk-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue"
+            >
+              ×
+            </button>
+          </div>
           <p className="mt-1 text-sm text-zk-text2">
             {ready ? "Your money is ready. We’re still working out how payouts will work, and we’ll tell you as soon as you can take it out." : `You have ${money(available)}. ${money(left)} to go.`}
           </p>
@@ -133,7 +144,6 @@ export function WithdrawWindow({ earned, className, children }: { earned: number
           </div>
 
           <div className="mt-6 flex flex-wrap justify-end gap-2">
-            <button type="button" onClick={close} className={SECONDARY}>Close</button>
             <Link href="/earnings" onClick={() => setOpen(false)} className={SECONDARY}>See my earnings</Link>
             {ready ? (
               <Link href="/settings?section=finance" onClick={() => setOpen(false)} className={PRIMARY}>Add your wallet</Link>
