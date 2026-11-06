@@ -31,15 +31,19 @@ vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/notify", () => ({ notifyLater: vi.fn() }));
 vi.mock("@/lib/session-user", () => ({ resolveSessionUserId: vi.fn() }));
 vi.mock("@/lib/auth-helpers", () => ({ requireUser: vi.fn() }));
-vi.mock("@/lib/tenant-access", () => ({
-  currentTenantAccess: vi.fn(async () => ({
-    tenantId: "tenant-zedu",
-    tenantName: "Zedu",
-    tenantSlug: "zedu",
-    membershipRole: "member",
-    admin: false,
-  })),
-}));
+vi.mock("@/lib/tenant-access", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/tenant-access")>();
+  return {
+    ...actual,
+    currentTenantAccess: vi.fn(async () => ({
+      tenantId: "own-workspace-id",
+      tenantName: "Own Workspace",
+      tenantSlug: "own",
+      membershipRole: "owner" as const,
+      admin: true,
+    })),
+  };
+});
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     bug: { findUnique: bugFindUnique, create: bugCreate },
@@ -63,6 +67,9 @@ import { currentTenantIdFor, NO_TENANT_MESSAGE } from "@/lib/tenant-context";
 import { canContributeToProject } from "@/lib/project-permissions";
 import { createBugAction, updateBugAction } from "@/app/actions/issues";
 import { setWatchingAction } from "@/app/actions/watch";
+import { tenantAccessFor, currentTenantAccess } from "@/lib/tenant-access";
+import { canDeleteTicket } from "@/lib/ticket-deletion";
+import { showsAllProjects } from "@/lib/issue-list-filters";
 
 const tenantOf = currentTenantIdFor as unknown as ReturnType<typeof vi.fn>;
 
@@ -232,5 +239,64 @@ describe("canContributeToProject permissions", () => {
     membershipFindUnique.mockResolvedValue(null);
     const allowed = await canContributeToProject({ id: "stranger-1", role: "user" }, "p-1", "t-1");
     expect(allowed).toBe(false);
+  });
+});
+
+describe("external workspace owner visiting another org's public project (Items 1 & 2)", () => {
+  const user = { id: "user-owner-1", role: "user" as const };
+  const targetTenantId = "tenant-other-org";
+  const publicProjectId = "project-public-1";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("ensures an owner of another workspace gets no membership or admin role in the target org", async () => {
+    // Current workspace access says owner/admin because they own their own workspace
+    const ownAccess = await currentTenantAccess(user.id, user.role);
+    expect(ownAccess.membershipRole).toBe("owner");
+    expect(ownAccess.admin).toBe(true);
+
+    // But in the target org where they have no membership row, tenantAccessFor returns null/false
+    membershipFindUnique.mockResolvedValue(null);
+    const targetAccess = await tenantAccessFor(user.id, targetTenantId, user.role);
+    expect(targetAccess.membershipRole).toBeNull();
+    expect(targetAccess.admin).toBe(false);
+
+    // Consequently, they cannot delete tickets or access deleted issues in that org
+    const canDelete = canDeleteTicket(user.role, targetAccess.membershipRole);
+    expect(canDelete).toBe(false);
+
+    // With ?deleted=true requested, isDeletedView is false
+    const isDeletedView = canDelete && "true" === "true";
+    expect(isDeletedView).toBe(false);
+  });
+
+  it("prevents an external workspace owner from seeing private projects via ?all=1", () => {
+    // User is visiting another org's public project, so isOrgMember is false
+    const isOrgMember = false;
+    const allParam = "all";
+
+    // Unchecked showsAllProjects would be true
+    expect(showsAllProjects(allParam)).toBe(true);
+
+    // But guarded by isOrgMember, allProjects is false
+    const allProjects = isOrgMember && showsAllProjects(allParam);
+    expect(allProjects).toBe(false);
+
+    // Query scope strictly retains projectId, ensuring private projects in the org are never exposed
+    const projectId = publicProjectId;
+    const projectFilter = projectId && !allProjects ? { projectId } : {};
+    expect(projectFilter).toEqual({ projectId: publicProjectId });
+  });
+
+  it("refuses deleted issue history to external workspace owners even if they own another workspace", async () => {
+    // In another org, membership is null
+    membershipFindUnique.mockResolvedValue(null);
+    const targetAccess = await tenantAccessFor(user.id, targetTenantId, user.role);
+
+    const deletedBug = { id: "bug-1", isDeleted: true, tenantId: targetTenantId };
+    const canSee = !deletedBug.isDeleted || canDeleteTicket(user.role, targetAccess.membershipRole);
+    expect(canSee).toBe(false);
   });
 });

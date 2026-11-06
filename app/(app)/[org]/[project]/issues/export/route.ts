@@ -5,7 +5,7 @@ import { getIssueTypes } from "@/lib/lookups";
 import { auth } from "@/auth";
 import { requireUser } from "@/lib/auth-helpers";
 import { canDeleteTicket } from "@/lib/ticket-deletion";
-import { currentTenantAccess } from "@/lib/tenant-access";
+import { tenantAccessFor } from "@/lib/tenant-access";
 import { getBugOrderBy } from "@/lib/issues-sort";
 import { parseBugListFilters, type RawParams } from "@/lib/issue-list-filters";
 import { CSV_EOL, csvRow } from "@/lib/csv";
@@ -49,7 +49,6 @@ export async function GET(request: NextRequest, { params: routeParams }: { param
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
   const user = await requireUser();
-  const access = await currentTenantAccess(user.id, user.role);
 
   const format = exportFormat(request.nextUrl.searchParams);
   const params: RawParams = Object.fromEntries(

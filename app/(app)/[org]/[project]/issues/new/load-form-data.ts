@@ -1,6 +1,6 @@
 import type { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { currentTenantAccess } from "@/lib/tenant-access";
+import { tenantAccessFor } from "@/lib/tenant-access";
 import { getActiveIssueTypesCached } from "@/lib/lookups";
 import { tenantMemberWhere } from "@/lib/tenant-mentions";
 import { requireProject } from "@/lib/project-route";
@@ -60,12 +60,12 @@ async function loadAssigneeUsers(tenantId: string | null): Promise<MentionUser[]
 
 /** The report form's data for the project in the URL (#project-urls): the slug picks it and checks access. */
 export async function loadReportFormData(org: string, slug: string) {
-  const { user, tenantId, project } = await requireProject(org, slug);
-  const admin = (await currentTenantAccess(user.id, user.role)).admin;
+  const { user, tenantId, project, canContribute } = await requireProject(org, slug);
+  const admin = (await tenantAccessFor(user.id, tenantId, user.role)).admin;
   const [users, assigneeUsers, types] = await Promise.all([
-    loadMentionUsers(tenantId),
-    loadAssigneeUsers(tenantId),
+    canContribute ? loadMentionUsers(tenantId) : Promise.resolve([]),
+    canContribute ? loadAssigneeUsers(tenantId) : Promise.resolve([]),
     loadOrEmpty("issue types", () => getActiveIssueTypesCached(tenantId), []),
   ]);
-  return { user, admin, users, assigneeUsers, types, projectId: project.id, projectSlug: project.ref };
+  return { user, admin, users, assigneeUsers, types, projectId: project.id, projectSlug: project.ref, canContribute };
 }

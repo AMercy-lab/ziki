@@ -159,7 +159,7 @@ export async function acceptJoinRequestAction(formData: FormData): Promise<void>
     await tx.notification.create({
       data: {
         userId: joinRequest.userId,
-        tenantId: joinRequest.project.tenantId,
+        tenantId: null,
         kind: "join_request_accepted",
         title: `Your request to join ${joinRequest.project.name} was accepted!`,
         url: projectPath(pRef),
@@ -218,7 +218,7 @@ export async function rejectJoinRequestAction(formData: FormData): Promise<void>
     await tx.notification.create({
       data: {
         userId: joinRequest.userId,
-        tenantId: joinRequest.project.tenantId,
+        tenantId: null,
         kind: "join_request_rejected",
         title: `Your request to join ${joinRequest.project.name} was not accepted`,
         url: "/discover",

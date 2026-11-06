@@ -24,9 +24,9 @@ export async function GET(
       contentType: true,
       size: true,
       data: true,
-      bug: { select: { isDeleted: true, tenantId: true } },
-      idea: { select: { isDeleted: true, tenantId: true } },
-      comment: { select: { bug: { select: { tenantId: true, isDeleted: true } } } },
+      bug: { select: { isDeleted: true, tenantId: true, projectId: true, project: { select: { visibility: true } } } },
+      idea: { select: { isDeleted: true, tenantId: true, projectId: true, project: { select: { visibility: true } } } },
+      comment: { select: { bug: { select: { tenantId: true, isDeleted: true, projectId: true, project: { select: { visibility: true } } } } } },
       redesignProposal: { select: { tenantId: true } },
     },
   });
@@ -43,11 +43,24 @@ export async function GET(
     if (!membership) return notFound();
   }
   if (bug) {
-    const membership = await prisma.membership.findUnique({
-      where: { tenantId_userId: { tenantId: bug.tenantId, userId: user.id } },
-      select: { userId: true },
-    });
-    if (!membership) return notFound();
+    const isOrgMember = Boolean(
+      await prisma.membership.findUnique({
+        where: { tenantId_userId: { tenantId: bug.tenantId, userId: user.id } },
+        select: { userId: true },
+      }),
+    );
+    const isProjectMember = Boolean(
+      bug.projectId
+        ? await prisma.projectMembership.findUnique({
+            where: { projectId_userId: { projectId: bug.projectId, userId: user.id } },
+            select: { id: true },
+          })
+        : false,
+    );
+    const isPublicProject = bug.project?.visibility === "public";
+    if (!isOrgMember && !isProjectMember && !isPublicProject && user.role !== "super_admin") {
+      return notFound();
+    }
   }
   if (bug?.isDeleted) {
     const access = await tenantAccessFor(user.id, bug.tenantId, user.role);

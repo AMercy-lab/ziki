@@ -84,7 +84,7 @@ import {
   deletedSummary,
   deletionCounts,
 } from "@/lib/ticket-deletion";
-import { currentTenantAccess } from "@/lib/tenant-access";
+import { tenantAccessFor } from "@/lib/tenant-access";
 import { MilestoneDue } from "@/components/milestone-due";
 import { LoadError } from "@/components/load-error";
 import { logLoadFailure } from "@/lib/load-error";
@@ -310,7 +310,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
 
   const projectContext = await requireProject(org, projectSlug);
   const { user, tenantId, isOrgMember, isOrgAdmin } = projectContext;
-  const access = await currentTenantAccess(user.id, user.role);
+  const access = await tenantAccessFor(user.id, tenantId, user.role);
   const canTriage = isOrgAdmin;
   const canDelete = isOrgAdmin || (isOrgMember && canDeleteTicket(user.role, access.membershipRole));
   if (!lookup) notFound();
@@ -377,7 +377,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   if ("detail" in loadedBug && /milestoneId|Milestone/i.test(loadedBug.detail)) {
     loadedBug = await prisma.bug
       .findUnique({
-        where: { id, ...bugInTenant(await currentTenantIdFor(userId)) },
+        where: { id, tenantId },
         include: {
           type: { select: { id: true, name: true, isActive: true } },
           reporter: { select: { name: true, email: true, role: true, image: true } },

@@ -75,7 +75,7 @@ import {
   parseBugSort,
 } from "@/lib/issues-sort";
 import { canDeleteTicket } from "@/lib/ticket-deletion";
-import { currentTenantAccess } from "@/lib/tenant-access";
+import { tenantAccessFor } from "@/lib/tenant-access";
 import type { OrganizationRole } from "@/lib/organization-role";
 import { defaultSortFor, mineFilterWhere, parseMineFilter } from "@/lib/mine-filter";
 import { finishedWatchedWhere } from "@/lib/watching";
@@ -250,11 +250,11 @@ export async function IssuesList({
   returnTo: string;
   searchParams: SearchParams;
 }) {
-  const { user, tenantId, project } = await requireProject(org, slug);
+  const { user, tenantId, project, isOrgMember, canContribute, isOrgAdmin } = await requireProject(org, slug);
   const ref = project.ref;
   const userId: string | undefined = user.id;
   const effectiveRole: AppRole | null | undefined = user.role;
-  const membershipRole: OrganizationRole | null = (await currentTenantAccess(user.id, user.role)).membershipRole;
+  const membershipRole: OrganizationRole | null = (await tenantAccessFor(user.id, tenantId, user.role)).membershipRole;
   // #425: only this project's issues, in its workspace.
   const projectId: string | null = project.id;
   const activeProject = project;
@@ -285,7 +285,7 @@ export async function IssuesList({
   const trackSearch = trackFilter === "all" ? {} : { track: trackFilter };
   const isDeletedView = canDelete && deletedParam === "true";
   // Workspace-wide view (`?all=1`). Absent → unchanged project scope.
-  const allProjects = showsAllProjects(params[PROJECT_ALL_PARAM]);
+  const allProjects = isOrgMember && showsAllProjects(params[PROJECT_ALL_PARAM]);
 
   // Column sort (#column-sort): the address wins, then the sort remembered in this list's cookie.
   const sortCookies = await cookies();
@@ -1262,7 +1262,7 @@ export async function IssuesList({
                   : "Maybe the bugs went into hiding, or they've all been squashed! Try clearing your filters or create a new issue."
             }
             clearHref={issuesPath(ref, statusParam ?? ALL_STATUS)}
-            createHref={newIssueHref(ref, returnTo)}
+            createHref={canContribute ? newIssueHref(ref, returnTo) : undefined}
             showClear={Boolean((myWorkOn || !onlyStatusTab) && (qParam || statusParam || tagsParam || selectedMilestone || myWorkOn))}
             showCreate={true}
           />
@@ -1550,7 +1550,7 @@ export async function IssuesList({
         ) : null}
         {/* Project notes and settings, as icons, beside the tabs. */}
         {!isDeletedView ? (
-          <ProjectIconLinks notesHref={projectPath(ref, "/notes")} settingsHref={`/projects/${encodeURIComponent(slug)}/settings`} />
+          <ProjectIconLinks notesHref={canContribute ? projectPath(ref, "/notes") : undefined} settingsHref={isOrgAdmin ? `/projects/${encodeURIComponent(slug)}/settings` : undefined} />
         ) : null}
       </div>
     </div>
@@ -1632,14 +1632,16 @@ function FirstRunWelcome({
         This is where reported issues will appear. A good report says what you
         expected, what happened instead, and how to make it happen again.
       </p>
-      <div className="mt-5">
-        <Link
-          href={newIssueHref(slug, returnTo)}
-          className="inline-flex h-[42px] items-center justify-center rounded-full bg-electric-blue-strong px-5 text-sm font-bold text-white shadow-[0_8px_20px_rgba(46,111,239,0.35)]"
-        >
-          Report the first issue
-        </Link>
-      </div>
+      {canContribute ? (
+        <div className="mt-5">
+          <Link
+            href={newIssueHref(slug, returnTo)}
+            className="inline-flex h-[42px] items-center justify-center rounded-full bg-electric-blue-strong px-5 text-sm font-bold text-white shadow-[0_8px_20px_rgba(46,111,239,0.35)]"
+          >
+            Report the first issue
+          </Link>
+        </div>
+      ) : null}
       {isAdmin ? (
         <p className="mx-auto mt-6 max-w-md text-sm text-zk-muted">
           Before people start reporting, you may want to set up your{" "}
