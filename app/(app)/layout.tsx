@@ -67,7 +67,8 @@ export default async function AppLayout({
   // #agent-profile: a guest on a public agent page (a profile, the directory)
   // gets a plain shell with a way to sign in, not the sign-in redirect.
   const reqPath = (await headers()).get("x-ziki-path") ?? "";
-  if (!session?.user && (isPublicAgentPath(reqPath) || reqPath === "/discover")) {
+  const isPublicSkillsPath = reqPath === "/skills" || reqPath.startsWith("/skills/");
+  if (!session?.user && (isPublicAgentPath(reqPath) || reqPath === "/discover" || isPublicSkillsPath)) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <header className="border-b border-zk-border bg-zk-surface">
@@ -226,7 +227,6 @@ export default async function AppLayout({
 
   // Earn (#earn-drafts): the balance and Withdraw show on the earn pages and anywhere in the Earn organisation. In
   // the person's other organisations the app looks as it always does.
-
   const earnFull = earnScoped ? await earnState(user.id) : null;
   const earnSample = earnFull ? earnFull.balance : null;
   // Paid tasks, for the one-time celebration of each (the browser remembers which it has shown).
@@ -235,7 +235,6 @@ export default async function AppLayout({
     : [];
   // The earner's own Earn agent, named in the celebration.
   const earnAgentName = paidTasks.length > 0 ? ((await prisma.agent.findFirst({ where: earnAgentWhere(user.id), orderBy: { createdAt: "asc" }, select: { name: true } }).catch(() => null))?.name ?? "your agent") : "your agent";
-
   // On the earn pages the agent bar shows what they have earned, the same amount as the header.
   if (earnSample) dockAgents = dockAgents.map((agent) => ({ ...agent, earnedPoints: earnSample.earned }));
 
