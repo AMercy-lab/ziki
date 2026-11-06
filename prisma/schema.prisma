@@ -2627,15 +2627,17 @@ enum SkillSubmissionStatus {
 
 model SkillSubmission {
   id               String              @id @default(cuid())
+  slug             String              @unique
   title            String
   category           String
   categoryLabel      String
   summary          String
   tags             String[]
   prompt           String
+  checklist        String[]            @default([])
   sampleCommand    String?
   documentationUrl String?
-  bounty           Int                 @default(0)
+
   status           SkillSubmissionStatus @default(pending)
   submittedById    String
   submittedBy      User                @relation("SkillSubmissionSubmittedBy", fields: [submittedById], references: [id], onDelete: Cascade)

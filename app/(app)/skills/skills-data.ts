@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 
-export type SkillCategory = "testing" | "security" | "design" | "backend" | "marketing";
+export type SkillCategory = "testing" | "security" | "design" | "backend" | "marketing" | "general";
 export type SkillBadgeColor = "blue" | "emerald" | "indigo" | "pink" | "purple" | "cyan" | "amber";
 
 export interface SkillItem {
@@ -10,28 +10,78 @@ export interface SkillItem {
   icon: "flutter" | "shield" | "browser" | "figma" | "database" | "a11y" | "test" | "api" | "seo";
   category: SkillCategory;
   categoryLabel: string;
-  badge: string;
+  badge?: string;
   badgeColor?: SkillBadgeColor;
   description: string;
   tags: string[];
-  usersCount: number;
   prompt: string;
   spec: {
     overview: string;
-    capabilities: string[];
     checklist: string[];
-    sampleCommand: string;
-    documentationUrl?: string;
+    sampleCommand?: string | null;
+    documentationUrl?: string | null;
   };
   author: {
     name: string;
     handle: string;
-    isVerified: boolean;
   };
   createdAt: string;
 }
 
-export const VERIFIED_SKILLS: SkillItem[] = [];
+function resolveIcon(title: string, category: string): SkillItem["icon"] {
+  const t = title.toLowerCase();
+  const c = category.toLowerCase();
+  if (t.includes("flutter")) return "flutter";
+  if (c === "security" || t.includes("security") || t.includes("snare") || t.includes("guard")) return "shield";
+  if (t.includes("browser") || t.includes("playwright") || t.includes("e2e")) return "browser";
+  if (c === "design" || t.includes("figma") || t.includes("tailwind") || t.includes("ui")) return "figma";
+  if (c === "backend" || t.includes("database") || t.includes("postgres") || t.includes("sql") || t.includes("redis")) return "database";
+  if (t.includes("accessibility") || t.includes("a11y") || t.includes("wcag")) return "a11y";
+  if (t.includes("seo") || c === "marketing") return "seo";
+  return "test";
+}
+
+function mapSubmissionToSkill(sub: {
+  id: string;
+  slug: string;
+  title: string;
+  category: string;
+  categoryLabel: string;
+  summary: string;
+  tags: string[];
+  prompt: string;
+  checklist?: string[];
+  sampleCommand?: string | null;
+  documentationUrl?: string | null;
+  createdAt: Date;
+  submittedBy?: { name: string | null; email: string | null } | null;
+}): SkillItem {
+  const authorName = sub.submittedBy?.name || "Contributor";
+  const handle = "@" + authorName.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  return {
+    id: sub.id,
+    slug: sub.slug || sub.id,
+    title: sub.title,
+    icon: resolveIcon(sub.title, sub.category),
+    category: (sub.category as SkillCategory) || "general",
+    categoryLabel: sub.categoryLabel || "General",
+    description: sub.summary,
+    tags: Array.isArray(sub.tags) ? sub.tags : [],
+    prompt: sub.prompt,
+    spec: {
+      overview: sub.summary,
+      checklist: Array.isArray(sub.checklist) ? sub.checklist : [],
+      sampleCommand: sub.sampleCommand || null,
+      documentationUrl: sub.documentationUrl || null,
+    },
+    author: {
+      name: authorName,
+      handle,
+    },
+    createdAt: sub.createdAt.toISOString(),
+  };
+}
 
 export async function getSkills(): Promise<SkillItem[]> {
   try {
@@ -43,61 +93,7 @@ export async function getSkills(): Promise<SkillItem[]> {
       },
     });
 
-    return approved.map((sub) => {
-      const slug = sub.title
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "");
-
-      const authorName = sub.submittedBy?.name || "Contributor";
-      const handle = "@" + authorName.toLowerCase().replace(/[^a-z0-9]/g, "");
-
-      const titleLower = sub.title.toLowerCase();
-      let icon: SkillItem["icon"] = "test";
-      if (titleLower.includes("flutter")) icon = "flutter";
-      else if (sub.category === "security" || titleLower.includes("security") || titleLower.includes("snare")) icon = "shield";
-      else if (titleLower.includes("browser") || titleLower.includes("playwright") || titleLower.includes("e2e")) icon = "browser";
-      else if (sub.category === "design" || titleLower.includes("figma") || titleLower.includes("tailwind") || titleLower.includes("ui")) icon = "figma";
-      else if (sub.category === "backend" || titleLower.includes("database") || titleLower.includes("postgres") || titleLower.includes("sql") || titleLower.includes("redis")) icon = "database";
-      else if (titleLower.includes("accessibility") || titleLower.includes("a11y") || titleLower.includes("wcag")) icon = "a11y";
-      else if (titleLower.includes("api") || titleLower.includes("graphql")) icon = "api";
-      else if (sub.category === "marketing" || titleLower.includes("seo")) icon = "seo";
-
-      return {
-        id: sub.id,
-        slug: slug || sub.id,
-        title: sub.title,
-        icon,
-        category: (sub.category as SkillCategory) || "testing",
-        categoryLabel: sub.categoryLabel || "Testing & QA",
-        badge: "Verified",
-        badgeColor: "emerald",
-        description: sub.summary,
-        tags: Array.isArray(sub.tags) ? (sub.tags as string[]) : [],
-        usersCount: 1,
-        prompt: sub.prompt,
-        spec: {
-          overview: sub.summary,
-          capabilities: [
-            "Deterministic lint and validation checks",
-            "Zero false positive assertions",
-            "Actionable agent instructions",
-          ],
-          checklist: [
-            "Run automated verification commands",
-            "Ensure 0 errors and zero regressions",
-          ],
-          sampleCommand: sub.sampleCommand || "npm run test",
-          documentationUrl: sub.documentationUrl ?? undefined,
-        },
-        author: {
-          name: authorName,
-          handle,
-          isVerified: true,
-        },
-        createdAt: sub.createdAt.toISOString(),
-      };
-    });
+    return approved.map(mapSubmissionToSkill);
   } catch (error) {
     console.error("[skills] failed to load approved skills from db", error);
     return [];
@@ -105,14 +101,22 @@ export async function getSkills(): Promise<SkillItem[]> {
 }
 
 export async function getSkillBySlug(slug: string): Promise<SkillItem | undefined> {
-  const skills = await getSkills();
   const normalized = slug.trim().toLowerCase();
-  return skills.find(
-    (skill) => skill.slug.toLowerCase() === normalized || skill.id.toLowerCase() === normalized
-  );
-}
+  try {
+    const sub = await prisma.skillSubmission.findFirst({
+      where: {
+        OR: [{ slug: normalized }, { id: slug }],
+        status: "approved",
+      },
+      include: {
+        submittedBy: { select: { name: true, email: true } },
+      },
+    });
 
-export async function getSkillsByCategory(category: SkillCategory): Promise<SkillItem[]> {
-  const skills = await getSkills();
-  return skills.filter((skill) => skill.category === category);
+    if (!sub) return undefined;
+    return mapSubmissionToSkill(sub);
+  } catch (error) {
+    console.error("[skills] failed to load skill by slug", error);
+    return undefined;
+  }
 }

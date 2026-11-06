@@ -52,6 +52,7 @@ export function EarnSkillsPortal({ user, initialSubmissions = [] }: EarnSkillsPo
   const [checklist, setChecklist] = useState("");
   const [sampleCommand, setSampleCommand] = useState("");
   const [docUrl, setDocUrl] = useState("");
+  const [revisingSubmissionId, setRevisingSubmissionId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Close modal on Escape
@@ -88,50 +89,76 @@ export function EarnSkillsPortal({ user, initialSubmissions = [] }: EarnSkillsPo
     setIsSubmitting(true);
 
     try {
-      let createdSubmissionId = `sub-${Date.now()}`;
-      try {
-        const res = await fetch("/api/v1/skills/submissions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: title.trim(),
-            category,
-            categoryLabel: activeCategoryConfig.label,
-            summary: summary.trim(),
-            tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-            prompt: prompt.trim(),
-            sampleCommand: sampleCommand.trim() || undefined,
-            documentationUrl: docUrl.trim() || undefined,
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.submission?.id) {
-            createdSubmissionId = data.submission.id;
+      const assertionsList = checklist
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+
+      const parsedTags = tags
+        .split(",")
+        .map((t) => t.trim().toLowerCase().replace(/[^a-z0-9_-]/g, ""))
+        .filter(Boolean);
+
+      const res = await fetch("/api/v1/skills/submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          category,
+          summary: summary.trim(),
+          tags: parsedTags,
+          prompt: prompt.trim(),
+          checklist: assertionsList,
+          sampleCommand: sampleCommand.trim() || undefined,
+          documentationUrl: docUrl.trim() || undefined,
+          revisionOfId: revisingSubmissionId || undefined,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        let errorMsg = "Submission failed. Please check your inputs.";
+        if (data?.error) {
+          if (typeof data.error === "string") {
+            errorMsg = data.error;
+          } else if (typeof data.error === "object") {
+            const firstKey = Object.keys(data.error)[0];
+            const firstVal = data.error[firstKey];
+            errorMsg = Array.isArray(firstVal) ? firstVal[0] : `${firstKey}: ${firstVal}`;
           }
         }
-      } catch {
-        // Fall back gracefully for demo or offline testing
+        showToast(errorMsg);
+        return;
       }
 
-      const newSubmission: ContributorSubmission = {
-        id: createdSubmissionId,
-        title: title.trim(),
-        category,
-        categoryLabel: activeCategoryConfig.label,
-        summary: summary.trim(),
-        status: "pending",
-        submittedAt: "Just now",
-        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-        prompt: prompt.trim(),
-        checklist: checklist.split("\n").map((l) => l.trim()).filter(Boolean),
-        sampleCommand: sampleCommand.trim() || undefined,
-        docUrl: docUrl.trim() || undefined,
-      };
+      if (data?.submission) {
+        const sub = data.submission;
+        const formattedSub: ContributorSubmission = {
+          id: sub.id,
+          title: sub.title,
+          category: sub.category,
+          categoryLabel: sub.categoryLabel,
+          summary: sub.summary,
+          status: sub.status || "pending",
+          submittedAt: "Just now",
+          tags: sub.tags || [],
+          prompt: sub.prompt,
+          checklist: sub.checklist || assertionsList,
+          sampleCommand: sub.sampleCommand || undefined,
+          docUrl: sub.documentationUrl || undefined,
+        };
 
-      setSubmissions((prev) => [newSubmission, ...prev]);
+        if (revisingSubmissionId) {
+          setSubmissions((prev) =>
+            prev.map((s) => (s.id === revisingSubmissionId ? formattedSub : s))
+          );
+        } else {
+          setSubmissions((prev) => [formattedSub, ...prev]);
+        }
+      }
 
-      // Reset form
+      // Reset form ONLY on verified success
       setTitle("");
       setSummary("");
       setTags("");
@@ -139,11 +166,16 @@ export function EarnSkillsPortal({ user, initialSubmissions = [] }: EarnSkillsPo
       setChecklist("");
       setSampleCommand("");
       setDocUrl("");
+      setRevisingSubmissionId(null);
 
-      showToast("Skill submitted successfully! Queued for maintainer review.");
+      showToast(
+        revisingSubmissionId
+          ? "Revision resubmitted successfully! Queued for review."
+          : "Skill submitted successfully! Queued for superadmin review."
+      );
       setActiveTab("submissions");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Submission failed. Try again.");
+      showToast(error instanceof Error ? error.message : "Network error. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -567,7 +599,7 @@ Confirm passing test suite`}
                 <div className="space-y-1 text-xs">
                   <p className="font-bold text-zk-ok-fg text-sm">Verified &amp; Live in Catalog</p>
                   <p className="text-zk-text2 leading-relaxed">
-                    {selectedSubmission.maintainerFeedback || "This skill has passed automated syntax tests and maintainer verification. It is currently published live in the official Skills Library catalog."}
+                    {selectedSubmission.maintainerFeedback || "This skill was reviewed and approved by a superadmin. It is published live in the Skills Library."}
                   </p>
                 </div>
               </div>
@@ -581,7 +613,7 @@ Confirm passing test suite`}
                 <div className="space-y-1 text-xs">
                   <p className="font-bold text-blue-600 dark:text-blue-400 text-sm">Under Maintainer Review</p>
                   <p className="text-zk-text2 leading-relaxed">
-                    Queued for static syntax checks and test suite verification. Typical review turnaround time is 24–48 hours.
+                    This submission is waiting for superadmin review in the approvals queue.
                   </p>
                 </div>
               </div>
@@ -723,6 +755,7 @@ Confirm passing test suite`}
                       setSampleCommand(selectedSubmission.sampleCommand || "");
                       setDocUrl(selectedSubmission.docUrl || "");
                       setSelectedSubmission(null);
+                      setRevisingSubmissionId(selectedSubmission.id);
                       setActiveTab("submit");
                       showToast("Loaded submission into form for revision.");
                     }}

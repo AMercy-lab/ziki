@@ -1,9 +1,34 @@
 -- Skill submissions to the verified skills library (#skill-submissions).
--- Contributors submit skills (test runners, linters, security guardrails)
--- with a bounty; a super admin reviews and approves or rejects each one.
--- An approved submission can be equipped by agents from /skills.
+-- Contributors submit skills (test runners, linters, security guardrails);
+-- a super admin reviews and approves or rejects each one.
+-- An approved submission is published to the skills directory.
 --
--- Additive only: a new table and enum, no existing data is touched.
+-- Additive only: a new table and enum, plus reservation of the 'skills' top-level route.
+
+-- Rename any project that uses the reserved slug 'skills' (#project-slug)
+DO $$
+DECLARE
+  project RECORD;
+  candidate TEXT;
+  attempt INT;
+BEGIN
+  FOR project IN
+    SELECT "id", "tenantId", "slug"
+    FROM "Project"
+    WHERE "slug" IN ('skills')
+    ORDER BY "createdAt", "id"
+  LOOP
+    candidate := project."slug" || '-project';
+    attempt := 2;
+    WHILE EXISTS (
+      SELECT 1 FROM "Project" WHERE "tenantId" = project."tenantId" AND "slug" = candidate
+    ) LOOP
+      candidate := project."slug" || '-project-' || attempt;
+      attempt := attempt + 1;
+    END LOOP;
+    UPDATE "Project" SET "slug" = candidate, "updatedAt" = NOW() WHERE "id" = project."id";
+  END LOOP;
+END $$;
 
 -- CreateEnum
 CREATE TYPE "SkillSubmissionStatus" AS ENUM ('pending', 'approved', 'rejected');
@@ -11,15 +36,16 @@ CREATE TYPE "SkillSubmissionStatus" AS ENUM ('pending', 'approved', 'rejected');
 -- CreateTable
 CREATE TABLE "SkillSubmission" (
     "id" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "category" TEXT NOT NULL,
     "categoryLabel" TEXT NOT NULL,
     "summary" TEXT NOT NULL,
     "tags" TEXT[],
     "prompt" TEXT NOT NULL,
+    "checklist" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "sampleCommand" TEXT,
     "documentationUrl" TEXT,
-    "bounty" INTEGER NOT NULL DEFAULT 0,
     "status" "SkillSubmissionStatus" NOT NULL DEFAULT 'pending',
     "submittedById" TEXT NOT NULL,
     "reviewedById" TEXT,
@@ -30,6 +56,9 @@ CREATE TABLE "SkillSubmission" (
 
     CONSTRAINT "SkillSubmission_pkey" PRIMARY KEY ("id")
 );
+
+-- CreateIndex
+CREATE UNIQUE INDEX "SkillSubmission_slug_key" ON "SkillSubmission"("slug");
 
 -- CreateIndex
 CREATE INDEX "SkillSubmission_status_idx" ON "SkillSubmission"("status");

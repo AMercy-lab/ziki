@@ -39,6 +39,8 @@ export function isPublicPath(
     pathWithoutBase === "/for-agents" ||
     pathWithoutBase === "/developers" ||
     pathWithoutBase === "/earn" ||
+    pathWithoutBase === "/skills" ||
+    pathWithoutBase.startsWith("/skills/") ||
     isAuthPage ||
     isPasswordResetPage ||
     isPublicAgentPath(pathWithoutBase) ||

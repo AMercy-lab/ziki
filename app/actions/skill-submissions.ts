@@ -39,7 +39,8 @@ export async function reviewSkillSubmissionAction(
     },
   });
 
-  revalidatePath("/superadmin/users");
+  revalidatePath("/superadmin/skill-approvals");
+  revalidatePath("/skills");
   return { ok: true };
 }
 
