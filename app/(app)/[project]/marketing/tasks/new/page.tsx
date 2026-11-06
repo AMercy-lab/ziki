@@ -8,7 +8,7 @@ import { requireProject } from "@/lib/project-route";
 
 export const metadata = { title: "Propose a marketing task" };
 
-/** `/<slug>/marketing/tasks/new`: the form for proposing a marketing task (M-UI-3). Reachable by address until M-LAUNCH-1. */
+/** `/<slug>/marketing/tasks/new`: the form for proposing a marketing task (M-UI-3). */
 export default async function NewMarketingTaskPage({
   params,
 }: {

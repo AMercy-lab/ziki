@@ -3,10 +3,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireProject } from "@/lib/project-route";
-import { ideasPath } from "@/lib/project-paths";
+import { ideasPath, marketingPath } from "@/lib/project-paths";
 import { issueHref, parseIssueRef } from "@/lib/issue-ref";
 import { IDEA_SUMMARY_MAX_CHARS, listIdeaVerdicts } from "@/lib/agent-api/idea-verdicts";
 import { IdeaVerdictsPanel, type IdeaVerdictBlock } from "@/components/idea-verdicts";
+import { MarketingAreaMarker } from "@/components/marketing/marketing-area";
 import { AttachmentList } from "@/components/attachment-list";
 import { RichText } from "@/components/rich-text";
 import { LocalTime } from "@/components/local-time";
@@ -73,6 +74,7 @@ export default async function IdeaPage({ params, searchParams }: {
       summary: true,
       description: true,
       status: true,
+      track: true,
       projectId: true,
       createdAt: true,
       convertedAt: true,
@@ -141,13 +143,20 @@ export default async function IdeaPage({ params, searchParams }: {
       )
     : new Map<string, string | null>();
 
+  const marketingIdea = idea.track === "marketing";
+  const closedIdea = idea.status === "rejected" || idea.status === "archived";
+  const backFallback = marketingIdea
+    ? marketingPath(slug, closedIdea ? "proposals/rejected" : "proposals")
+    : closedIdea ? ideasPath(slug, "rejected") : ideasPath(slug);
+
   return (
     <div className="flex flex-col gap-5 pb-10">
+      {marketingIdea ? <MarketingAreaMarker /> : null}
       {/* Header like an issue's: back to the Ideas tab, number + title. */}
       <div className="flex flex-col gap-3">
         <div className="flex items-start gap-2">
           {/* Back to the list it was opened from; otherwise New ideas or Rejected ideas. */}
-          <BackToList fallback={idea.status === "rejected" || idea.status === "archived" ? ideasPath(slug, "rejected") : ideasPath(slug)} label="Back to ideas" />
+          <BackToList fallback={backFallback} label={marketingIdea ? "Back to proposals" : "Back to ideas"} />
           <h1 className="min-w-0 break-words text-[28px] font-extrabold leading-tight tracking-[-0.02em] text-zk-text">
             <span className="font-bold tabular-nums text-zk-muted">Idea #{idea.number}</span> {idea.title}
           </h1>
@@ -179,7 +188,7 @@ export default async function IdeaPage({ params, searchParams }: {
             </section>
           ) : null}
 
-          <IdeaVerdictsPanel ideaId={idea.id} data={verdicts} viewerId={user.id} block={block} summaryMaxChars={IDEA_SUMMARY_MAX_CHARS} />
+          <IdeaVerdictsPanel ideaId={idea.id} track={idea.track} data={verdicts} viewerId={user.id} block={block} summaryMaxChars={IDEA_SUMMARY_MAX_CHARS} />
 
           {earlier.length > 0 ? (
             <section className="rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-6" aria-labelledby="earlier-comments">
