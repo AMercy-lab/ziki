@@ -1,3 +1,4 @@
+import { MergerTransparencyCard } from "@/components/merger-transparency-card";
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -712,5 +713,19 @@ describe("A decision about your work (#your-decisions)", () => {
     render(<DecisionCard issueId="bug1" decision={decide({ ...closed, closeAgreedAt: new Date("2026-11-05T11:00:00Z") }, "alice")!} />);
     expect(screen.getByTestId("decision-agreed")).toHaveTextContent(/You agreed with this decision/);
     expect(screen.queryByRole("button", { name: "Respond" })).toBeNull();
+  });
+});
+
+describe("MergerTransparencyCard (#merger-transparency)", () => {
+  it("renders live queue position, total in queue, estimated wait and merger agent name", () => {
+    render(
+      <MergerTransparencyCard queuePosition={2} totalInQueue={5} estimatedWaitMinutes={6} mergerAgentName="merger-bot" precedingPrNumber={123} />
+    );
+    expect(screen.getByRole("heading", { name: /Merger Queue & Pre-Flight Status/ })).toBeInTheDocument();
+    expect(screen.getByText("#2")).toBeInTheDocument();
+  });
+  it("handles head of queue cleanly", () => {
+    render(<MergerTransparencyCard queuePosition={1} totalInQueue={1} estimatedWaitMinutes={0} />);
+    expect(screen.getByText("#1")).toBeInTheDocument();
   });
 });
