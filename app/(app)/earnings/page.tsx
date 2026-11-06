@@ -2,113 +2,171 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { formatZ } from "@/lib/points/rules";
+import { LocalTime } from "@/components/local-time";
 import { WITHDRAW_THRESHOLD, earningsSummary } from "@/lib/earnings";
-import { agentsLink, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
 
-export const metadata = { title: "Earnings" };
+export const metadata = { title: "Your earnings" };
 export const dynamic = "force-dynamic";
 
-const when = new Intl.DateTimeFormat("en", { day: "numeric", month: "short" });
+const card = "rounded-[22px] border border-zk-border bg-zk-surface p-5 sm:p-6";
+const label = "text-[11px] font-bold uppercase tracking-[0.08em] text-zk-muted";
+/** Where-it-came-from colours, in the bar's order: blue for the work, then quieter tones for the small things. */
+const SOURCE_DOT = ["bg-[#2f6fe4]", "bg-[#6f9bf0]", "bg-[#a9c4f7]", "bg-zk-ok-fg", "bg-[#5f6577]"];
+/** The goal bar keeps Earn's colours: green for what is paid, yellow stripes for what is being checked. */
+const PAID = "bg-zk-ok-fg";
+const CHECKING = "bg-[repeating-linear-gradient(45deg,#f2c14e_0,#f2c14e_6px,#f7d98a_6px,#f7d98a_12px)]";
 
 /**
- * Earnings (#earnings): what you've earned on every project you work on, in one place in the normal app. The
- * header's $ opens it from any page. The total and the money by project come straight off the ledger; "being
- * checked" is money won on live work that is paid once enough people report it deployed. Withdrawals open at
- * $30 and go to the wallet kept in Settings → Finance; payouts themselves aren't built yet.
+ * Your earnings (#earnings): what you and your agents earned on every project you work on, and the quickest way to
+ * the goal, withdrawing at $30. The header's $ opens it from any page. Everything comes off the ledger; "being
+ * checked" is money won on live work, paid once enough people report it deployed. Payouts go to the wallet in
+ * Settings → Finance; taking money out isn't built yet.
  */
 export default async function EarningsPage() {
   const user = await requireUser();
-  const { total, checking, byProject, latest } = await earningsSummary(prisma, user.id);
+  const { total, checking, solvedCount, sources, tasks, activity } = await earningsSummary(prisma, user.id);
   const earned = Math.max(0, total);
   const ready = earned >= WITHDRAW_THRESHOLD;
   const left = Math.max(0, WITHDRAW_THRESHOLD - earned);
   const pct = (value: number) => `${Math.min(100, (Math.max(0, value) / WITHDRAW_THRESHOLD) * 100)}%`;
+  const sourcesTotal = sources.reduce((sum, source) => sum + source.amount, 0);
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-5">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">Earnings</h1>
-          <p className="mt-1 text-sm text-zk-text2">What you&apos;ve earned on every project you work on.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">Your earnings</h1>
+          <p className="mt-1 text-sm text-zk-text2">What you and your agents earned on every project you work on, and the quickest way to your goal.</p>
         </div>
-        <span
-          aria-disabled={!ready}
-          className={`inline-flex min-h-11 items-center rounded-full bg-electric-blue-strong px-6 text-sm font-bold text-white ${ready ? "" : "opacity-50"}`}
-        >
-          {ready ? "Withdraw" : `Withdraw (${formatZ(left)} to go)`}
-        </span>
+        <Link href="/leaderboard" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-zk-border bg-zk-surface px-5 text-sm font-bold text-zk-text hover:bg-zk-chip">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4ZM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" /></svg>
+          Ranking
+        </Link>
       </div>
 
-      <section aria-labelledby="earned" className={`${agentsSurface} p-6`}>
-        <div className="flex flex-wrap gap-x-12 gap-y-4">
-          <div>
-            <h2 id="earned" className="text-xs font-bold uppercase tracking-[0.06em] text-zk-muted">Earned</h2>
-            <p className="mt-1 text-4xl font-extrabold tracking-tight tabular-nums text-zk-text">{formatZ(earned)}</p>
+      <div className="grid gap-5 md:grid-cols-2">
+        {/* The goal: withdrawing at $30. */}
+        <section aria-labelledby="goal" className={`${card} bg-[linear-gradient(160deg,var(--color-zk-surface)_60%,var(--color-zk-tint))]`}>
+          <div className="flex items-start justify-between gap-3">
+            <h2 id="goal" className={label}>Your goal: withdraw</h2>
+            <Link href="/settings?section=finance" className="text-sm font-semibold text-zk-accent hover:underline">Wallet</Link>
           </div>
-          <div>
-            <h2 className="text-xs font-bold uppercase tracking-[0.06em] text-zk-muted">Being checked</h2>
-            <p className="mt-1 text-4xl font-extrabold tracking-tight tabular-nums text-zk-warn-fg">{formatZ(checking)}</p>
+          <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+            <p className="text-4xl font-extrabold tracking-tight tabular-nums text-zk-text sm:text-[44px]">
+              {formatZ(earned)} <span className="text-base font-medium text-zk-muted">of {formatZ(WITHDRAW_THRESHOLD)}</span>
+            </p>
+            <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${ready ? "bg-zk-ok-bg text-zk-ok-fg" : "bg-zk-warn-bg text-zk-warn-fg"}`}>
+              {ready ? "Ready to withdraw" : `${formatZ(left)} to go`}
+            </span>
           </div>
-        </div>
-        <div
-          role="img"
-          aria-label={`${formatZ(earned)} earned of ${formatZ(WITHDRAW_THRESHOLD)}, ${formatZ(checking)} being checked`}
-          className="mt-5 flex h-3 overflow-hidden rounded-full bg-zk-seg"
-        >
-          <span className="h-full bg-zk-ok-fg" style={{ width: pct(earned) }} />
-          <span className="h-full bg-[repeating-linear-gradient(45deg,#f2c14e_0,#f2c14e_6px,#f7d98a_6px,#f7d98a_12px)]" style={{ width: pct(Math.min(checking, left)) }} />
-        </div>
-        <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-zk-muted">
-          <span className="tabular-nums">{formatZ(earned)} of {formatZ(WITHDRAW_THRESHOLD)}</span>
-          <span>
-            {ready ? "You can withdraw. Payouts are coming soon: we'll tell you when you can take it out." : `Withdraw opens at ${formatZ(WITHDRAW_THRESHOLD)}.`}{" "}
-            Paid to the wallet in <Link href="/settings?section=finance" className={agentsLink}>Settings → Finance</Link>
-          </span>
-        </div>
-      </section>
+          <div
+            role="img"
+            aria-label={`${formatZ(earned)} paid and ${formatZ(checking)} being checked, of ${formatZ(WITHDRAW_THRESHOLD)}`}
+            className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-zk-seg"
+          >
+            <span className={`h-full ${PAID}`} style={{ width: pct(earned) }} />
+            <span className={`h-full ${CHECKING}`} style={{ width: pct(Math.min(checking, left)) }} />
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zk-text2">
+            <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className={`h-2 w-2 rounded-full ${PAID}`} />Paid</span>
+            <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-2 w-2 rounded-full bg-[#f2c14e]" />Being checked</span>
+          </div>
+          <dl className="mt-5 grid grid-cols-3 gap-3 border-t border-zk-divider pt-4">
+            <div><dt className="text-xs text-zk-muted">Still to earn</dt><dd className="mt-0.5 font-mono text-base font-bold tabular-nums text-zk-text">{formatZ(left)}</dd></div>
+            <div><dt className="text-xs text-zk-muted">Being checked</dt><dd className="mt-0.5 font-mono text-base font-bold tabular-nums text-zk-warn-fg">+{formatZ(checking)}</dd></div>
+            <div><dt className="text-xs text-zk-muted">Withdraw opens at</dt><dd className="mt-0.5 font-mono text-base font-bold tabular-nums text-zk-text">{formatZ(WITHDRAW_THRESHOLD)}</dd></div>
+          </dl>
+          {ready ? <p className="mt-3 text-xs text-zk-text2">Payouts are coming soon: we&apos;ll tell you when you can take it out.</p> : null}
+        </section>
 
-      <div className="grid gap-5 md:grid-cols-[2fr_3fr]">
-        <section aria-labelledby="by-project" className={`${agentsSurface} p-6`}>
-          <h2 id="by-project" className="text-base font-extrabold text-zk-text">By project</h2>
-          {byProject.length === 0 ? (
-            <p className="mt-3 text-sm text-zk-text2">Nothing yet. Join a project and your agent&apos;s accepted work shows here.</p>
+        {/* Where it came from. */}
+        <section aria-labelledby="sources" className={card}>
+          <h2 id="sources" className={label}>Where it came from</h2>
+          {sources.length === 0 ? (
+            <p className="mt-4 text-sm text-zk-text2">Nothing yet. Your agent&apos;s accepted work shows here.</p>
           ) : (
-            <ul className="m-0 mt-2 list-none divide-y divide-zk-divider p-0">
-              {byProject.map((row) => (
-                <li key={row.key} className="flex items-center gap-3 py-3">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-bold text-zk-text">{row.name}</span>
-                    {row.organisation && row.organisation !== row.name ? <span className="block truncate text-xs text-zk-muted">{row.organisation}</span> : null}
-                  </span>
-                  <span className="text-sm font-extrabold tabular-nums text-zk-ok-fg">{formatZ(row.amount)}</span>
-                </li>
-              ))}
-            </ul>
+            <>
+              <div aria-hidden="true" className="mt-4 flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-zk-seg">
+                {sources.map((source, index) => (
+                  <span key={source.key} className={`h-full ${SOURCE_DOT[index % SOURCE_DOT.length]}`} style={{ width: `${(source.amount / sourcesTotal) * 100}%` }} />
+                ))}
+              </div>
+              <ul className="m-0 mt-4 list-none space-y-2.5 p-0">
+                {sources.map((source, index) => (
+                  <li key={source.key} className="flex items-center gap-2.5 text-sm text-zk-text">
+                    <span aria-hidden="true" className={`h-2 w-2 rounded-full ${SOURCE_DOT[index % SOURCE_DOT.length]}`} />
+                    <span className="flex-1">{source.label}</span>
+                    <span className="font-mono font-bold tabular-nums">{formatZ(source.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
-          <p className="mt-3 text-sm text-zk-text2">
-            Earn on more projects in <Link href="/discover?open=true" className={agentsLink}>Discover</Link>.
+          <p className="mt-5 border-t border-zk-divider pt-4 text-sm text-zk-text2">
+            {solvedCount === 0 ? "0 issues solved yet. Solving pays the most per task." : `${solvedCount} ${solvedCount === 1 ? "issue" : "issues"} solved. Solving pays the most per task.`}
           </p>
         </section>
+      </div>
 
-        <section aria-labelledby="latest" className={`${agentsSurface} p-6`}>
-          <h2 id="latest" className="text-base font-extrabold text-zk-text">Latest</h2>
-          {latest.length === 0 ? (
-            <p className="mt-3 text-sm text-zk-text2">Your payments show here as work is accepted.</p>
-          ) : (
-            <ul className="m-0 mt-2 list-none divide-y divide-zk-divider p-0">
-              {latest.map((entry) => (
-                <li key={entry.id} className="flex items-center gap-3 py-3">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-bold text-zk-text">{entry.title}</span>
-                    <span className="block truncate text-xs text-zk-muted">{entry.where} · {when.format(entry.at)}</span>
+      {/* The fastest way there: the open issues that pay the most in your projects. */}
+      <section aria-labelledby="fastest" className={card}>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="fastest" className="text-lg font-extrabold text-zk-text">Fastest way to your goal</h2>
+          <p className="text-sm text-zk-text2">Open issues in your projects, highest reward first</p>
+        </div>
+        {tasks.length === 0 ? (
+          <p className="mt-4 rounded-2xl bg-zk-chip px-4 py-3 text-sm text-zk-text2">
+            No open issues in your projects right now. <Link href="/discover?open=true" className="font-semibold text-zk-accent hover:underline">Find a project on Discover</Link> to earn on.
+          </p>
+        ) : (
+          <div className="mt-4 overflow-hidden rounded-2xl border border-zk-border">
+            <div className="grid grid-cols-[88px_1fr_auto] gap-3 bg-zk-tint px-4 py-3 text-[11px] font-bold uppercase tracking-[0.08em] text-zk-info-fg">
+              <span>Reward</span><span>Task</span><span>Next step</span>
+            </div>
+            <ul className="m-0 list-none divide-y divide-zk-divider p-0">
+              {tasks.map((task, index) => (
+                <li key={task.id} className="grid grid-cols-[88px_1fr_auto] items-center gap-3 px-4 py-3.5">
+                  <span className="justify-self-start rounded-lg border border-zk-border px-2.5 py-1.5 font-mono text-sm font-bold tabular-nums text-zk-ok-fg">+{formatZ(task.reward)}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold text-zk-text">{task.title}</span>
+                    <span className="block truncate text-xs text-zk-muted">{task.where}</span>
                   </span>
-                  <span className={`text-sm font-extrabold tabular-nums ${entry.amount < 0 ? "text-zk-bad-fg" : "text-zk-ok-fg"}`}>{formatZ(entry.amount)}</span>
+                  <Link
+                    href={task.href}
+                    className={`inline-flex min-h-10 items-center rounded-full px-4 text-sm font-bold ${index === 0 ? "bg-electric-blue-strong text-white hover:bg-[#2552af]" : "border border-zk-border bg-zk-surface text-zk-text hover:bg-zk-chip"}`}
+                  >
+                    Place bid
+                  </Link>
                 </li>
               ))}
             </ul>
-          )}
-        </section>
-      </div>
+          </div>
+        )}
+        <p className="mt-3 text-sm text-zk-text2">
+          Earn on more projects in <Link href="/discover?open=true" className="font-semibold text-zk-accent hover:underline">Discover</Link>.
+        </p>
+      </section>
+
+      {/* Activity: the latest payments. */}
+      <section aria-labelledby="activity" className={card}>
+        <h2 id="activity" className={label}>Activity ({activity.length})</h2>
+        {activity.length === 0 ? (
+          <p className="mt-3 text-sm text-zk-text2">Your payments show here as work is accepted.</p>
+        ) : (
+          <ul className="m-0 mt-3 list-none space-y-3 p-0">
+            {activity.map((entry) => (
+              <li key={entry.id} className="flex items-baseline gap-3 text-sm">
+                <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 translate-y-[-2px] rounded-full ${entry.amount < 0 ? "bg-zk-bad-fg" : "bg-[#2f6fe4]"}`} />
+                <span className="min-w-0 flex-1 text-zk-text">
+                  <b>{entry.who}</b>{entry.did ? ` ${entry.did}` : ""}{entry.ref ? ` ${entry.ref}` : ""}
+                  <span className="text-zk-muted"> · <LocalTime date={entry.at} /></span>
+                </span>
+                <span className={`font-mono font-bold tabular-nums ${entry.amount < 0 ? "text-zk-bad-fg" : "text-zk-ok-fg"}`}>{entry.amount < 0 ? "" : "+"}{formatZ(entry.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

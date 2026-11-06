@@ -1,10 +1,11 @@
-import { Prisma, type PrismaClient } from "@prisma/client";
+import { Prisma, type PointRole, type PrismaClient } from "@prisma/client";
 import { pointsNumber } from "@/lib/points/rules";
+import { issueHref } from "@/lib/issue-ref";
 
 /**
- * Earnings (#earnings): what a person has earned on every project they work on, read straight off the ledger. A
- * balance is the sum of their `PointEntry` rows (lib/points/balance.ts), corrections included; here it is summed
- * across every organisation, old Ziki Earn entries too, so nobody's money drops when Earn folds into Ziki.
+ * Earnings (#earnings): what a person and their agents have earned on every project they work on, read straight off
+ * the ledger. A balance is the sum of their `PointEntry` rows (lib/points/balance.ts), corrections included; here it
+ * is summed across every organisation, old Ziki Earn entries too, so nobody's money drops when Earn folds into Ziki.
  *
  * "Being checked" is money already won but held on a live issue until enough people report it deployed
  * (lib/points/payout.ts): it is not in the ledger yet, so it is not in the total.
@@ -12,7 +13,7 @@ import { pointsNumber } from "@/lib/points/rules";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
-/** Withdrawals open once someone has earned this much. */
+/** Withdrawals open once someone has earned this much: the goal the Earnings page counts towards. */
 export const WITHDRAW_THRESHOLD = 30;
 
 /** Everything a person has earned, across every organisation. */
@@ -20,23 +21,6 @@ export async function totalEarned(db: Db, userId: string): Promise<number> {
   const sum = await db.pointEntry.aggregate({ where: { userId }, _sum: { points: true } });
   return pointsNumber(sum._sum.points);
 }
-
-/** A payment with no task or idea of its own, named by what earned it. */
-const ROLE_LABEL: Record<string, string> = {
-  signup: "Welcome bonus",
-  solver: "Work accepted",
-  reporter: "Report",
-  reviewer: "Review",
-  submission: "Job answer",
-  triager: "Triage",
-  dispatcher: "Dispatch",
-  idea: "Idea",
-  comment: "Comment",
-  vote: "Vote",
-};
-
-export type EarningsByProject = { key: string; name: string; organisation: string; amount: number };
-export type EarningsEntry = { id: string; title: string; where: string; amount: number; at: Date };
 
 /** A held award, as lib/points/payout.ts keeps it on the issue. */
 type HeldAward = { userId?: unknown; points?: unknown };
@@ -58,65 +42,105 @@ export async function beingChecked(db: Db, userId: string): Promise<number> {
   return held;
 }
 
+/** Where the money came from, in the few groups a person thinks in. Order is the bar's order. */
+export const SOURCE_GROUPS = [
+  { key: "solved", label: "Solved issues", roles: ["solver", "dispatcher", "submission"] },
+  { key: "reviews", label: "Accepted reviews", roles: ["reviewer"] },
+  { key: "confirmations", label: "Confirmations", roles: ["triager"] },
+  { key: "reported", label: "Reported ideas", roles: ["reporter", "idea"] },
+  { key: "small", label: "Verdicts, votes, sign-up", roles: ["vote", "comment", "signup"] },
+] as const satisfies readonly { key: string; label: string; roles: readonly PointRole[] }[];
+
+/** What a ledger row says happened, for the activity list. */
+const DID: Record<PointRole, string> = {
+  solver: "solved",
+  reporter: "reported",
+  reviewer: "review accepted on",
+  triager: "confirmed",
+  submission: "research answer accepted on",
+  dispatcher: "dispatched",
+  idea: "verdict on",
+  signup: "",
+  comment: "comment upvoted on",
+  vote: "vote on",
+};
+
+export type EarningsSource = { key: string; label: string; amount: number };
+export type EarningsTask = { id: string; title: string; reward: number; where: string; href: string };
+export type EarningsActivity = { id: string; who: string; did: string; ref: string | null; amount: number; at: Date };
+
 /**
- * The Earnings page: the total, what is being checked, the money by project, and the latest payments. Money with
- * no project (an idea's verdict, an old Ziki Earn task) counts under its organisation.
+ * The Earnings page: the total and what is being checked, where the money came from, the open issues that pay the
+ * most in the projects the person is in (the fastest way to the goal), and the latest payments.
  */
 export async function earningsSummary(db: Db, userId: string) {
-  const [total, checking, groups, latest] = await Promise.all([
+  const [total, checking, byRole, solvedCount, latest, memberships, projectMemberships] = await Promise.all([
     totalEarned(db, userId),
     beingChecked(db, userId),
-    db.pointEntry.groupBy({ by: ["organisationId", "bugId", "ideaId"], where: { userId }, _sum: { points: true } }),
+    db.pointEntry.groupBy({ by: ["role"], where: { userId }, _sum: { points: true } }),
+    db.pointEntry.count({ where: { userId, role: "solver", points: { gt: 0 } } }),
     db.pointEntry.findMany({
       where: { userId },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: 8,
+      take: 6,
       select: {
         id: true,
         points: true,
         role: true,
         createdAt: true,
-        organisation: { select: { name: true } },
-        bug: { select: { number: true, title: true, project: { select: { name: true } } } },
-        idea: { select: { number: true, title: true, project: { select: { name: true } } } },
+        agent: { select: { name: true } },
+        bug: { select: { number: true } },
+        idea: { select: { number: true } },
       },
     }),
+    db.membership.findMany({ where: { userId }, select: { organisationId: true } }),
+    db.projectMembership.findMany({ where: { userId }, select: { projectId: true } }),
   ]);
 
-  const bugIds = [...new Set(groups.map((group) => group.bugId).filter((id): id is string => Boolean(id)))];
-  const ideaIds = [...new Set(groups.map((group) => group.ideaId).filter((id): id is string => Boolean(id)))];
-  const organisationIds = [...new Set(groups.map((group) => group.organisationId))];
-  const [bugs, ideas, organisations] = await Promise.all([
-    bugIds.length ? db.bug.findMany({ where: { id: { in: bugIds } }, select: { id: true, project: { select: { id: true, name: true } } } }) : [],
-    ideaIds.length ? db.idea.findMany({ where: { id: { in: ideaIds } }, select: { id: true, project: { select: { id: true, name: true } } } }) : [],
-    db.organisation.findMany({ where: { id: { in: organisationIds } }, select: { id: true, name: true } }),
-  ]);
-  const projectOfBug = new Map(bugs.map((bug) => [bug.id, bug.project]));
-  const projectOfIdea = new Map(ideas.map((idea) => [idea.id, idea.project]));
-  const organisationName = new Map(organisations.map((organisation) => [organisation.id, organisation.name]));
+  const amountOf = new Map(byRole.map((row) => [row.role, pointsNumber(row._sum.points)]));
+  const sources: EarningsSource[] = SOURCE_GROUPS.map((group) => ({
+    key: group.key,
+    label: group.label,
+    amount: group.roles.reduce((sum, role) => sum + (amountOf.get(role) ?? 0), 0),
+  })).filter((source) => source.amount > 0.004);
 
-  const byProject = new Map<string, EarningsByProject>();
-  for (const group of groups) {
-    const project = (group.bugId ? projectOfBug.get(group.bugId) : null) ?? (group.ideaId ? projectOfIdea.get(group.ideaId) : null) ?? null;
-    const organisation = organisationName.get(group.organisationId) ?? "";
-    const key = project ? `project:${project.id}` : `organisation:${group.organisationId}`;
-    const row = byProject.get(key) ?? { key, name: project?.name ?? organisation, organisation, amount: 0 };
-    row.amount += pointsNumber(group._sum.points);
-    byProject.set(key, row);
-  }
+  const organisationIds = memberships.map((row) => row.organisationId);
+  const projectIds = projectMemberships.map((row) => row.projectId);
+  const open = organisationIds.length || projectIds.length
+    ? await db.bug.findMany({
+        where: {
+          status: "open",
+          substatus: "open",
+          isDeleted: false,
+          OR: [{ organisationId: { in: organisationIds } }, { projectId: { in: projectIds } }],
+        },
+        orderBy: [{ reward: "desc" }, { createdAt: "desc" }],
+        take: 4,
+        select: { id: true, number: true, title: true, reward: true, _count: { select: { bids: true } }, project: { select: { name: true, slug: true, organisation: { select: { slug: true } } } } },
+      })
+    : [];
 
   return {
     total,
     checking,
-    byProject: [...byProject.values()].filter((row) => Math.abs(row.amount) >= 0.005).sort((a, b) => b.amount - a.amount),
-    latest: latest.map((entry): EarningsEntry => {
-      const item = entry.bug ?? entry.idea;
-      const project = item?.project?.name ?? entry.organisation.name;
+    solvedCount,
+    sources,
+    tasks: open.map((bug): EarningsTask => ({
+      id: bug.id,
+      title: bug.title,
+      reward: pointsNumber(bug.reward),
+      where: `#${bug.number} · ${bug._count.bids === 1 ? "1 bid" : `${bug._count.bids} bids`} · ${bug.project.name}`,
+      href: issueHref(bug),
+    })),
+    activity: latest.map((entry): EarningsActivity => {
+      const amount = pointsNumber(entry.points);
+      const number = entry.bug?.number ?? entry.idea?.number ?? null;
       return {
         id: entry.id,
-        title: item ? item.title : (ROLE_LABEL[entry.role] ?? "Payment"),
-        where: item ? `${project} · #${item.number}` : entry.organisation.name,
-        amount: pointsNumber(entry.points),
+        who: amount < 0 ? "Correction" : entry.role === "signup" ? "Welcome bonus" : entry.agent?.name ?? "You",
+        did: amount < 0 ? "taken back on" : entry.role === "signup" ? "" : DID[entry.role] ?? "earned on",
+        ref: number === null ? null : `#${number}`,
+        amount,
         at: entry.createdAt,
       };
     }),
