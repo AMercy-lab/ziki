@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireSuperAdmin } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
-import { EARN_WORKSPACE_SLUG } from "@/lib/earn/draft";
+import { EARN_ORGANISATION_SLUG } from "@/lib/earn/draft";
 import { confirmTask, rejectTask } from "@/lib/earn/progress";
 
 export type EarnReviewResult = { error?: string; message?: string };
@@ -21,12 +21,12 @@ export async function confirmEarnTaskAction(_prev: EarnReviewResult, formData: F
       userId: field(formData, "userId"),
       taskKey: field(formData, "taskKey"),
       staffId: staff.id,
-      earnTenantSlug: EARN_WORKSPACE_SLUG,
+      earnOrganisationSlug: EARN_ORGANISATION_SLUG,
       note: field(formData, "note"),
     });
     if (!result.ok) return { error: result.error };
     revalidatePath("/superadmin/earn");
-    revalidatePath("/earn", "layout");
+    revalidatePath("/earnings");
     return { message: "Confirmed and paid." };
   } catch (error) {
     console.error("[superadmin/earn] confirm failed", error);
@@ -46,7 +46,7 @@ export async function rejectEarnTaskAction(_prev: EarnReviewResult, formData: Fo
     });
     if (!result.ok) return { error: result.error };
     revalidatePath("/superadmin/earn");
-    revalidatePath("/earn", "layout");
+    revalidatePath("/earnings");
     return { message: "Sent back." };
   } catch (error) {
     console.error("[superadmin/earn] reject failed", error);

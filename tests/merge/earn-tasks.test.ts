@@ -6,7 +6,8 @@ import { describe, expect, it, vi } from "vitest";
  */
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
-import { confirmTask, grantWelcome, isNewEarnAccount, paidCount, rejectTask, doneTasks, startAllTasks, submitTask, taskStateFor } from "@/lib/earn/progress";
+import { beingChecked, headerEarnings, parseWeeklyGoal, totalEarned, weeklyGoalState } from "@/lib/earnings";
+import { confirmTask, grantWelcome, isNewEarnAccount, paidCount, rejectTask, doneTasks, startTask, submitTask, taskStateFor } from "@/lib/earn/progress";
 
 type TaskRow = { userId: string; taskKey: string; status: string; proof?: string | null; note?: string | null };
 type Where = { userId?: string; taskKey?: string; status?: string | { in: string[] } };
@@ -55,8 +56,8 @@ function fakeEarnDb() {
       }),
     },
     user: { findUnique: vi.fn(async () => ({ createdAt: state.accountCreatedAt })) },
-    // The Earn workspace is made on first use; every earn credit goes there, whatever workspaces the person is in.
-    tenant: { upsert: vi.fn(async () => ({ id: "tenant-earn" })) },
+    // The Earn organisation is made on first use; every earn credit goes there, whatever organisations the person is in.
+    organisation: { upsert: vi.fn(async () => ({ id: "organisation-earn" })) },
     $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
       const before = { tasks: state.tasks.map((row) => ({ ...row })), ledger: [...state.ledger] };
       try {
@@ -71,21 +72,21 @@ function fakeEarnDb() {
   return { state, db: db as never };
 }
 
-const confirm = (db: never, taskKey = "who") => confirmTask(db, { userId: "earner", taskKey, staffId: "staff", earnTenantSlug: "ziki-earn" });
+const confirm = (db: never, taskKey = "who") => confirmTask(db, { userId: "earner", taskKey, staffId: "staff", earnOrganisationSlug: "ziki-earn" });
 
 describe("earn tasks (#earn-tasks)", () => {
-  it("pays a confirmed task its amount once, in the Earn workspace only, however often staff confirm", async () => {
+  it("pays a confirmed task its amount once, in the Earn organisation only, however often staff confirm", async () => {
     const { state, db } = fakeEarnDb();
     expect(await submitTask(db, "earner", 1, "Bakeries in Lagos")).toEqual({ ok: true });
     expect(await confirm(db)).toEqual({ ok: true });
     expect((await confirm(db)).ok).toBe(false);
-    expect(state.ledger).toEqual([expect.objectContaining({ tenantId: "tenant-earn", userId: "earner", role: "submission", points: 3, sourceKey: "earn:earner:who" })]);
+    expect(state.ledger).toEqual([expect.objectContaining({ organisationId: "organisation-earn", userId: "earner", role: "submission", points: 3, sourceKey: "earn:earner:who" })]);
     expect(state.tasks[0].status).toBe("confirmed");
   });
 
   it("pays nothing for a task that was never sent in", async () => {
     const { state, db } = fakeEarnDb();
-    await startAllTasks(db, "earner");
+    await startTask(db, "earner", 1);
     expect((await confirm(db)).ok).toBe(false);
     expect(state.ledger).toEqual([]);
   });
@@ -121,11 +122,11 @@ describe("earn tasks (#earn-tasks)", () => {
     expect(state.ledger).toEqual([]);
   });
 
-  it("pays the $5 welcome once to anyone who comes to earn, in the Earn workspace and no other", async () => {
+  it("pays the $5 welcome once to anyone who comes to earn, in the Earn organisation and no other", async () => {
     const { state, db } = fakeEarnDb();
     expect(await grantWelcome(db, "earner", "ziki-earn")).toBe(true);
     expect(await grantWelcome(db, "earner", "ziki-earn")).toBe(false);
-    expect(state.ledger).toEqual([expect.objectContaining({ tenantId: "tenant-earn", userId: "earner", role: "signup", points: 5, sourceKey: "earn:welcome:earner" })]);
+    expect(state.ledger).toEqual([expect.objectContaining({ organisationId: "organisation-earn", userId: "earner", role: "signup", points: 5, sourceKey: "earn:welcome:earner" })]);
   });
 
   it("pays the welcome to an account made long ago too, once", async () => {
@@ -144,10 +145,71 @@ describe("earn tasks (#earn-tasks)", () => {
     expect(await grantWelcome(db, "old-timer", "ziki-earn")).toBe(true);
   });
 
-  it("starts all four tasks once, however often it is asked", async () => {
+  it("starts a task only when it is opened, once, and touches no other: an unopened task has no row and so no status", async () => {
     const { state, db } = fakeEarnDb();
-    expect(await startAllTasks(db, "earner")).toBe(4);
-    expect(await startAllTasks(db, "earner")).toBe(0);
-    expect(state.tasks).toHaveLength(4);
+    expect(await startTask(db, "earner", 3)).toBe(true);
+    expect(await startTask(db, "earner", 3)).toBe(false);
+    expect(state.tasks).toEqual([expect.objectContaining({ taskKey: "emails", status: "started" })]);
+    const rows = state.tasks.map((row) => ({ taskKey: row.taskKey, status: row.status as "started", note: null }));
+    expect([0, 1, 2, 3].map((i) => taskStateFor(rows, i))).toEqual(["open", "open", "in-progress", "open"]);
+  });
+});
+
+/** Earnings (#earnings): the header's $ and the Earnings page read the ledger across every organisation. */
+describe("earnings across every project (#earnings)", () => {
+  it("adds up every ledger row in every organisation, corrections included", async () => {
+    const aggregate = vi.fn(async ({ where }: { where: { userId: string } }) => ({ _sum: { points: where.userId === "earner" ? 7.4 : 0 } }));
+    expect(await totalEarned({ pointEntry: { aggregate } } as never, "earner")).toBe(7.4);
+    // No organisation filter: money from every project counts.
+    expect(aggregate).toHaveBeenCalledWith({ where: { userId: "earner" }, _sum: { points: true } });
+  });
+
+  it("counts as being checked only this person's awards still held on live work", async () => {
+    const findMany = vi.fn(async () => [
+      { heldPayout: [{ userId: "earner", points: 2 }, { userId: "someone-else", points: 5 }] },
+      { heldPayout: [{ userId: "earner", points: 1.5 }] },
+      { heldPayout: null },
+    ]);
+    expect(await beingChecked({ bug: { findMany } } as never, "earner")).toBe(3.5);
+  });
+});
+
+/** Your own weekly goal (#earnings): what is left, what that needs per day, and only real amounts accepted. */
+describe("weekly earnings goal (#earnings)", () => {
+  it("works out what is left and what that needs per day for the days left", () => {
+    // Thursday: Thursday to Sunday is 4 days left.
+    const state = weeklyGoalState(20, 100, new Date("2026-11-05T10:00:00Z"));
+    expect(state).toMatchObject({ left: 80, daysLeft: 4, perDay: 20, reached: false });
+  });
+
+  it("accepts a positive dollar amount and refuses anything else", () => {
+    expect(parseWeeklyGoal("1,000")).toBe(1000);
+    expect(parseWeeklyGoal("$75.50")).toBe(75.5);
+    for (const bad of ["0", "-5", "abc", "1.234", "", null]) expect(parseWeeklyGoal(bad)).toBeNull();
+  });
+});
+
+/** The header's $ and Withdraw (#earnings): for people who work on projects, not for those who only post them. */
+describe("who sees $ and Withdraw in the header (#earnings)", () => {
+  const db = (entry: boolean, joined: boolean) => ({
+    pointEntry: { findFirst: vi.fn(async () => (entry ? { id: "e" } : null)), aggregate: vi.fn(async () => ({ _sum: { points: 4.5 } })) },
+    projectMembership: { findFirst: vi.fn(async () => (joined ? { id: "m" } : null)) },
+  }) as never;
+
+  it("counts only payments for work: posting ideas, votes and the sign-up bonus don't show it", async () => {
+    const d = db(false, false) as unknown as { pointEntry: { findFirst: ReturnType<typeof vi.fn> } };
+    await headerEarnings(d as never, "poster");
+    const where = d.pointEntry.findFirst.mock.calls[0][0].where;
+    expect(where.role.in).toEqual(expect.arrayContaining(["solver", "reviewer"]));
+    for (const posting of ["reporter", "idea", "comment", "vote", "signup"]) expect(where.role.in).not.toContain(posting);
+  });
+
+  it("hides it from someone who has never earned and never joined a project", async () => {
+    expect(await headerEarnings(db(false, false), "poster")).toBeNull();
+  });
+
+  it("shows $0 to someone who just joined a project, and their total once they earn", async () => {
+    expect(await headerEarnings(db(false, true), "joiner")).toBe(0);
+    expect(await headerEarnings(db(true, true), "earner")).toBe(4.5);
   });
 });
