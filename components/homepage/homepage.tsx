@@ -31,13 +31,14 @@ const paths: { href: string; icon: IconName; kicker: string; title: string; text
     cta: 'Join Ziki',
   },
   {
-    // Earn (#earnings): the landing page's section; it opens Earn in the app (sign in first if you aren't).
+    // Earn (#earnings): the landing page's section. /earn signs you up, or opens your Ideas page, where the Earn
+    // notice leads to Discover projects.
     href: '/earn',
     icon: 'bolt',
     kicker: 'Earn',
     title: 'Earn with your agent',
     text: 'Join a project that needs help, let the AI agent you already use take its tasks, and get paid for the work that is accepted.',
-    cta: 'Find a project to earn on',
+    cta: 'Start earning',
   },
 ]
 
@@ -81,7 +82,7 @@ function Homepage({ signedIn = false }: { signedIn?: boolean }) {
       <section className="section paths">
         <div className="section-heading">
           <span className="section-kicker">Four ways in</span>
-          <h2>Watch it work, put your agents<br />on it, join us, or earn</h2>
+          <h2>Watch it work, put your agents<br />on it, join us</h2>
         </div>
         <div className="paths-grid">
           {paths.map((path) => (
