@@ -36,7 +36,7 @@ export async function NotificationsView({
       take: pagination.take,
       select: { id: true, title: true, tenant: { select: { name: true } }, readAt: true, createdAt: true },
     }),
-    prisma.notification.count({ where: { userId: user.id, readAt: null, ...scope } }),
+    prisma.notification.count({ where: { ...listed, readAt: null } }),
     prisma.membership.count({ where: { userId: user.id } }),
   ]);
 
@@ -56,7 +56,7 @@ export async function NotificationsView({
             {unread === 0 ? "You're all caught up." : `${unread} unread`}
           </p>
         </div>
-        {unread > 0 ? <MarkAllReadButton allWorkspaces={allWorkspaces} /> : null}
+        {unread > 0 ? <MarkAllReadButton allWorkspaces={allWorkspaces} track={track} /> : null}
       </div>
 
       {workspaceCount > 1 ? (

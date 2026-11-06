@@ -5,7 +5,7 @@ import { currentTenantIdFor } from "@/lib/tenant-context";
 import { listOwnerQuestions, parseEscalationBody } from "@/lib/agent-questions";
 import { issueHref } from "@/lib/issue-ref";
 import type { WorkTrack } from "@prisma/client";
-import { escalationOnTrack } from "@/lib/my-work-filter";
+import { escalationOnTrack, escalationTrackWhere } from "@/lib/my-work-filter";
 import { LocalTime } from "@/components/local-time";
 import { EscalationTypeBadge, QuickResolveButtons } from "./escalation-controls";
 
@@ -27,11 +27,13 @@ export async function EscalationsView({
 }) {
   const user = await requireUser();
   const tenantId = await currentTenantIdFor(user.id);
+  const params = searchParams ? await searchParams : {};
+  const track = params.track ?? "all";
   const [questions, proposals] = tenantId
     ? await Promise.all([
-        listOwnerQuestions(user.id, tenantId),
+        listOwnerQuestions(user.id, tenantId, track),
         prisma.redesignProposal.findMany({
-          where: { tenantId },
+          where: { tenantId, ...escalationTrackWhere(track) },
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
           take: 50,
           select: {
@@ -47,9 +49,7 @@ export async function EscalationsView({
       ])
     : [[], []];
 
-  const params = searchParams ? await searchParams : {};
   const view: View = VIEWS.some((v) => v.value === params.status) ? (params.status as View) : "waiting";
-  const track = params.track ?? "all";
   const trackQuery = track === "all" ? "" : `&track=${track}`;
 
   const rows = [
