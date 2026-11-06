@@ -36,7 +36,7 @@ export async function NotificationsView({
       take: pagination.take,
       select: { id: true, title: true, tenant: { select: { name: true } }, readAt: true, createdAt: true },
     }),
-    prisma.notification.count({ where: { userId: user.id, readAt: null, ...scope } }),
+    prisma.notification.count({ where: { ...listed, readAt: null } }),
     prisma.membership.count({ where: { userId: user.id } }),
   ]);
 

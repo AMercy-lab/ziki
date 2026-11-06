@@ -5,7 +5,8 @@ const db = vi.hoisted(() => ({
   agentInboxItem: { findMany: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
   bug: { findMany: vi.fn() },
   agentQuestion: { findMany: vi.fn() },
-  notification: { updateMany: vi.fn() },
+  notification: { updateMany: vi.fn(), count: vi.fn(), findMany: vi.fn() },
+  membership: { count: vi.fn() },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 vi.mock("@/lib/auth-helpers", () => ({ requireUser: vi.fn(async () => ({ id: "owner-1" })) }));
@@ -23,6 +24,7 @@ import { publish } from "@/lib/agent-api/events";
 import { escalationOnTrack, escalationTrackWhere, notificationTrackWhere, parseInboxTrack } from "@/lib/my-work-filter";
 import { listOwnerQuestions } from "@/lib/agent-questions";
 import { markAllNotificationsReadAction } from "@/app/actions/notifications";
+import { NotificationsView } from "@/app/(app)/inbox/notifications-view";
 import { requireUser } from "@/lib/auth-helpers";
 import { currentTenantIdFor } from "@/lib/tenant-context";
 
@@ -73,6 +75,20 @@ describe("the person's Inbox track filter (M-UI-8)", () => {
 });
 
 describe("track-scoped mark-all-read", () => {
+  it("counts unread only on the selected track, so the button matches what it can mark", async () => {
+    vi.mocked(requireUser).mockResolvedValue({ id: "owner-1" } as never);
+    vi.mocked(currentTenantIdFor).mockResolvedValue("tenant-a");
+    db.notification.count.mockResolvedValue(0);
+    db.notification.findMany.mockResolvedValue([]);
+    db.membership.count.mockResolvedValue(1);
+
+    await NotificationsView({ searchParams: Promise.resolve({ track: "marketing" }) });
+
+    expect(db.notification.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({ userId: "owner-1", readAt: null, bug: { track: "marketing" } }),
+    });
+  });
+
   it.each([
     {
       name: "Marketing in this workspace",
