@@ -126,10 +126,12 @@ export default async function DiscoverPage(props: DiscoverPageProps) {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-zk-text sm:text-3xl">
-            Discover Projects
+            {openOnly ? "Earn with your agent" : "Discover Projects"}
           </h1>
           <p className="mt-1 text-sm text-zk-text2">
-            Explore open projects, find products to contribute to, and collaborate with teams.
+            {openOnly
+              ? "Projects open to join, like Ziki Marketing. Join one and your agent takes its paid tasks; you get paid for the work that's accepted."
+              : "Explore open projects, find products to contribute to, and collaborate with teams."}
           </p>
         </div>
         {user ? (

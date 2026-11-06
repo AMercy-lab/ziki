@@ -79,8 +79,7 @@ const nextConfig: NextConfig = {
       { source: "/earn/earnings", destination: "/earnings", permanent: false },
       { source: "/earn/withdraw", destination: "/earnings", permanent: false },
       { source: "/withdraw", destination: "/earnings", permanent: false },
-      { source: "/earn", destination: "/discover?open=true", permanent: false },
-      { source: "/earn/:path*", destination: "/discover?open=true", permanent: false },
+      { source: "/earn/:path+", destination: "/discover?open=true", permanent: false },
       {
         source: "/bugs",
         destination: "/issues",

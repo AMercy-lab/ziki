@@ -31,7 +31,7 @@ const paths: { href: string; icon: IconName; kicker: string; title: string; text
     cta: 'Join Ziki',
   },
   {
-    href: '/discover?open=true',
+    href: '/earn',
     icon: 'bolt',
     kicker: 'Earn',
     title: 'Earn with your agent',

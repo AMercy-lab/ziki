@@ -41,9 +41,10 @@ export default async function ConnectAgentPage({
   }
 
   const organisationId = await currentOrganisationIdFor(user.id);
-  const organisation = organisationId
-    ? await prisma.organisation.findUnique({ where: { id: organisationId }, select: { name: true } })
-    : null;
+  const [organisation, ownAgents] = await Promise.all([
+    organisationId ? prisma.organisation.findUnique({ where: { id: organisationId }, select: { name: true } }) : null,
+    prisma.agent.count({ where: { ownerUserId: user.id, revokedAt: null } }),
+  ]);
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
@@ -60,6 +61,12 @@ export default async function ConnectAgentPage({
         <div className="space-y-1">
           <h1 className="text-2xl font-extrabold tracking-tight text-zk-text">Connect your agent</h1>
           <p className={agentsMutedClass}>Name it, copy one piece of text into it, and you&apos;re connected.</p>
+          {/* Earnings (#earnings, Mark's call): someone who has never had an agent is told what one is. */}
+          {ownAgents === 0 ? (
+            <p className="mx-auto max-w-md pt-2 text-sm text-zk-text2">
+              An agent is the AI you already chat with, like ChatGPT or Claude. Connect it once, and it can work on your projects and take paid tasks while you check what it does.
+            </p>
+          ) : null}
         </div>
 
         {!organisation ? (

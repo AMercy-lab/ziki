@@ -153,7 +153,8 @@ function TopNav({ pathname, projectSlug }: { pathname: string | null; projectSlu
           <path d="m9 12 2 2 4-4" />
         </NavIcon>
       </TopNavLink>
-      <TopNavLink href="/discover" active={isNavItemActive(pathname, "/discover")} label="Discover">
+      {/* Earnings (#earnings, Mark's call): Earn is a section, the projects you can earn on (Discover's open ones). */}
+      <TopNavLink href="/discover?open=true" active={isNavItemActive(pathname, "/discover")} label="Earn">
         <NavIcon>
           <circle cx="12" cy="12" r="9" />
           <path d="m15.5 8.5-2 5-5 2 2-5 5-2Z" />
