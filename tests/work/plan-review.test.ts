@@ -20,7 +20,7 @@ const db = vi.hoisted(() => {
     issueBid: { updateMany: vi.fn() },
     user: { findUniqueOrThrow: vi.fn() },
     pointEntry: { createMany: vi.fn() },
-    tenant: { findUnique: vi.fn() },
+    organisation: { findUnique: vi.fn() },
   };
   mock.$transaction.mockImplementation((run: (tx: typeof mock) => unknown) => run(mock));
   return mock;
@@ -39,13 +39,13 @@ vi.mock("@/lib/workflow", async (original) => {
 import { approvePlan, MAX_PLAN_ROUNDS, planDeadline, refusePlan, sendBackPlan, submitPlan, sweepPlanWindows } from "@/lib/agent-api/plan";
 import { PLAN_POINTS } from "@/lib/points/rules";
 
-const bob: AgentContext = { agentId: "agent-bob", name: "Bob's agent", ownerId: "bob", tenantId: "t1", level: "working", burst: false, keyId: "k1" };
+const bob: AgentContext = { agentId: "agent-bob", name: "Bob's agent", ownerId: "bob", organisationId: "t1", level: "working", burst: false, keyId: "k1" };
 const cara: AgentContext = { ...bob, agentId: "agent-cara", name: "Cara's agent", ownerId: "cara" };
 
 const HOUR = 60 * 60_000;
 const awardedAt = new Date(Date.now() - HOUR);
 const claim = { id: "claim1", bugId: "bug1", agentId: "agent-bob", beneficiaryUserId: "bob", offeredAt: awardedAt, createdAt: awardedAt };
-const planning = { id: "bug1", number: 5, title: "Learners drop off", substatus: "plan_review", projectId: "p1", tenantId: "t1", assigneeId: null, assignee: null };
+const planning = { id: "bug1", number: 5, title: "Learners drop off", substatus: "plan_review", projectId: "p1", organisationId: "t1", assigneeId: null, assignee: null };
 
 const input = {
   summary: "Measure the drop-off, then fix the biggest friction point.",
@@ -79,7 +79,7 @@ beforeEach(() => {
   db.plan.update.mockResolvedValue({ id: "plan1" });
   db.user.findUniqueOrThrow.mockResolvedValue({ name: "Bob" });
   db.pointEntry.createMany.mockResolvedValue({ count: 1 });
-  db.tenant.findUnique.mockResolvedValue(null);
+  db.organisation.findUnique.mockResolvedValue(null);
   db.issueBid.updateMany.mockResolvedValue({ count: 1 });
 });
 
@@ -219,11 +219,11 @@ describe("the plan window", () => {
   });
 
   it("releases a lapsed award: owner_unresponsive when a plan was waiting, plan_expired when none was, and leaves a live one alone", async () => {
-    const lapsed = { ...claim, offeredAt: new Date(Date.now() - 3 * HOUR), createdAt: new Date(Date.now() - 3 * HOUR), bug: { projectId: "p1", tenantId: "t1" } };
+    const lapsed = { ...claim, offeredAt: new Date(Date.now() - 3 * HOUR), createdAt: new Date(Date.now() - 3 * HOUR), bug: { projectId: "p1", organisationId: "t1" } };
     db.issueClaim.findMany.mockResolvedValue([
       { ...lapsed, id: "claim1", plan: { id: "plan1", decision: null, reviewBy: new Date(Date.now() - 1000), round: 1 } },
       { ...lapsed, id: "claim2", bugId: "bug2", plan: null },
-      { ...claim, id: "claim3", bugId: "bug3", bug: { projectId: "p1", tenantId: "t1" }, plan: null },
+      { ...claim, id: "claim3", bugId: "bug3", bug: { projectId: "p1", organisationId: "t1" }, plan: null },
     ]);
     db.issueClaim.findFirst.mockImplementation(async ({ where }: { where: { bugId: string } }) => ({ ...claim, id: where.bugId === "bug1" ? "claim1" : "claim2", bugId: where.bugId }));
     await expect(sweepPlanWindows()).resolves.toEqual({ expired: 2 });

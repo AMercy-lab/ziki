@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { IssueApiError } from "@/lib/agent-api/errors";
 import { approvePlan, ownerStepsSchema, sendBackPlan } from "@/lib/agent-api/plan";
 import { revalidateIssue } from "@/lib/revalidate-issue";
-import { bugInTenant, currentTenantIdFor } from "@/lib/tenant-context";
+import { bugInOrganisation, currentOrganisationIdFor } from "@/lib/organisation-context";
 
 export type PlanReviewResult = { ok: true } | { ok: false; error: string };
 
@@ -17,8 +17,8 @@ export type PlanReviewResult = { ok: true } | { ok: false; error: string };
  */
 async function ownedIssue(bugId: string) {
   const user = await requireUser();
-  const tenantId = await currentTenantIdFor(user.id);
-  const bug = await prisma.bug.findFirst({ where: { id: bugId, ...bugInTenant(tenantId), isDeleted: false }, select: { id: true } });
+  const organisationId = await currentOrganisationIdFor(user.id);
+  const bug = await prisma.bug.findFirst({ where: { id: bugId, ...bugInOrganisation(organisationId), isDeleted: false }, select: { id: true } });
   return bug ? { user, bug } : null;
 }
 

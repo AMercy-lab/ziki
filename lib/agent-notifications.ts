@@ -10,7 +10,7 @@ import type { NotificationEvent } from "@/lib/notifications";
  * recipient can be unit-tested without a database.
  *
  * The inputs are plain shapes rather than Prisma rows, so callers pass the
- * names they already have instead of this module loading agents and tenants.
+ * names they already have instead of this module loading agents and organisations.
  */
 
 type Agent = { name: string };
@@ -19,7 +19,7 @@ type Issue = { bugId?: string | null; bugTitle?: string | null };
 export type AgentQuestionInput = Issue & {
   id: string;
   body: string;
-  tenantId: string;
+  organisationId: string;
   /** The owner being asked; the only person who may answer (#446). */
   ownerUserId: string;
   agent: Agent;
@@ -30,7 +30,7 @@ export type AgentQuestionInput = Issue & {
 export type ApprovalInput = Issue & {
   id: string;
   title: string;
-  tenantId?: string;
+  organisationId?: string;
   /** The person the proposing agent acts for (#431). */
   onBehalfOfUserId: string;
   agent: Agent;
@@ -39,17 +39,17 @@ export type ApprovalInput = Issue & {
 export type PlanSubmittedInput = Issue & {
   /** The plan's id. */
   id: string;
-  tenantId: string;
+  organisationId: string;
   /** The agent's owner, who decides. */
   ownerUserId: string;
   round: number;
   agent: Agent;
 };
 
-export type TenantInviteInput = {
+export type OrganisationInviteInput = {
   id: string;
-  tenantName: string;
-  tenantId?: string;
+  organisationName: string;
+  organisationId?: string;
   /** The account the invite went to, when one exists for its email (#444). */
   inviteeUserId: string;
   invitedBy: { id: string; name: string };
@@ -67,7 +67,7 @@ export type ReviewerEligibleInput = {
   agent: Agent;
   /** The person who owns the agent and chooses its role. */
   ownerUserId: string;
-  tenantId: string;
+  organisationId: string;
 };
 
 export type MergeFailedInput = Issue & {
@@ -92,7 +92,7 @@ export function agentQuestionEvent(question: AgentQuestionInput): NotificationEv
     actorId: null,
     actorName: question.agent.name,
     recipientId: question.ownerUserId,
-    tenantId: question.tenantId,
+    organisationId: question.organisationId,
     questionId: question.id,
     excerpt: excerpt(question.body) || undefined,
     bugId: question.bugId ?? null,
@@ -107,7 +107,7 @@ export function approvalNeededEvent(proposal: ApprovalInput): NotificationEvent 
     actorId: null,
     actorName: proposal.agent.name,
     recipientId: proposal.onBehalfOfUserId,
-    tenantId: proposal.tenantId,
+    organisationId: proposal.organisationId,
     proposalId: proposal.id,
     proposalTitle: proposal.title,
     bugId: proposal.bugId ?? null,
@@ -121,7 +121,7 @@ export function planSubmittedEvent(plan: PlanSubmittedInput): NotificationEvent 
     actorId: null,
     actorName: plan.agent.name,
     recipientId: plan.ownerUserId,
-    tenantId: plan.tenantId,
+    organisationId: plan.organisationId,
     planId: plan.id,
     round: plan.round,
     bugId: plan.bugId ?? null,
@@ -129,15 +129,15 @@ export function planSubmittedEvent(plan: PlanSubmittedInput): NotificationEvent 
   };
 }
 
-export function tenantInviteEvent(invite: TenantInviteInput): NotificationEvent {
+export function organisationInviteEvent(invite: OrganisationInviteInput): NotificationEvent {
   return {
-    kind: "tenant_invite",
+    kind: "organisation_invite",
     actorId: invite.invitedBy.id,
     actorName: invite.invitedBy.name,
     recipientId: invite.inviteeUserId,
-    tenantId: invite.tenantId,
+    organisationId: invite.organisationId,
     inviteId: invite.id,
-    tenantName: invite.tenantName,
+    organisationName: invite.organisationName,
   };
 }
 
@@ -159,7 +159,7 @@ export function reviewerEligibleEvent(input: ReviewerEligibleInput): Notificatio
     actorId: null,
     actorName: input.agent.name,
     recipientId: input.ownerUserId,
-    tenantId: input.tenantId,
+    organisationId: input.organisationId,
   };
 }
 
@@ -193,10 +193,10 @@ export function notifyPlanSubmitted(plan: PlanSubmittedInput): void {
  * an account can get an in-app notification; anyone else learns of the
  * invite from the link #444 sends them.
  */
-export async function notifyTenantInvite(invite: {
+export async function notifyOrganisationInvite(invite: {
   id: string;
-  tenantName: string;
-  tenantId?: string;
+  organisationName: string;
+  organisationId?: string;
   email: string;
   invitedBy: { id: string; name: string };
 }): Promise<void> {
@@ -205,7 +205,7 @@ export async function notifyTenantInvite(invite: {
     select: { id: true },
   });
   if (!invitee) return;
-  notifyLater(tenantInviteEvent({ ...invite, inviteeUserId: invitee.id }));
+  notifyLater(organisationInviteEvent({ ...invite, inviteeUserId: invitee.id }));
 }
 
 export function notifyClaimOffered(claim: ClaimOfferInput): void {

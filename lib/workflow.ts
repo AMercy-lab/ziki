@@ -60,6 +60,7 @@ export async function workflowFor(
         acceptThreshold: true,
         stakeLimit: true,
         stakeInProgressLimit: true,
+        revisionLimit: true,
         planReviewSeconds: true,
       },
     })) as Partial<ProjectWorkflowValues> | null;

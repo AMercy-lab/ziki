@@ -198,8 +198,8 @@ export async function approvedPlan(bugId: string, db: Db = prisma): Promise<Plan
 }
 
 /** `GET /api/v1/issues/{id}/plan`: the issue's current plan with its revisions and replies. */
-export async function readPlan(scope: { tenantId: string; projectId: string }, issueRef: string): Promise<{ plan: PlanView | null; deadline: Date | null }> {
-  const bugId = await issueIdFor(prisma, issueRef, scope.tenantId);
+export async function readPlan(scope: { organisationId: string; projectId: string }, issueRef: string): Promise<{ plan: PlanView | null; deadline: Date | null }> {
+  const bugId = await issueIdFor(prisma, issueRef, scope.organisationId);
   const bug = bugId ? await prisma.bug.findFirst({ where: { id: bugId, ...scope, isDeleted: false }, select: { id: true, substatus: true, projectId: true } }) : null;
   if (!bug) throw new IssueApiError(404, "Issue not found in this project.");
   const plan = await currentPlan(bug.id);
@@ -237,8 +237,8 @@ export async function submitPlan(agent: AgentContext, projectId: string, issueRe
   assertKeyProject(agent, projectId);
   const input = parsePlan(raw);
   const result = await prisma.$transaction(async (tx) => {
-    const bugId = await issueIdFor(tx, issueRef, agent.tenantId);
-    const bug = bugId ? await tx.bug.findFirst({ where: { id: bugId, tenantId: agent.tenantId, projectId, isDeleted: false }, select: { id: true, number: true, title: true, substatus: true, projectId: true } }) : null;
+    const bugId = await issueIdFor(tx, issueRef, agent.organisationId);
+    const bug = bugId ? await tx.bug.findFirst({ where: { id: bugId, organisationId: agent.organisationId, projectId, isDeleted: false }, select: { id: true, number: true, title: true, substatus: true, projectId: true } }) : null;
     if (!bug) throw new IssueApiError(404, "Issue not found in this project.");
     const claim = await lockPlanningClaim(tx, bug.id);
     if (bug.substatus !== "plan_review" || !claim) refuse(409, "not_in_plan_review", "This issue is not in plan review.");
@@ -272,12 +272,12 @@ export async function submitPlan(agent: AgentContext, projectId: string, issueRe
       },
     });
     await publish(tx, {
-      tenantId: agent.tenantId, type: "plan.submitted", actorAgentId: agent.agentId, bugId: bug.id,
+      organisationId: agent.organisationId, type: "plan.submitted", actorAgentId: agent.agentId, bugId: bug.id,
       payload: { planId: plan.id, claimId: claim.id, issueId: bug.id, projectId: bug.projectId, beneficiaryUserId: claim.beneficiaryUserId, round, reviewBy: deadline.toISOString() },
     });
     return { planId: plan.id, round, reviewBy: deadline, bug, claim };
   }, { maxWait: 10000, timeout: 15000 });
-  notifyPlanSubmitted({ id: result.planId, bugId: result.bug.id, bugTitle: result.bug.title, tenantId: agent.tenantId, ownerUserId: result.claim.beneficiaryUserId, round: result.round, agent: { name: agent.name } });
+  notifyPlanSubmitted({ id: result.planId, bugId: result.bug.id, bugTitle: result.bug.title, organisationId: agent.organisationId, ownerUserId: result.claim.beneficiaryUserId, round: result.round, agent: { name: agent.name } });
   return { planId: result.planId, round: result.round, reviewBy: result.reviewBy.toISOString(), status: "waiting" as const };
 }
 
@@ -305,7 +305,7 @@ async function lockWaitingPlan(tx: Tx, decider: Decider, bugId: string) {
 export async function approvePlan(decider: Decider, bugId: string) {
   return prisma.$transaction(async (tx) => {
     const { claim, plan } = await lockWaitingPlan(tx, decider, bugId);
-    const bug = await tx.bug.findUniqueOrThrow({ where: { id: bugId }, select: { id: true, number: true, title: true, tenantId: true, projectId: true, assigneeId: true, assignee: { select: { name: true } } } });
+    const bug = await tx.bug.findUniqueOrThrow({ where: { id: bugId }, select: { id: true, number: true, title: true, organisationId: true, projectId: true, assigneeId: true, assignee: { select: { name: true } } } });
     const beneficiary = await tx.user.findUniqueOrThrow({ where: { id: claim.beneficiaryUserId }, select: { name: true } });
     const now = new Date();
     const deliverBy = new Date(now.getTime() + plan.estimateMinutes * 60_000);
@@ -326,15 +326,15 @@ export async function approvePlan(decider: Decider, bugId: string) {
     // The award is taken up: the other open bids on the issue are withdrawn, as on an accepted offer.
     await tx.issueBid.updateMany({ where: { bugId, withdrawnAt: null, awardedAt: null }, data: { withdrawnAt: now } });
     await award(tx, {
-      tenantId: bug.tenantId, userId: claim.beneficiaryUserId, bugId, role: "plan", points: PLAN_POINTS,
+      organisationId: bug.organisationId, userId: claim.beneficiaryUserId, bugId, role: "plan", points: PLAN_POINTS,
       sourceKey: planSourceKey(bugId, claim.id), agentId: claim.agentId,
     });
     await publish(tx, {
-      tenantId: bug.tenantId, type: "plan.approved", actorAgentId: null, bugId,
+      organisationId: bug.organisationId, type: "plan.approved", actorAgentId: null, bugId,
       payload: { planId: plan.id, claimId: claim.id, issueId: bugId, projectId: bug.projectId, beneficiaryUserId: claim.beneficiaryUserId, round: plan.round, deliverBy: deliverBy.toISOString(), decidedByUserId: decider.userId },
     });
     await publish(tx, {
-      tenantId: bug.tenantId, type: "claim.accepted", actorAgentId: claim.agentId, bugId,
+      organisationId: bug.organisationId, type: "claim.accepted", actorAgentId: claim.agentId, bugId,
       payload: { claimId: claim.id, issueId: bugId, projectId: bug.projectId, beneficiaryUserId: claim.beneficiaryUserId, via: "plan_approved" },
     });
     return { planId: plan.id, claimId: claim.id, deliverBy };
@@ -354,7 +354,7 @@ export async function sendBackPlan(decider: Decider, bugId: string, input: { ste
   return prisma.$transaction(async (tx) => {
     const { claim, plan } = await lockWaitingPlan(tx, decider, bugId);
     if (plan.round >= MAX_PLAN_ROUNDS) refuse(409, "plan_rounds_exhausted", "This plan was sent back twice already: approve it, or let the window run out.");
-    const bug = await tx.bug.findUniqueOrThrow({ where: { id: bugId }, select: { id: true, tenantId: true, projectId: true } });
+    const bug = await tx.bug.findUniqueOrThrow({ where: { id: bugId }, select: { id: true, organisationId: true, projectId: true } });
     const now = new Date();
     const before = new Map(toSteps(plan.steps).map((step) => [step.id, step]));
     const steps: PlanStep[] = edited.map((step, index) => {
@@ -372,7 +372,7 @@ export async function sendBackPlan(decider: Decider, bugId: string, input: { ste
       },
     });
     await publish(tx, {
-      tenantId: bug.tenantId, type: "plan.sent_back", actorAgentId: null, bugId,
+      organisationId: bug.organisationId, type: "plan.sent_back", actorAgentId: null, bugId,
       payload: { planId: plan.id, claimId: claim.id, issueId: bugId, projectId: bug.projectId, beneficiaryUserId: claim.beneficiaryUserId, round: plan.round, reviewBy: reviewBy.toISOString(), decidedByUserId: decider.userId, note },
     });
     return { planId: plan.id, round: plan.round, reviewBy, sendBacksLeft: MAX_PLAN_ROUNDS - plan.round - 1 };
@@ -391,7 +391,7 @@ export async function releasePlanningClaim(
   tx: Tx,
   claim: { id: string; bugId: string; agentId: string; beneficiaryUserId: string },
   reason: PlanReleaseReason,
-  options: { withdrawBid?: boolean; actorAgentId?: string | null; tenantId: string } ,
+  options: { withdrawBid?: boolean; actorAgentId?: string | null; organisationId: string } ,
 ): Promise<void> {
   const now = new Date();
   await tx.issueClaim.update({ where: { id: claim.id }, data: { status: "released", releasedAt: now, releaseReason: reason } });
@@ -403,7 +403,7 @@ export async function releasePlanningClaim(
     await tx.bugActivity.create({ data: { bugId: claim.bugId, actorId: claim.beneficiaryUserId, type: "status_changed", summary: statusChangedSummary("plan_review", "open"), metadata: { field: "status", from: "plan_review", to: "open", via: reason, claimId: claim.id } } });
   }
   await publish(tx, {
-    tenantId: options.tenantId, type: "claim.released", actorAgentId: options.actorAgentId ?? null, bugId: claim.bugId,
+    organisationId: options.organisationId, type: "claim.released", actorAgentId: options.actorAgentId ?? null, bugId: claim.bugId,
     payload: { claimId: claim.id, issueId: claim.bugId, beneficiaryUserId: claim.beneficiaryUserId, reason },
   });
 }
@@ -417,17 +417,17 @@ export async function refusePlan(agent: AgentContext, projectId: string, issueRe
   requireLevel(agent, "working");
   assertKeyProject(agent, projectId);
   return prisma.$transaction(async (tx) => {
-    const bugId = await issueIdFor(tx, issueRef, agent.tenantId);
-    const bug = bugId ? await tx.bug.findFirst({ where: { id: bugId, tenantId: agent.tenantId, projectId, isDeleted: false }, select: { id: true, substatus: true, projectId: true } }) : null;
+    const bugId = await issueIdFor(tx, issueRef, agent.organisationId);
+    const bug = bugId ? await tx.bug.findFirst({ where: { id: bugId, organisationId: agent.organisationId, projectId, isDeleted: false }, select: { id: true, substatus: true, projectId: true } }) : null;
     if (!bug) throw new IssueApiError(404, "Issue not found in this project.");
     const claim = await lockPlanningClaim(tx, bug.id);
     if (bug.substatus !== "plan_review" || !claim) refuse(409, "not_in_plan_review", "This issue is not in plan review.");
     if (claim.agentId !== agent.agentId) refuse(409, "not_holder", "Only the agent awarded this issue can refuse its plan.");
     const plan = await tx.plan.findUnique({ where: { claimId: claim.id }, select: { id: true, decision: true, round: true } });
     if (!plan || plan.decision !== "sent_back") refuse(409, "plan_not_sent_back", "There is nothing to refuse: refuse a plan your owner sent back with edits. To give the award up otherwise, release the claim.");
-    await releasePlanningClaim(tx, claim, "plan_refused", { withdrawBid: true, actorAgentId: agent.agentId, tenantId: agent.tenantId });
+    await releasePlanningClaim(tx, claim, "plan_refused", { withdrawBid: true, actorAgentId: agent.agentId, organisationId: agent.organisationId });
     await publish(tx, {
-      tenantId: agent.tenantId, type: "plan.refused", actorAgentId: agent.agentId, bugId: bug.id,
+      organisationId: agent.organisationId, type: "plan.refused", actorAgentId: agent.agentId, bugId: bug.id,
       payload: { planId: plan.id, claimId: claim.id, issueId: bug.id, projectId: bug.projectId, beneficiaryUserId: claim.beneficiaryUserId, round: plan.round },
     });
     return { planId: plan.id, claimId: claim.id, issueId: bug.id, released: true as const, reason: "plan_refused" as const };
@@ -441,13 +441,13 @@ export async function refusePlan(agent: AgentContext, projectId: string, issueRe
  * issue goes back to Open for bids (the agent bids afresh). Run by the
  * platform sweeper; idempotent.
  */
-export async function sweepPlanWindows(tenantId?: string, projectId?: string): Promise<{ expired: number }> {
+export async function sweepPlanWindows(organisationId?: string, projectId?: string): Promise<{ expired: number }> {
   const candidates = await prisma.issueClaim.findMany({
     where: {
       status: "planning", releasedAt: null,
-      ...(tenantId || projectId ? { bug: { ...(tenantId ? { tenantId } : {}), ...(projectId ? { projectId } : {}) } } : {}),
+      ...(organisationId || projectId ? { bug: { ...(organisationId ? { organisationId } : {}), ...(projectId ? { projectId } : {}) } } : {}),
     },
-    select: { id: true, bugId: true, offeredAt: true, createdAt: true, bug: { select: { projectId: true, tenantId: true } }, plan: { select: { id: true, decision: true, reviewBy: true, round: true } } },
+    select: { id: true, bugId: true, offeredAt: true, createdAt: true, bug: { select: { projectId: true, organisationId: true } }, plan: { select: { id: true, decision: true, reviewBy: true, round: true } } },
   });
   const now = Date.now();
   let expired = 0;
@@ -459,9 +459,9 @@ export async function sweepPlanWindows(tenantId?: string, projectId?: string): P
       const claim = await lockPlanningClaim(tx, candidate.bugId);
       if (!claim || claim.id !== candidate.id) return false;
       const reason: PlanReleaseReason = candidate.plan && candidate.plan.decision === null ? "owner_unresponsive" : "plan_expired";
-      await releasePlanningClaim(tx, claim, reason, { tenantId: candidate.bug.tenantId });
+      await releasePlanningClaim(tx, claim, reason, { organisationId: candidate.bug.organisationId });
       await publish(tx, {
-        tenantId: candidate.bug.tenantId, type: "plan.expired", actorAgentId: null, bugId: claim.bugId,
+        organisationId: candidate.bug.organisationId, type: "plan.expired", actorAgentId: null, bugId: claim.bugId,
         payload: { planId: candidate.plan?.id ?? null, claimId: claim.id, issueId: claim.bugId, projectId: candidate.bug.projectId, beneficiaryUserId: claim.beneficiaryUserId, reason, round: candidate.plan?.round ?? 0 },
       });
       return true;

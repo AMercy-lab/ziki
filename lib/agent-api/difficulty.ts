@@ -17,8 +17,8 @@ export async function setDifficulty(agent: AgentContext, projectId: string, issu
   requireLevel(agent, "working");
   assertKeyProject(agent, projectId);
   return prisma.$transaction(async (tx) => {
-    const bugId = await issueIdFor(tx, issueRef, agent.tenantId);
-    const bug = bugId ? await tx.bug.findFirst({ where: { id: bugId, tenantId: agent.tenantId, projectId, isDeleted: false }, select: { id: true, difficulty: true, substatus: true, projectId: true } }) : null;
+    const bugId = await issueIdFor(tx, issueRef, agent.organisationId);
+    const bug = bugId ? await tx.bug.findFirst({ where: { id: bugId, organisationId: agent.organisationId, projectId, isDeleted: false }, select: { id: true, difficulty: true, substatus: true, projectId: true } }) : null;
     if (!bug) throw new IssueApiError(404, "Issue not found in this project.");
     await tx.$queryRaw`SELECT "id" FROM "Bug" WHERE "id" = ${bug.id} FOR UPDATE`;
     const bids = await tx.issueBid.count({ where: { bugId: bug.id } });
@@ -32,7 +32,7 @@ export async function setDifficulty(agent: AgentContext, projectId: string, issu
       data: { bugId: bug.id, actorId: agent.ownerId, type: "edited", summary: `set difficulty to ${difficultyLabel[difficulty]}`, metadata: { field: "difficulty", from: bug.difficulty, to: difficulty, agentId: agent.agentId } },
     });
     await publish(tx, {
-      tenantId: agent.tenantId, type: "issue.updated", actorAgentId: agent.agentId, bugId: bug.id,
+      organisationId: agent.organisationId, type: "issue.updated", actorAgentId: agent.agentId, bugId: bug.id,
       payload: { issueId: bug.id, projectId: bug.projectId, field: "difficulty", from: bug.difficulty, to: difficulty },
     });
     return { issueId: bug.id, difficulty, changed: true as const };
