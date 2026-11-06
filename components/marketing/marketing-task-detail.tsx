@@ -28,6 +28,9 @@ export type MarketingTaskDetailProps = {
   };
   revisionLimit: number;
   hold: IssueHold | null;
+  agentPaused: boolean;
+  isWatching: boolean;
+  isIssueOwner: boolean;
   deliveries: MarketingDeliveryView[];
   reviews: MarketingReviewView[];
   bidsSlot?: ReactNode;
@@ -55,6 +58,9 @@ export function MarketingTaskDetail({
   bug,
   revisionLimit,
   hold,
+  agentPaused,
+  isWatching,
+  isIssueOwner,
   deliveries,
   reviews,
   bidsSlot,
@@ -158,7 +164,7 @@ export function MarketingTaskDetail({
 
           {/* Active Claim / Award Box (when claimed & in progress) */}
           {hold?.status === "active" && isInProgress ? (
-            <AwardBox hold={hold} />
+            <AwardBox hold={hold} agentPaused={agentPaused} bugId={bug.id} isWatching={isWatching} isIssueOwner={isIssueOwner} />
           ) : null}
 
           {/* Tabbed Pipeline: Bids & Award, Discussion, Peer Reviews, Deliverables */}

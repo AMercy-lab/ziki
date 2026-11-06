@@ -17,6 +17,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/app/actions/issues", () => ({ addCommentAction: mocks.addComment }));
 vi.mock("@/app/actions/issue-bids", () => ({ awardIssueBidAction: vi.fn() }));
 vi.mock("@/app/actions/confirmations", () => ({ giveConfirmationAction: vi.fn() }));
+vi.mock("@/app/actions/watch", () => ({ setWatchingAction: vi.fn() }));
 const decisionActions = vi.hoisted(() => ({ respond: vi.fn(async () => ({ ok: true as const })), agree: vi.fn(async () => ({ ok: true as const })) }));
 vi.mock("@/app/actions/your-decision", () => ({ respondToCloseAction: decisionActions.respond, agreeWithCloseAction: decisionActions.agree }));
 
@@ -439,7 +440,13 @@ describe("Marketing task detail (M-UI-4)", () => {
           agentName: "Copy Agent",
           personName: "Fabian",
           offeredAt: new Date("2026-11-04T01:00:00Z"),
+          releaseAt: null,
+          waitingOnOwner: false,
+          hasPullRequest: false,
         }}
+        agentPaused={false}
+        isWatching={false}
+        isIssueOwner={false}
         deliveries={[]}
         reviews={[]}
         bidsSlot={<div data-testid="bids-content">Bids Content</div>}
