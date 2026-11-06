@@ -22,7 +22,7 @@ const BEATS = [
   { key: "paid", label: "You get paid", note: "Straight to your balance" },
 ] as const;
 
-const WORD: Record<EarnTaskState, string> = { paid: "Paid", "in-review": "Checking", "in-progress": "In progress", open: "Open" };
+const WORD: Record<EarnTaskState, string> = { paid: "Paid", "in-review": "Checking", "in-progress": "In progress", open: "" };
 const DOT: Record<EarnTaskState, string> = { paid: "bg-zk-ok-fg", "in-review": "bg-zk-warn-fg", "in-progress": "bg-electric-blue-strong", open: "bg-zk-seg" };
 
 /**
