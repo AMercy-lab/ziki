@@ -5,7 +5,27 @@ import { useActionState, useRef } from "react";
 import { switchIssueWorkspaceAction } from "@/app/(app)/tenants/issue-switch-action";
 import type { IssueTenantHint } from "@/lib/issue-tenant-hint";
 import { stateLabel } from "@/lib/labels";
-import styles from "./issue-workspace-switch.module.css";
+
+// Keep the notice in the app's Tailwind pipeline: its Turbopack CSS loader
+// does not export CSS-module class names.
+const styles = {
+  notice: "mx-auto my-10 flex max-w-[684px] flex-col gap-[22px] rounded-2xl bg-zk-surface p-8 text-sm leading-normal text-zk-text max-[560px]:mx-0 max-[560px]:my-5 max-[560px]:px-4 max-[560px]:py-[22px] [&_h1]:m-0 [&_h1]:text-[clamp(22px,4vw,28px)] [&_h1]:leading-tight [&_h1]:tracking-[-.015em] [&_h1]:text-balance",
+  eyebrow: "self-start rounded-full bg-zk-warn-bg px-2.5 py-1 text-[11.5px] font-semibold uppercase tracking-[.06em] text-zk-warn-fg",
+  lede: "m-0 text-[15px] text-zk-text2 [&_strong]:font-semibold [&_strong]:text-zk-text",
+  route: "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 max-[560px]:grid-cols-1",
+  workspace: "flex min-w-0 items-center gap-2.5 rounded-xl border border-zk-border bg-zk-bg px-3.5 py-3 break-words [&_strong]:font-semibold [&_small]:block [&_small]:text-xs [&_small]:text-zk-muted",
+  avatar: "grid size-[30px] shrink-0 place-items-center rounded-lg bg-zk-chip text-[13px] font-bold text-zk-text2",
+  target: "!border-zk-accent !bg-zk-info-bg [&_small]:!text-zk-info-fg [&>span]:bg-zk-surface [&>span]:text-zk-info-fg",
+  arrow: "text-2xl text-zk-muted max-[560px]:rotate-90 max-[560px]:justify-self-center",
+  preview: "flex flex-col gap-2 rounded-[14px] border border-zk-border bg-zk-bg px-[18px] py-4 break-words [&>strong]:text-[15px] [&>strong]:font-semibold [&>small]:text-xs [&>small]:text-zk-muted",
+  metadata: "flex flex-wrap items-center gap-2 text-xs text-zk-text2",
+  status: "rounded-full bg-zk-chip px-[9px] py-[3px] text-[11px] font-semibold text-zk-text2",
+  actions: "flex flex-wrap gap-2.5",
+  primary: "inline-flex cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-zk-accent bg-zk-info-bg px-[18px] py-3 text-sm leading-[1.3] font-semibold text-zk-info-fg no-underline hover:bg-zk-tint focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-zk-accent disabled:cursor-wait disabled:opacity-65 max-[560px]:w-full",
+  secondary: "inline-flex items-center justify-center gap-2 rounded-[10px] border border-zk-border bg-transparent px-[18px] py-3 text-sm leading-[1.3] font-semibold text-zk-text2 no-underline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-zk-accent max-[560px]:w-full",
+  error: "m-0 text-[13px] text-zk-bad-fg",
+  fine: "m-0 text-xs text-zk-muted",
+};
 
 export function IssueTenantSwitch({issueId, tenant, currentWorkspace, destination}: {issueId: string; tenant: IssueTenantHint; currentWorkspace?: string; destination: string}) {
   const [state, action, pending] = useActionState(switchIssueWorkspaceAction, {});
