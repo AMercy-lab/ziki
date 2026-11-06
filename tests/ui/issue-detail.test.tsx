@@ -6,7 +6,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** The issue page's stage panels: bids with their votes and the Award control only where it may be used, confirmations and their banner, and judgements and merge reviews with their replies. */
-const mocks = vi.hoisted(() => ({ addComment: vi.fn(), editPullRequestUrl: vi.fn() }));
+const mocks = vi.hoisted(() => ({ addComment: vi.fn(), editPullRequestUrl: vi.fn(), switchWorkspace: vi.fn() }));
+vi.mock("@/app/(app)/organisations/issue-switch-action", () => ({ switchIssueWorkspaceAction: mocks.switchWorkspace }));
 const libraryRefresh = vi.hoisted(() => vi.fn());
 vi.mock("@/app/(app)/[org]/[project]/marketing/output-box/actions", () => ({ refreshLibrary: libraryRefresh }));
 vi.mock("next/navigation", () => ({
@@ -28,6 +29,7 @@ vi.mock("@/app/actions/your-decision", () => ({ respondToCloseAction: decisionAc
 import { MergeReviewsPanel, TestVerdictsPanel, type MergeReviewView, type TestVerdictView } from "@/components/issue-review-entries";
 import { IssueBidsPanel, type BidEntryView } from "@/components/issue-bids";
 import { IssueConfirmationsPanel, type ConfirmationEntryView, type ConfirmationsData } from "@/components/issue-confirmations";
+import { IssueOrganisationSwitch } from "@/components/issue-organisation-hint";
 import { IssueLinks } from "@/components/issue-links";
 import { CopyIssueSummaryButton } from "@/components/copy-issue-summary-button";
 import { formatIssueSummary } from "@/lib/issue-share-summary";
@@ -73,6 +75,27 @@ const review: MergeReviewView = {
 
 beforeEach(() => vi.clearAllMocks());
 afterEach(() => cleanup());
+
+describe("shared issue workspace switch", () => {
+  it("submits the exact issue, workspace, query and anchor, and allows retry after failure", async () => {
+    mocks.switchWorkspace.mockResolvedValue({ error: "Switch failed. Try again." });
+    window.history.replaceState(null, "", "/engineering/app/73?comment=c1#comment-c1");
+    const user = userEvent.setup();
+    render(<IssueOrganisationSwitch issueId="internal" currentWorkspace="Design" destination="/engineering/app/73?comment=c1" organisation={{ id: "eng", name: "Engineering", slug: "engineering", issue: { number: 73, title: "Preserve shared links", substatus: "open", projectName: "Web" } }} />);
+    const button = screen.getByRole("button", { name: /Switch to Engineering and open #73/ });
+    expect(screen.getByRole("link", { name: "Stay in Design" })).toHaveAttribute("href", "/home");
+    await user.click(button);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Switch failed. Try again."));
+    const submitted = mocks.switchWorkspace.mock.calls[0][1] as FormData;
+    expect(submitted.get("issueId")).toBe("internal");
+    expect(submitted.get("organisationId")).toBe("eng");
+    expect(submitted.get("returnTo")).toBe("/engineering/app/73?comment=c1#comment-c1");
+    expect(button).toBeEnabled();
+    await user.click(button);
+    await waitFor(() => expect(mocks.switchWorkspace).toHaveBeenCalledTimes(2));
+    window.history.replaceState(null, "", "/");
+  });
+});
 
 describe("Library approved deliverables", () => {
   const items: LibraryItem[] = [

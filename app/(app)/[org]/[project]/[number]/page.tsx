@@ -321,13 +321,20 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   if (lookup.kind === "elsewhere") {
     // A link into another of the viewer's organisations should not dead-end (#519):
     // name the organisation and offer the switch. Non-members still get the 404.
+    const activeOrganisationId = await currentOrganisationIdFor(userId);
     const hint = await issueOrganisationHintFor(prisma, {
       userId,
-      activeOrganisationId: await currentOrganisationIdFor(userId),
+      activeOrganisationId,
       issueId: lookup.issueId,
     });
     if (!hint) notFound();
-    return <IssueOrganisationSwitch issueId={lookup.issueId} organisation={hint} />;
+    const currentWorkspace = activeOrganisationId ? await loadOptional("current workspace", null, () =>
+      prisma.organisation.findFirst({
+        where: { id: activeOrganisationId, archivedAt: null, memberships: { some: { userId } } },
+        select: { name: true },
+      }),
+    ) : null;
+    return <IssueOrganisationSwitch issueId={lookup.issueId} organisation={hint} currentWorkspace={currentWorkspace?.name} destination={`${issuePath(projectRef(org, projectSlug), number)}${queryString(query)}`} />;
   }
   if (lookup.kind === "moved") {
     // #project-urls: the number lives in another project of this organisation.
