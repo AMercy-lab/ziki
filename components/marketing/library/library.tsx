@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { refreshLibrary } from "@/app/(app)/[project]/marketing/output-box/actions";
-import { marketingPath, projectPath } from "@/lib/project-paths";
+import { refreshLibrary } from "@/app/(app)/[org]/[project]/marketing/output-box/actions";
+import { marketingPath, projectPath, type ProjectRef } from "@/lib/project-paths";
 import { formatBytes } from "@/lib/attachments";
 import { formatDate } from "@/lib/format";
 import { CONTENT_TYPES, filterLibrary, type ContentType, type LibraryFile, type LibraryItem, type LibraryResult } from "./model";
@@ -30,7 +30,7 @@ function FileThumbnail({ file }: { file?: LibraryFile }) {
   </span>;
 }
 
-export function Library({ slug, projectName, initial }: { slug: string; projectName: string; initial: LibraryResult }) {
+export function Library({ slug, projectName, initial }: { slug: ProjectRef; projectName: string; initial: LibraryResult }) {
   const params = useSearchParams();
   const [result, setResult] = useState(initial);
   const [refreshError, setRefreshError] = useState(false);
@@ -152,7 +152,7 @@ export function Library({ slug, projectName, initial }: { slug: string; projectN
   </div>;
 }
 
-function DeliverablePreview({ file, item, slug }: { file: LibraryFile; item: LibraryItem; slug: string }) {
+function DeliverablePreview({ file, item, slug }: { file: LibraryFile; item: LibraryItem; slug: ProjectRef }) {
   const supported = ["Graphics", "Videos"].includes(file.kind);
   const [state, setState] = useState<"loading" | "ready" | "error">(supported ? "loading" : "ready");
   const [attempt, setAttempt] = useState(0);

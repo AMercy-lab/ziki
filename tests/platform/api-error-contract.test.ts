@@ -21,7 +21,6 @@ import { penaltySchema } from "@/lib/agent-api/confirmation-penalties";
 import { ideaVerdictFields } from "@/lib/agent-api/idea-verdicts";
 import { recordMistakeSchema } from "@/lib/agent-api/mistakes";
 import { createIdeaSchema } from "@/lib/agent-api/ideas";
-import { platformAssignSchema } from "@/lib/agent-api/platform-assign";
 import { stakeSchema } from "@/lib/agent-api/stakes";
 import { estimateSchema } from "@/lib/agent-api/reward-estimates";
 import { abandonVoteSchema } from "@/lib/agent-api/abandon";
@@ -31,6 +30,7 @@ import { pullRequestReportSchema } from "@/lib/validations/pull-request-report";
 import { deploymentSchema } from "@/lib/agent-api/deployment";
 import { archiveIdeaSchema, withdrawIdeaSchema } from "@/lib/idea-archive";
 import { createMarketingTaskTypeSchema, updateMarketingTaskTypeSchema } from "@/lib/marketing/task-types";
+import { agentProfileUpdateSchema, agentSkillsReplaceSchema, agentSkillUpsertSchema } from "@/lib/validations/agent-profile";
 
 /** The HTTP contract agents rely on: unknown routes and methods answer JSON errors with the allowed methods, and every MCP/CLI tool sends exactly the fields its route accepts. */
 describe("agent API HTTP errors", () => {
@@ -72,10 +72,11 @@ describe("agent API HTTP errors", () => {
  * from the API (#612).
  */
 const ROUTE_SCHEMAS: Record<string, z.ZodType> = {
+  ziki_update_profile: agentProfileUpdateSchema,
+  ziki_set_skills: agentSkillsReplaceSchema,
+  ziki_set_skill: agentSkillUpsertSchema,
   ziki_deliver: deliveryBodySchema,
   ziki_create_idea: createIdeaSchema,
-  ziki_set_issue_platform: platformAssignSchema,
-  ziki_set_idea_platform: platformAssignSchema,
   ziki_stake_issue: stakeSchema,
   ziki_stake_idea: stakeSchema,
   ziki_estimate_reward: estimateSchema,

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import "@/app/(app)/[project]/issues/_list/issues.css";
+import "@/app/(app)/[org]/[project]/issues/_list/issues.css";
 import { RememberIssueList } from "@/components/back-to-list";
 import { IdeasList } from "@/components/ideas-list";
 import { RowAge } from "@/components/issue-row-meta";
@@ -15,7 +15,7 @@ import { formatIssueNumber } from "@/lib/issue-number";
 import { isDone } from "@/lib/issue-state";
 import type { BugSortOption } from "@/lib/issues-sort";
 import { ISSUE_SORT_COOKIE } from "@/lib/list-sort";
-import { marketingPath } from "@/lib/project-paths";
+import { marketingPath, type ProjectRef } from "@/lib/project-paths";
 import { TASK_STAGES, taskTab, tasksHref, type TaskRow, type TaskTabParam, type TasksBoardData } from "./model";
 
 const EMPTY: Record<TaskTabParam, string> = {
@@ -32,7 +32,7 @@ const EMPTY: Record<TaskTabParam, string> = {
  * the top, each stage's lifecycle steps down the left, ideas as the Ideas list
  * and tasks as issue rows. Tasks open on the shared issue route (D6).
  */
-export function TasksBoard({ slug, board }: { slug: string; board: TasksBoardData }) {
+export function TasksBoard({ slug, board }: { slug: ProjectRef; board: TasksBoardData }) {
   const { tab: current, counts, list, pagination, sortParam } = board;
   const stage = TASK_STAGES.find((candidate) => candidate.steps.includes(current.param));
   const isIdeas = list.kind === "proposals";

@@ -53,13 +53,14 @@ import {
   createMarketingIssueTypeAction,
   deleteMarketingIssueTypeAction,
   updateMarketingRevisionLimitAction,
-} from "@/app/(app)/[project]/marketing/settings/actions";
+} from "@/app/(app)/[org]/[project]/marketing/settings/actions";
 import { IssueApiError } from "@/lib/agent-api/errors";
 import {
   DEFAULT_PROJECT_WORKFLOW,
   revisionLimitSchema,
   workflowSettingsSchema,
   workflowValues } from "@/lib/workflow-config";
+import { projectRef } from "@/lib/project-paths";
 
 function form(values: Record<string, string | number | boolean> = {}) {
   const data = new FormData();
@@ -95,6 +96,8 @@ function form(values: Record<string, string | number | boolean> = {}) {
   }
   return data;
 }
+
+const WEB = projectRef("acme", "web");
 
 describe("updateProjectWorkflowAction (#595)", () => {
   beforeEach(() => {
@@ -283,13 +286,13 @@ describe("the marketing settings actions (M-UI-7)", () => {
 
   it("saves the revision limit through the marketing lib and revalidates the section", async () => {
     updateMarketingSettings.mockResolvedValue({ projectId: "project-1", slug: "web", name: "Web", revisionLimit: 3 });
-    await expect(updateMarketingRevisionLimitAction("web", revisionForm(3))).resolves.toEqual({ ok: true });
+    await expect(updateMarketingRevisionLimitAction(WEB, revisionForm(3))).resolves.toEqual({ ok: true });
     expect(updateMarketingSettings).toHaveBeenCalledWith("tenant-1", "project-1", "admin", { revisionLimit: 3 });
-    expect(revalidatePath).toHaveBeenCalledWith("/web/marketing/settings");
+    expect(revalidatePath).toHaveBeenCalledWith("/acme/web/marketing/settings");
   });
 
   it("refuses a limit outside 1 to 10 without saving", async () => {
-    await expect(updateMarketingRevisionLimitAction("web", revisionForm(11))).resolves.toMatchObject({
+    await expect(updateMarketingRevisionLimitAction(WEB, revisionForm(11))).resolves.toMatchObject({
       error: expect.any(String),
     });
     expect(updateMarketingSettings).not.toHaveBeenCalled();
@@ -299,14 +302,14 @@ describe("the marketing settings actions (M-UI-7)", () => {
     assertMarketingSettingsAccess.mockRejectedValue(
       new IssueApiError(403, "Only workspace owners and admins can change marketing settings."),
     );
-    await expect(updateMarketingRevisionLimitAction("web", revisionForm(3))).resolves.toMatchObject({
+    await expect(updateMarketingRevisionLimitAction(WEB, revisionForm(3))).resolves.toMatchObject({
       error: expect.stringContaining("owners and admins"),
     });
     expect(updateMarketingSettings).not.toHaveBeenCalled();
   });
 
   it("stores a new type on the marketing track", async () => {
-    await expect(createMarketingIssueTypeAction("web", typeForm({ name: "Email newsletter" }))).resolves.toEqual({
+    await expect(createMarketingIssueTypeAction(WEB, typeForm({ name: "Email newsletter" }))).resolves.toEqual({
       ok: true,
     });
     expect(typeCreate).toHaveBeenCalledWith(
@@ -319,13 +322,13 @@ describe("the marketing settings actions (M-UI-7)", () => {
   it("stores a type as inactive when the Active box is unticked", async () => {
     const form = typeForm({ name: "Email newsletter" });
     form.delete("isActive");
-    await expect(createMarketingIssueTypeAction("web", form)).resolves.toEqual({ ok: true });
+    await expect(createMarketingIssueTypeAction(WEB, form)).resolves.toEqual({ ok: true });
     expect(typeCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ isActive: false }) }));
   });
 
   it("refuses a name a type already uses, across tracks", async () => {
     typeFindFirst.mockResolvedValueOnce({ name: "Blog post" });
-    await expect(createMarketingIssueTypeAction("web", typeForm({ name: "blog post" }))).resolves.toMatchObject({
+    await expect(createMarketingIssueTypeAction(WEB, typeForm({ name: "blog post" }))).resolves.toMatchObject({
       error: expect.stringContaining("Blog post"),
     });
     expect(typeCreate).not.toHaveBeenCalled();
@@ -335,7 +338,7 @@ describe("the marketing settings actions (M-UI-7)", () => {
     typeFindFirst.mockResolvedValue({ id: "type-1" });
     bugCount.mockResolvedValue(2);
     ideaCount.mockResolvedValue(0);
-    await expect(deleteMarketingIssueTypeAction("web", "type-1")).resolves.toMatchObject({
+    await expect(deleteMarketingIssueTypeAction(WEB, "type-1")).resolves.toMatchObject({
       error: expect.stringContaining("Deactivate it instead"),
     });
     expect(typeDelete).not.toHaveBeenCalled();
@@ -345,12 +348,12 @@ describe("the marketing settings actions (M-UI-7)", () => {
     typeFindFirst.mockResolvedValue({ id: "type-1" });
     bugCount.mockResolvedValue(0);
     ideaCount.mockResolvedValue(0);
-    await expect(deleteMarketingIssueTypeAction("web", "type-1")).resolves.toEqual({ ok: true });
+    await expect(deleteMarketingIssueTypeAction(WEB, "type-1")).resolves.toEqual({ ok: true });
     expect(typeDelete).toHaveBeenCalledWith({ where: { id: "type-1" } });
   });
 
   it("creating a type never writes task activity", async () => {
-    await expect(createMarketingIssueTypeAction("web", typeForm({ name: "Social post" }))).resolves.toEqual({
+    await expect(createMarketingIssueTypeAction(WEB, typeForm({ name: "Social post" }))).resolves.toEqual({
       ok: true,
     });
     expect(bugActivityCreateMany).not.toHaveBeenCalled();

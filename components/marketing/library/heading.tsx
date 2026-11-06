@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { marketingPath, projectPath } from "@/lib/project-paths";
+import { marketingPath, projectPath, type ProjectRef } from "@/lib/project-paths";
 
-export function LibraryHeading({ slug, projectName }: { slug?: string; projectName?: string }) {
+export function LibraryHeading({ slug, projectName }: { slug?: ProjectRef; projectName?: string }) {
   return <>
     {slug && <nav aria-label="Breadcrumb" className="lb-breadcrumb">
       <Link href={projectPath(slug)}>{projectName ?? "Project"}</Link><span aria-hidden="true">›</span>

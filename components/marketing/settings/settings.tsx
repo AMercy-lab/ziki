@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { marketingPath, projectPath } from "@/lib/project-paths";
+import { marketingPath, projectPath, type ProjectRef } from "@/lib/project-paths";
 import { Badge } from "@/components/ui/badge";
 import type { MarketingBriefKey, MarketingSettingsData, MarketingTaskType } from "./model";
 import { BriefForm } from "./brief-form";
@@ -60,7 +60,7 @@ export function MarketingSettings({
   projectName,
   data,
 }: {
-  slug: string;
+  slug: ProjectRef;
   projectName: string;
   data: MarketingSettingsData;
 }) {

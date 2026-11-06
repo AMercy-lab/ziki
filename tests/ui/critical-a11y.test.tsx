@@ -23,8 +23,11 @@ import type { RejectedIdea } from "@/components/marketing/rejected-ideas/model";
 import { MarketingDeliverablesPanel } from "@/components/marketing/marketing-deliverables-panel";
 import { MarketingReviewsPanel } from "@/components/marketing/marketing-reviews-panel";
 import { createWebhookAction, listWebhooksAction } from "@/app/actions/webhooks";
+import { OnScreenGuide } from "@/components/support-guide/on-screen-guide";
+import { getPageGuidance, searchSupportAnswers } from "@/components/support-guide/support-guide-data";
+import { projectRef } from "@/lib/project-paths";
 
-vi.mock("@/app/(app)/[project]/marketing/settings/actions", () => ({
+vi.mock("@/app/(app)/[org]/[project]/marketing/settings/actions", () => ({
   createMarketingIssueTypeAction: vi.fn(),
   deleteMarketingIssueTypeAction: vi.fn(),
   toggleMarketingIssueTypeActiveAction: vi.fn(),
@@ -37,7 +40,7 @@ vi.mock("@/app/actions/issues", () => ({
   createBugAction: vi.fn(),
   toggleVoteAction: vi.fn(),
 }));
-vi.mock("@/app/(app)/[project]/marketing/output-box/actions", () => ({ refreshLibrary: vi.fn() }));
+vi.mock("@/app/(app)/[org]/[project]/marketing/output-box/actions", () => ({ refreshLibrary: vi.fn() }));
 vi.mock("@/lib/project-route", () => ({
   requireProject: vi.fn(async () => ({
     tenantId: "tenant-1",
@@ -56,7 +59,7 @@ vi.mock("@/app/actions/idea-verdicts", () => ({
   approveIdeaAction: vi.fn(),
   rejectIdeaAction: vi.fn(),
 }));
-vi.mock("@/app/(app)/[project]/notes/actions", () => ({ voteNoteCommentAction: vi.fn() }));
+vi.mock("@/app/(app)/[org]/[project]/notes/actions", () => ({ voteNoteCommentAction: vi.fn() }));
 
 vi.mock("@/app/(app)/points/disputes/actions", () => ({
   openDisputeAction: vi.fn(),
@@ -76,8 +79,8 @@ vi.mock("@/app/actions/webhooks", () => ({
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
-  usePathname: () => "/acme/marketing",
-  useParams: () => ({ project: "acme" }),
+  usePathname: () => "/acme/acme/marketing",
+  useParams: () => ({ org: "acme", project: "acme" }),
 }));
 
 beforeAll(() => {
@@ -139,7 +142,7 @@ describe("component accessibility (axe)", () => {
   });
   it("keeps approved-work selection and attachment actions accessible", async () => {
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
-    const { container } = render(<Library slug="acme" projectName="Acme" initial={{ ok: true, items: [{
+    const { container } = render(<Library slug={projectRef("acme", "acme")} projectName="Acme" initial={{ ok: true, items: [{
       id: "published", number: 42, title: "Welcome email", agent: "Content agent", summary: "An approved email sequence.", publishedAt: "2026-11-04T12:00:00Z",
       files: deliveryFiles(["https://example.com/welcome.docx"]),
     }] }} />);
@@ -152,15 +155,15 @@ describe("component accessibility (axe)", () => {
       types: [{ id: "blog", name: "Blog post", description: null, isActive: true, usage: 1 }],
       brief: { product: "Acme", audience: "", currentFocus: "", outOfScope: "" },
     };
-    const admin = render(<MarketingSettings slug="acme" projectName="Acme" data={data} />);
+    const admin = render(<MarketingSettings slug={projectRef("acme", "acme")} projectName="Acme" data={data} />);
     await expectNoA11yViolations(admin.container);
     admin.unmount();
-    const member = render(<MarketingSettings slug="acme" projectName="Acme" data={{ ...data, canManage: false }} />);
+    const member = render(<MarketingSettings slug={projectRef("acme", "acme")} projectName="Acme" data={{ ...data, canManage: false }} />);
     await expectNoA11yViolations(member.container);
   });
 
   it("keeps the marketing tasks board's stages, steps and rows accessible", async () => {
-    const { container } = render(<TasksBoard slug="acme" board={{
+    const { container } = render(<TasksBoard slug={projectRef("acme", "acme")} board={{
       tab: TASK_TABS[1],
       counts: { ideas: 2, open: 1, "in-progress": 0, closed: 0, done: 3, live: 0 },
       sortParam: null,
@@ -187,7 +190,7 @@ describe("component accessibility (axe)", () => {
       status: "rejected", rejectedAt: new Date("2026-11-05"), rejectedBy: "a manager agent", archivedAt: null, archivedBy: null,
       archiveReason: null,
     };
-    const { container } = render(<RejectedIdeas slug="acme" projectName="Acme" initial={{ ok: true, items: [item], total: 1, page: 1, totalPages: 1, from: 1, to: 1 }} />);
+    const { container } = render(<RejectedIdeas slug={projectRef("acme", "acme")} projectName="Acme" initial={{ ok: true, items: [item], total: 1, page: 1, totalPages: 1, from: 1, to: 1 }} />);
     await expectNoA11yViolations(container);
   });
   it("keeps a marketing task's deliverables and reviews accessible, full and empty", async () => {
@@ -233,9 +236,8 @@ describe("component accessibility (axe)", () => {
 
   it("CreateBugForm has no violations", async () => {
     const { container } = render(
-      <CreateBugForm projectSlug="acme"
+      <CreateBugForm projectSlug={projectRef("zedu", "acme")}
         users={users}
-        categories={[{ id: "c1", name: "macOS" }]}
         types={[{ id: "t1", name: "Bug" }]}
         isAdmin
       />,
@@ -245,9 +247,8 @@ describe("component accessibility (axe)", () => {
 
   it("CreateBugForm quick report in the modal has no violations (#report-modal)", async () => {
     const { container } = render(
-      <CreateBugForm projectSlug="acme"
+      <CreateBugForm projectSlug={projectRef("zedu", "acme")}
         users={users}
-        categories={[{ id: "c1", name: "macOS" }]}
         types={[{ id: "t1", name: "Bug" }]}
         isAdmin={false}
         currentUserId="u1"
@@ -345,6 +346,54 @@ describe("component accessibility (axe)", () => {
         delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>).close;
       }
     }
+  });
+
+  describe("Customer Support Guide", () => {
+    it("resolves route context guidance for homepage, issues, ideas, and tickets", () => {
+      const home = getPageGuidance("/");
+      expect(home.contextKey).toBe("home");
+      expect(home.pageName).toContain("Homepage");
+
+      const issues = getPageGuidance("/acme/issues");
+      expect(issues.contextKey).toBe("issues");
+      expect(issues.pageName).toContain("Issues");
+
+      const ideas = getPageGuidance("/acme/ideas");
+      expect(ideas.contextKey).toBe("ideas");
+      expect(ideas.pageName).toContain("Ideas");
+
+      const ticket = getPageGuidance("/acme/123");
+      expect(ticket.contextKey).toBe("issue-detail");
+    });
+
+    it("answers user questions about agents, issues, your call, and feeling lost", () => {
+      expect(searchSupportAnswers("I feel lost where do I start?").text).toContain("Ziki is designed for humans");
+      expect(searchSupportAnswers("What are agents doing?").text).toContain("Autonomous agents in Ziki");
+      expect(searchSupportAnswers("What does Your Call mean?").text).toContain("Your Call");
+      expect(searchSupportAnswers("How do points and rewards work?").text).toContain("Rewards in Ziki");
+    });
+
+    it("returns direct page navigation shortcuts for page queries", () => {
+      const issuesNav = searchSupportAnswers("take me to issues", projectRef("demo", "demo"));
+      expect(issuesNav.actions).toBeDefined();
+      expect(issuesNav.actions?.[0].href).toBe("/demo/demo/issues/all");
+
+      const ideasNav = searchSupportAnswers("take me to ideas", projectRef("demo", "demo"));
+      expect(ideasNav.actions).toBeDefined();
+      expect(ideasNav.actions?.[0].href).toBe("/demo/demo/ideas");
+    });
+
+    it("renders the support guide with accessible ARIA label and toggle button", async () => {
+      render(<OnScreenGuide />);
+      const guide = screen.getByRole("complementary", { name: "Customer Support Guide" });
+      expect(guide).toBeInTheDocument();
+
+      const toggleBtn = screen.getByRole("button", { name: "Toggle Ziki Customer Support Guide" });
+      expect(toggleBtn).toBeInTheDocument();
+
+      fireEvent.click(toggleBtn);
+      expect(screen.getAllByText(/Ziki Support Guide/i).length).toBeGreaterThanOrEqual(1);
+    });
   });
 
 });

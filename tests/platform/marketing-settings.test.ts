@@ -126,7 +126,7 @@ describe("Marketing settings core (M-API-6)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     isTenantAdmin.mockResolvedValue(true);
-    findFirst.mockResolvedValue({ id: "proj-1", slug: "marketing-proj", name: "Marketing Proj", workflow: null });
+    findFirst.mockResolvedValue({ id: "proj-1", slug: "marketing-proj", name: "Marketing Proj", workflow: null, tenant: { slug: "acme" } });
     findUnique.mockResolvedValue({ revisionLimit: 2 });
     transaction.mockImplementation(async (run: (tx: unknown) => unknown) =>
       run({
@@ -160,6 +160,7 @@ describe("Marketing settings core (M-API-6)", () => {
       expect(res).toEqual({
         projectId: "proj-1",
         slug: "marketing-proj",
+        ref: "acme/marketing-proj",
         name: "Marketing Proj",
         revisionLimit: 2,
       });
@@ -197,6 +198,7 @@ describe("Marketing settings core (M-API-6)", () => {
       expect(res).toEqual({
         projectId: "proj-1",
         slug: "marketing-proj",
+        ref: "acme/marketing-proj",
         name: "Marketing Proj",
         revisionLimit: 4,
       });
@@ -240,7 +242,7 @@ describe("Marketing settings API route (M-API-6)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     isTenantAdmin.mockResolvedValue(true);
-    findFirst.mockResolvedValue({ id: "proj-1", slug: "marketing-proj", name: "Marketing Proj", workflow: null });
+    findFirst.mockResolvedValue({ id: "proj-1", slug: "marketing-proj", name: "Marketing Proj", workflow: null, tenant: { slug: "acme" } });
     findUnique.mockResolvedValue({ revisionLimit: 2 });
     requireAgent.mockResolvedValue({
       agentId: "agent-1",
@@ -328,7 +330,7 @@ describe("updateMarketingSettingsAction (M-API-6, M-UI-7)", () => {
     requireUser.mockResolvedValue({ id: "user-admin", role: "admin" });
     isTenantAdmin.mockResolvedValue(true);
     currentTenantIdFor.mockResolvedValue("tenant-1");
-    findFirst.mockResolvedValue({ id: "proj-1", slug: "marketing-proj", name: "Marketing Proj", workflow: null });
+    findFirst.mockResolvedValue({ id: "proj-1", slug: "marketing-proj", name: "Marketing Proj", workflow: null, tenant: { slug: "acme" } });
     findUnique.mockResolvedValue({ revisionLimit: 2 });
     transaction.mockImplementation(async (run: (tx: unknown) => unknown) =>
       run({
@@ -350,8 +352,8 @@ describe("updateMarketingSettingsAction (M-API-6, M-UI-7)", () => {
         update: { revisionLimit: 4 },
       }),
     );
-    expect(revalidatePath).toHaveBeenCalledWith("/marketing-proj/marketing/settings");
-    expect(revalidatePath).toHaveBeenCalledWith("/marketing-proj/settings");
+    expect(revalidatePath).toHaveBeenCalledWith("/acme/marketing-proj/marketing/settings");
+    expect(revalidatePath).toHaveBeenCalledWith("/acme/marketing-proj/settings");
   });
 
   it("rejects non-admins", async () => {

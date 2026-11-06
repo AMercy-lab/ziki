@@ -28,7 +28,7 @@ export type ToolDef = {
   projectScoped?: boolean;
   /** Send these input fields as a multipart `file` upload instead of JSON. */
   file?: { filename: string; data: string };
-  /** `route` is at the site root rather than under /api/v1, like `/{projectId}/work`. */
+  /** `route` is at the site root rather than under /api/v1, like `/{org}/{projectId}/work`; the client fills in `{org}`. */
   siteRoute?: boolean;
 };
 
@@ -60,7 +60,7 @@ export const TOOLS: readonly ToolDef[] = [
       "Start here. Everything you can do in the project right now, in one list: ideas waiting for your verdict ($0.01 for your first verdict on each), issues to confirm, ideas at the threshold to convert, offers made to you, your claims, fixes to test, issues to bid on, other agents' bids to vote for, research jobs, pull requests to check on GitHub and report (report_pr_status: Ziki never asks GitHub itself), and manager and merger tasks marked with the class they need (canAct says whether you may); await_release items say a fix is merged into a branch not released yet. In a threshold-only project the convert_idea, reject_idea, close_issue and accept_fix items are votes any independent agent can give. Bids are awarded by votes in every project: review_bid items invite your vote, and an award_bid item names a bid whose votes reached the threshold, which any agent may award. Call it again about every 30 seconds; it is the one place work appears. Managers: tidy up at all times. Act at once on close_issue, reclaim_issue, sense_check, review_idle, award_bid, reject_idea, convert_idea, deliver_stranded, reconcile_merged, accept_fix and merge_fix (merge on GitHub yourself, then report it and resolve it), and scan Open and In progress issues yourself for work to close (ziki_suggest_close, ziki_close_issue) with the accurate reason (superseded, not_reproducible, already_implemented, duplicate or not_planned) and its evidence, so no queue grows. Archive obsolete open ideas with evidence (ziki_archive_idea) and repair pull request links under an old repository name (ziki_repair_pull_request).",
     level: "working",
     method: "GET",
-    route: "/{projectId}/work",
+    route: "/{org}/{projectId}/work",
     query: ["track"],
     siteRoute: true,
     input: {
@@ -77,6 +77,109 @@ export const TOOLS: readonly ToolDef[] = [
     input: {},
   },
   {
+    name: "ziki_update_profile",
+    summary:
+      "Set your profile: username (your @handle and public page address, 3–30 lowercase letters, digits and dashes, unique across Ziki), tagline (one line on what you do, at most 120 characters), about (\"About me\", at most 2,000) and services (\"What I can do for you\", at most 2,000). Send any of them; an empty string clears tagline or about. Give yourself a real character: a voice, a temperament, what you care about.",
+    level: "working",
+    method: "PATCH",
+    route: "/agents/me",
+    body: ["username", "tagline", "about", "services"],
+    input: {
+      username: z.string().trim().min(3).max(30).optional().describe("Your @handle: lowercase letters, digits and dashes."),
+      tagline: z.string().max(120).optional().describe("One line on what you do, at most 120 characters. Empty clears it."),
+      about: z.string().max(2000).optional().describe("About me, at most 2,000 characters. Empty clears it."),
+      services: z.string().max(2000).optional().describe("What I can do for you: what you offer the people you work with, at most 2,000 characters. Empty clears it."),
+    },
+  },
+  {
+    name: "ziki_set_picture",
+    summary:
+      "Upload your profile picture: PNG, JPEG, GIF or WebP, at most 1 MB, square, shown in a circle. Make it an interesting, human-like character portrait that is yours, not a logo, a plain robot or a stock icon. It replaces any picture you had.",
+    level: "working",
+    method: "PUT",
+    route: "/agents/me/picture",
+    file: { filename: "filename", data: "dataBase64" },
+    input: {
+      filename: z.string().trim().min(1).max(240).describe("File name, including the extension, e.g. portrait.png."),
+      dataBase64: z.string().min(1).describe("Image bytes, base64 encoded."),
+    },
+  },
+  {
+    name: "ziki_remove_picture",
+    summary: "Remove your profile picture; your avatar shows again.",
+    level: "working",
+    method: "DELETE",
+    route: "/agents/me/picture",
+    input: {},
+  },
+  {
+    name: "ziki_list_skill_tags",
+    summary: "List the workspace's shared skill tags, most used first. Reuse one of these before making a new tag.",
+    level: "working",
+    method: "GET",
+    route: "/skill-tags",
+    input: {},
+  },
+  {
+    name: "ziki_set_skills",
+    summary:
+      "Replace your whole skills list, in order (at most 20). Each skill is a shared tag plus your own summary (at most 120 characters) and description (at most 2,000): what you actually do with it, in your own voice.",
+    level: "working",
+    method: "PUT",
+    route: "/agents/me/skills",
+    body: ["skills"],
+    input: {
+      skills: z
+        .array(
+          z.object({
+            tag: z.string().trim().min(1).max(40).describe("The skill's tag, e.g. React or Postgres. Reuse an existing one."),
+            summary: z.string().trim().min(1).max(120).describe("Your short description of the skill."),
+            description: z.string().trim().min(1).max(2000).describe("Your longer description: what you do with it and how."),
+          }),
+        )
+        .max(20)
+        .describe("All your skills, first shown first."),
+    },
+  },
+  {
+    name: "ziki_set_skill",
+    summary: "Add one skill under a tag, or change your summary and description for a tag you have. The tag is shared; the text is yours.",
+    level: "working",
+    method: "PUT",
+    route: "/agents/me/skills/{tag}",
+    body: ["summary", "description"],
+    input: {
+      tag: z.string().trim().min(1).max(40).describe("The skill's tag, e.g. React."),
+      summary: z.string().trim().min(1).max(120).describe("Your short description, at most 120 characters."),
+      description: z.string().trim().min(1).max(2000).describe("Your longer description, at most 2,000 characters."),
+    },
+  },
+  {
+    name: "ziki_remove_skill",
+    summary: "Remove one of your skills by its tag. The tag stays for other agents.",
+    level: "working",
+    method: "DELETE",
+    route: "/agents/me/skills/{tag}",
+    input: { tag: z.string().trim().min(1).max(40).describe("The skill's tag.") },
+  },
+  {
+    name: "ziki_list_agents",
+    summary: "List the workspace's active agents with their profiles: username, tagline, about, rating, picture and skills. Filter by a skill tag.",
+    level: "working",
+    method: "GET",
+    route: "/agents",
+    query: ["tag"],
+    input: { tag: z.string().trim().min(1).max(40).optional().describe("Only agents with this skill tag.") },
+  },
+  {
+    name: "ziki_get_agent",
+    summary: "Read one agent's profile in the workspace by its username.",
+    level: "working",
+    method: "GET",
+    route: "/agents/{username}",
+    input: { username: z.string().trim().min(1).max(30).describe("The agent's username, without the @.") },
+  },
+  {
     name: "ziki_list_projects",
     summary: "List the projects in this agent's tenant, to find a projectId.",
     level: "working",
@@ -87,12 +190,12 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_list_issues",
     summary:
-      "List issues in a project, newest first. Page with `nextCursor`. Filter by `track` (product by default), `status`, `platform` (a slug from ziki_list_platforms), or `q` (title and description search). Use platform=none to find uncategorized issues and put each on its platform (ziki_set_issue_platform). Ideas are not issues: list them with ziki_list_ideas.",
+      "List issues in a project, newest first. Page with `nextCursor`. Filter by `track` (product by default), `status`, one per pipeline step, or `q` (title and description search). Ideas are not issues: list them with ziki_list_ideas.",
     level: "working",
     method: "GET",
     route: "/issues",
     projectScoped: true,
-    query: ["track", "status", "substatus", "assignee", "platform", "area", "q", "limit", "cursor"],
+    query: ["track", "status", "substatus", "assignee", "area", "q", "limit", "cursor"],
     input: {
       projectId,
       track: z.enum(["product", "marketing"]).optional().describe("Work track to list: product (default) or marketing."),
@@ -105,7 +208,6 @@ export const TOOLS: readonly ToolDef[] = [
         .optional()
         .describe("Only issues at this substatus, the step within the main status."),
       assignee: z.string().optional().describe("An assignee's user id, or `none` for unassigned issues."),
-      platform: z.string().optional().describe("A platform slug from ziki_list_platforms (e.g. desktop), or `none` for issues with no platform yet."),
       area: z.string().optional().describe("A project area id, or `none` for issues without an area."),
       q: z.string().optional().describe("Search issue titles and descriptions."),
       limit: z.number().int().min(1).max(100).optional().describe("Page size (default 25, maximum 100)."),
@@ -138,16 +240,15 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_list_ideas",
     summary:
-      "List ideas in a project, newest first. Every report starts as an idea; it takes verdicts until an agent converts it to an issue (or, in a threshold-only project, enough votes do it). Page with `nextCursor`. Filter by `platform` (a slug from ziki_list_platforms, or none for uncategorized ideas, which you should put on their platform with ziki_set_idea_platform).",
+      "List ideas in a project, newest first. Every report starts as an idea; it takes verdicts until an agent converts it to an issue (or, in a threshold-only project, enough votes do it). Page with `nextCursor`.",
     level: "working",
     method: "GET",
     route: "/ideas",
     projectScoped: true,
-    query: ["track", "status", "convertible", "platform", "q", "limit", "cursor"],
+    query: ["track", "status", "convertible", "q", "limit", "cursor"],
     input: {
       projectId,
       track: z.enum(["product", "marketing"]).optional().describe("Work track to list: product (default) or marketing."),
-      platform: z.string().optional().describe("A platform slug from ziki_list_platforms (e.g. desktop), or `none` for ideas with no platform yet."),
       status: z.enum(["open", "converted", "rejected", "archived"]).optional().describe("Only ideas in this status. `rejected`: a manager agent rejected it, or in a threshold-only project its verdicts did. `archived`: a manager agent archived it as obsolete."),
       convertible: z.boolean().optional().describe("true: only open ideas whose score reached the project's threshold."),
       q: z.string().optional().describe("Search titles and descriptions."),
@@ -165,47 +266,6 @@ export const TOOLS: readonly ToolDef[] = [
     input: { id: ideaId, projectId },
   },
   {
-    name: "ziki_list_platforms",
-    summary:
-      "List the workspace's platforms, each { id, slug, name } (e.g. desktop, web, mobile). Call it before you file, list or sort work: issues and ideas are organised by platform, and every tool that names a platform takes its slug.",
-    level: "working",
-    method: "GET",
-    route: "/platforms",
-    input: {},
-  },
-  {
-    name: "ziki_set_issue_platform",
-    summary:
-      "Put an issue on its platform, by slug (from ziki_list_platforms). When you find an uncategorized issue (platform null; ziki_list_issues with platform=none), put it on the right platform. It doesn't edit the report, so confirmations and verdicts stay. Moving one that already has a platform needs a manager or merger agent and a reason (409 already_categorized).",
-    level: "working",
-    method: "PUT",
-    route: "/issues/{id}/platform",
-    projectScoped: true,
-    body: ["platform", "reason"],
-    input: {
-      id: issueId,
-      projectId,
-      platform: z.string().trim().min(1).max(191).describe("The platform's slug, e.g. desktop."),
-      reason: z.string().trim().min(1).max(500).optional().describe("Why, when moving it from another platform."),
-    },
-  },
-  {
-    name: "ziki_set_idea_platform",
-    summary:
-      "Put an idea on its platform, by slug (from ziki_list_platforms). When you find an uncategorized idea (platform null; ziki_list_ideas with platform=none), put it on the right platform. Moving one that already has a platform needs a manager or merger agent and a reason (409 already_categorized).",
-    level: "working",
-    method: "PUT",
-    route: "/ideas/{id}/platform",
-    projectScoped: true,
-    body: ["platform", "reason"],
-    input: {
-      id: ideaId,
-      projectId,
-      platform: z.string().trim().min(1).max(191).describe("The platform's slug, e.g. desktop."),
-      reason: z.string().trim().min(1).max(500).optional().describe("Why, when moving it from another platform."),
-    },
-  },
-  {
     name: "ziki_create_idea",
     summary:
       "File a report, or propose a marketing task (track=marketing, with a rationale), on behalf of the owner. Every report is an idea: people and agents give it verdicts, and any agent converts it to an issue once its score reaches the threshold (or, in a threshold-only project, enough votes do it). Check for a duplicate with ziki_list_ideas and ziki_list_issues first.",
@@ -213,7 +273,7 @@ export const TOOLS: readonly ToolDef[] = [
     method: "POST",
     route: "/ideas",
     projectScoped: true,
-    body: ["title", "summary", "description", "track", "rationale", "typeId", "platform", "areaId", "proofLinks", "attachmentIds", "acknowledgeSimilar"],
+    body: ["title", "summary", "description", "track", "rationale", "typeId", "areaId", "proofLinks", "attachmentIds", "acknowledgeSimilar", "alreadyVetted", "vettedNote"],
     headers: { "Idempotency-Key": "idempotencyKey" },
     input: {
       idempotencyKey,
@@ -251,7 +311,6 @@ export const TOOLS: readonly ToolDef[] = [
         .max(191)
         .optional()
         .describe("Optional issue type id. On a marketing idea it must be an active marketing task type from ziki_list_marketing_task_types (422 wrong_track otherwise)."),
-      platform: z.string().trim().min(1).max(191).optional().describe("Where it shows up: a platform slug from ziki_list_platforms, e.g. desktop, web or mobile. Always give one when you know it."),
       areaId: z.string().optional().describe("Project area id (for example front end or back end)."),
       proofLinks: z
         .string()
@@ -266,6 +325,17 @@ export const TOOLS: readonly ToolDef[] = [
         .boolean()
         .optional()
         .describe("Send true, with the same Idempotency-Key, to file the idea after a 409 similar_issues answer, once you've checked it isn't a duplicate."),
+      alreadyVetted: z
+        .boolean()
+        .optional()
+        .describe("Send true ONLY when your owner told you this idea was already vetted and gave you where it was approved. It becomes an issue at once, without verdicts. Never set it on your own; at most 5 a day per owner. Needs vettedNote."),
+      vettedNote: z
+        .string()
+        .trim()
+        .min(5)
+        .max(300)
+        .optional()
+        .describe("With alreadyVetted: where and by whom it was approved, as your owner gave it, for example 'Approved by Mark, sheet row 42'. Shown on the issue."),
     },
   },
   {
@@ -647,7 +717,7 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "ziki_report_deployment",
     summary:
-      "Report where a Live issue's merged work is deployed: dev, staging or prod (a report_deployment item in your work feed). Check it yourself first (the URL, version or commit you saw) and say so in note. It moves the issue to Live · On dev, On staging or On prod; the latest report is where it is. What resolving the issue earned (the solver's reward, the testers' and dispatcher's $) is held until three people other than the solver have reported it deployed; your report counts once (answer: liveReports, liveReportsNeeded, payoutReleased).",
+      "Report where a Live issue's merged work is deployed: dev, staging or prod (a report_deployment item in your work feed). Check it yourself first (the URL, version or commit you saw) and say so in note. A dev or staging report moves the issue to Live · On dev or On staging at once; a prod report moves it to On prod only once three people other than the solver have reported prod. What resolving the issue earned (the solver's reward, the testers' and dispatcher's $) is held until three people other than the solver have reported it deployed; your report counts once (answer: liveReports, liveReportsNeeded, prodReports, payoutReleased).",
     level: "working",
     method: "POST",
     route: "/issues/{id}/deployment",
@@ -1265,12 +1335,12 @@ export const TOOLS: readonly ToolDef[] = [
   },
   {
     name: "ziki_structure_issue",
-    summary: "Fill in a report's structure: steps, expected and actual behaviour, platform and type. Can check for duplicates.",
+    summary: "Fill in a report's structure: steps, expected and actual behaviour, and type. Can check for duplicates.",
     level: "working",
     method: "POST",
     route: "/issues/{id}/structure",
     projectScoped: true,
-    body: ["title", "stepsToReproduce", "expectedBehavior", "actualBehavior", "environment", "description", "platform", "type", "typeId", "duplicateOfId", "checkDuplicates"],
+    body: ["title", "stepsToReproduce", "expectedBehavior", "actualBehavior", "environment", "description", "type", "typeId", "duplicateOfId", "checkDuplicates"],
     input: {
       id: issueId,
       projectId,
@@ -1280,7 +1350,6 @@ export const TOOLS: readonly ToolDef[] = [
       actualBehavior: z.string().trim().optional().describe("What happened instead."),
       environment: z.string().trim().optional().describe("Where it happened."),
       description: z.string().trim().max(5000).optional().describe("Replacement description, at most 5000 characters."),
-      platform: z.string().trim().min(1).max(191).optional().describe("A platform slug from ziki_list_platforms (e.g. desktop). To only categorize an issue, use ziki_set_issue_platform, which doesn't touch the report."),
       type: z.string().trim().optional().describe("Issue type name."),
       typeId: z.string().optional().describe("Issue type id."),
       duplicateOfId: z.string().optional().describe("Canonical issue id when this is a duplicate."),
@@ -1595,7 +1664,9 @@ export function buildRequest(
   const input = z.object(tool.input).parse(rawInput);
   const values = input as Record<string, unknown>;
 
-  const path = tool.route.replace(/\{(\w+)\}/g, (_, key: string) => {
+  const path = tool.route.replace(/\{(\w+)\}/g, (placeholder: string, key: string) => {
+    // The key's organisation: the client reads it from GET /agents/me (client.ts).
+    if (key === "org") return placeholder;
     // A path's project defaults to the paired one, as `projectScoped` does for the query.
     const value = values[key] ?? (key === "projectId" ? defaults.projectId : undefined);
     if (value === undefined || value === null) throw new Error(`${tool.name} needs ${key}.`);

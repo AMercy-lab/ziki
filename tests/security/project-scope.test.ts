@@ -27,24 +27,25 @@ const section = vi.hoisted(() => ({
   notFound: vi.fn(() => { throw new Error("NOT_FOUND"); }),
   redirect: vi.fn((to: string) => { throw new Error(`REDIRECT ${to}`); }),
   requireProject: vi.fn(),
-  firstProjectSlugFor: vi.fn(),
+  firstProjectRefFor: vi.fn(),
   requireUser: vi.fn(async () => ({ id: "ada" })),
 }));
 vi.mock("next/navigation", () => ({ notFound: section.notFound, redirect: section.redirect }));
-vi.mock("@/lib/project-route", () => ({ requireProject: section.requireProject, firstProjectSlugFor: section.firstProjectSlugFor }));
+vi.mock("@/lib/project-route", () => ({ requireProject: section.requireProject, firstProjectRefFor: section.firstProjectRefFor }));
 vi.mock("@/lib/auth-helpers", () => ({ requireUser: section.requireUser }));
 
-import MarketingHomePage from "@/app/(app)/[project]/marketing/page";
+import MarketingHomePage from "@/app/(app)/[org]/[project]/marketing/page";
 import MarketingPage from "@/app/(app)/marketing/page";
-import LibraryPage from "@/app/(app)/[project]/marketing/output-box/page";
-import { readLibrary } from "@/app/(app)/[project]/marketing/output-box/data";
-import { readTasksBoard } from "@/app/(app)/[project]/marketing/data";
-import RejectedIdeasPage from "@/app/(app)/[project]/marketing/ideas/rejected/page";
-import { readRejectedIdeas } from "@/app/(app)/[project]/marketing/ideas/rejected/data";
+import LibraryPage from "@/app/(app)/[org]/[project]/marketing/output-box/page";
+import { readLibrary } from "@/app/(app)/[org]/[project]/marketing/output-box/data";
+import { readTasksBoard } from "@/app/(app)/[org]/[project]/marketing/data";
+import RejectedIdeasPage from "@/app/(app)/[org]/[project]/marketing/ideas/rejected/page";
+import { readRejectedIdeas } from "@/app/(app)/[org]/[project]/marketing/ideas/rejected/data";
 import { parseTaskView } from "@/components/marketing/tasks/model";
 import { AgentProjectError } from "@/lib/agents/require-agent";
 import { marketingTabHref } from "@/lib/header-nav";
 import { issueProject } from "@/lib/agent-api/issues";
+import { projectRef } from "@/lib/project-paths";
 
 const agent = {
   agentId: "agent1",
@@ -92,7 +93,7 @@ describe("Library project isolation", () => {
   it("refuses access before reading published deliverables", async () => {
     section.requireProject.mockRejectedValue(new Error("NOT_FOUND"));
     publishedTasks.mockClear();
-    await expect(LibraryPage({ params: Promise.resolve({ project: "private" }) })).rejects.toThrow("NOT_FOUND");
+    await expect(LibraryPage({ params: Promise.resolve({ org: "acme", project: "private" }) })).rejects.toThrow("NOT_FOUND");
     expect(publishedTasks).not.toHaveBeenCalled();
   });
 
@@ -147,7 +148,7 @@ describe("the marketing tasks board", () => {
 
   it("refuses access before reading any task", async () => {
     section.requireProject.mockRejectedValue(new Error("NOT_FOUND"));
-    await expect(MarketingHomePage({ params: Promise.resolve({ project: "private" }), searchParams: Promise.resolve({}) })).rejects.toThrow("NOT_FOUND");
+    await expect(MarketingHomePage({ params: Promise.resolve({ org: "acme", project: "private" }), searchParams: Promise.resolve({}) })).rejects.toThrow("NOT_FOUND");
     expect(publishedTasks).not.toHaveBeenCalled();
     expect(proposals).not.toHaveBeenCalled();
     expect(taskCounts).not.toHaveBeenCalled();
@@ -185,7 +186,7 @@ describe("the marketing tasks board", () => {
   it("names who delivered finished work, but not the last worker of work reopened for bids", async () => {
     const task = {
       id: "t1", number: 41, title: "A launch post", closeReason: null, voteCount: 0, revisionCount: 0, updatedAt: new Date("2026-11-03"), reward: 4,
-      rewardEstimateCount: 0, rewardFixedAt: null, project: { slug: "web" }, type: null, assignee: null, claims: [],
+      rewardEstimateCount: 0, rewardFixedAt: null, project: { slug: "web", tenant: { slug: "acme" } }, type: null, assignee: null, claims: [],
       deliveries: [{ agent: { name: "Studio" } }], _count: { comments: 0, bids: 0 },
     };
     publishedTasks.mockResolvedValue([{ ...task, status: "resolved", substatus: "published" }]);
@@ -197,7 +198,7 @@ describe("the marketing tasks board", () => {
   it("shows the revision round while work is back with its worker", async () => {
     publishedTasks.mockResolvedValue([{
       id: "t1", number: 41, title: "A launch post", status: "in_progress", substatus: "in_progress", closeReason: null, voteCount: 0, revisionCount: 1,
-      updatedAt: new Date("2026-11-03"), reward: 4, rewardEstimateCount: 0, rewardFixedAt: null, project: { slug: "web" }, type: null, assignee: null,
+      updatedAt: new Date("2026-11-03"), reward: 4, rewardEstimateCount: 0, rewardFixedAt: null, project: { slug: "web", tenant: { slug: "acme" } }, type: null, assignee: null,
       claims: [], deliveries: [], _count: { comments: 0, bids: 0 },
     }]);
     expect(rowsOf(await readTasksBoard(context, parseTaskView({ status: "in-progress" })))[0].revision).toBe("Revision 1 of 2");
@@ -224,7 +225,7 @@ describe("Rejected marketing ideas project isolation", () => {
   it("refuses access before reading marketing ideas", async () => {
     section.requireProject.mockRejectedValue(new Error("NOT_FOUND"));
     await expect(
-      RejectedIdeasPage({ params: Promise.resolve({ project: "private" }), searchParams: Promise.resolve({}) }),
+      RejectedIdeasPage({ params: Promise.resolve({ org: "acme", project: "private" }), searchParams: Promise.resolve({}) }),
     ).rejects.toThrow("NOT_FOUND");
     expect(proposals).not.toHaveBeenCalled();
   });
@@ -248,19 +249,39 @@ describe("the marketing section", () => {
 
   it("is refused to someone who can't open the project", async () => {
     section.requireProject.mockRejectedValue(new Error("NOT_FOUND"));
-    await expect(MarketingHomePage({ params: Promise.resolve({ project: "web" }), searchParams: Promise.resolve({}) })).rejects.toThrow("NOT_FOUND");
-    expect(section.requireProject).toHaveBeenCalledWith("web", "/web/marketing");
+    await expect(MarketingHomePage({ params: Promise.resolve({ org: "acme", project: "web" }), searchParams: Promise.resolve({}) })).rejects.toThrow("NOT_FOUND");
+    expect(section.requireProject).toHaveBeenCalledWith("acme", "web");
   });
 
   it("sends the Marketing tab and /marketing to the project's section, not Amp", async () => {
-    expect(marketingTabHref("web")).toBe("/web/marketing");
+    expect(marketingTabHref(projectRef("acme", "web"))).toBe("/acme/web/marketing");
     expect(marketingTabHref(null)).toBe("/marketing");
-    section.firstProjectSlugFor.mockResolvedValue("web");
-    await expect(MarketingPage()).rejects.toThrow("REDIRECT /web/marketing");
+    section.firstProjectRefFor.mockResolvedValue(projectRef("acme", "web"));
+    await expect(MarketingPage()).rejects.toThrow("REDIRECT /acme/web/marketing");
   });
 
   it("sends someone with no project to their workspaces", async () => {
-    section.firstProjectSlugFor.mockResolvedValue(null);
+    section.firstProjectRefFor.mockResolvedValue(null);
     await expect(MarketingPage()).rejects.toThrow("REDIRECT /tenants");
+  });
+});
+
+describe("project addresses carry the organisation (#project-urls)", () => {
+  it("reads an old project-first address as old, and an org/project address as new", async () => {
+    const { isProjectFirstPath, issuesPath, projectRef } = await import("@/lib/project-paths");
+    expect(isProjectFirstPath("/desktop/ideas/2297")).toBe(true);
+    expect(isProjectFirstPath("/desktop/740")).toBe(true);
+    expect(isProjectFirstPath("/zedu/desktop/ideas/2297")).toBe(false);
+    expect(isProjectFirstPath("/zedu")).toBe(false);
+    expect(issuesPath(projectRef("zedu", "desktop"), "in_progress")).toBe("/zedu/desktop/issues/in-progress");
+  });
+
+  it("never lets a new project or organisation take a name an address reads as old or as a site page", async () => {
+    const { unreservedProjectSlug } = await import("@/lib/project-slug");
+    const { tenantSlugCandidate } = await import("@/lib/tenants");
+    expect(unreservedProjectSlug("123")).toBe("123-project");
+    expect(unreservedProjectSlug("workstream")).toBe("workstream-project");
+    expect(tenantSlugCandidate("agents", 0, () => "x2y3")).toBe("agents-x2y3");
+    expect(tenantSlugCandidate("zedu", 0)).toBe("zedu");
   });
 });

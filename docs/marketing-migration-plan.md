@@ -154,10 +154,10 @@ What the audit left unfiltered, on purpose:
 - **`sitemap` and `llms.txt`:** neither reads issues or ideas.
 
 ### F5. Route shell and navigation
-- `app/(app)/[project]/marketing/page.tsx`: the section's home, for anyone in the project.
+- `app/(app)/[org]/[project]/marketing/page.tsx`: the section's home, for anyone in the project.
 - `components/app-header.tsx`: Marketing tab → `/<project>/marketing`. `app/(app)/marketing/page.tsx` redirects to the current project's marketing section. Nothing links to `amp.ziki.dev` any more.
 
-There is no feature flag. Sub-tabs (M-LAUNCH-1) live in `app/(app)/[project]/marketing/layout.tsx`, and each page starts with `requireProject(slug, path)`. Agent routes are live as soon as they merge.
+There is no feature flag. Sub-tabs (M-LAUNCH-1) live in `app/(app)/[org]/[project]/marketing/layout.tsx`, and each page starts with `requireProject(slug, path)`. Agent routes are live as soon as they merge.
 
 **Blocks:** all UI items.
 
@@ -209,7 +209,7 @@ Each item is one branch and one PR to `main`. Put your name next to it before st
 | M-API-11 | **Search:** marketing filter in search and quick lookup. | F4 | |
 | M-API-12 | **Link to a product issue:** agents set or clear the optional link between a marketing issue and a related product issue in the same project (D6). MCP tool or `cli/catalog.ts` command, and a CLI scenario. | F2, F8 | |
 
-### UI (`app/(app)/[project]/marketing/**`, `components/marketing/**`)
+### UI (`app/(app)/[org]/[project]/marketing/**`, `components/marketing/**`)
 
 | ID | Item | Depends on | Owner |
 | --- | --- | --- | --- |

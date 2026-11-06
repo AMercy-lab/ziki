@@ -3,7 +3,7 @@ import { EntrySummary } from "@/components/entry-summary";
 import { IdeaVoteTotals, opinionChipClass, opinionLabels } from "@/components/idea-verdicts";
 import { LocalTime } from "@/components/local-time";
 import { PaginationControls } from "@/components/pagination-controls";
-import { ideaPath, marketingPath, projectPath } from "@/lib/project-paths";
+import { ideaPath, marketingPath, projectPath, type ProjectRef } from "@/lib/project-paths";
 import type { RejectedIdea, RejectedIdeasResult } from "./model";
 
 const chip = "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold";
@@ -39,7 +39,7 @@ function Verdicts({ item }: { item: RejectedIdea }) {
   );
 }
 
-function IdeaCard({ slug, item }: { slug: string; item: RejectedIdea }) {
+function IdeaCard({ slug, item }: { slug: ProjectRef; item: RejectedIdea }) {
   return (
     <li className="rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-[22px]">
       <article className="flex flex-col gap-4">
@@ -98,7 +98,7 @@ function IdeaCard({ slug, item }: { slug: string; item: RejectedIdea }) {
 }
 
 /** `/<slug>/marketing/ideas/rejected`: marketing ideas that were rejected or archived. Open ones are on the board's Ideas tab. */
-export function RejectedIdeas({ slug, projectName, initial }: { slug: string; projectName: string; initial: RejectedIdeasResult }) {
+export function RejectedIdeas({ slug, projectName, initial }: { slug: ProjectRef; projectName: string; initial: RejectedIdeasResult }) {
   const href = marketingPath(slug, "ideas/rejected");
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 pb-10">

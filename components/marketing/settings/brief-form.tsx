@@ -1,7 +1,8 @@
 "use client";
+import type { ProjectRef } from "@/lib/project-paths";
 
 import { useState, useTransition } from "react";
-import { updateMarketingBriefAction } from "@/app/(app)/[project]/marketing/settings/actions";
+import { updateMarketingBriefAction } from "@/app/(app)/[org]/[project]/marketing/settings/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,7 +55,7 @@ const FIELDS: {
  * before proposing or delivering marketing work. `lib/marketing/brief.ts` owns
  * the rules, so a refusal comes back from the action.
  */
-export function BriefForm({ slug, initial }: { slug: string; initial: MarketingBrief }) {
+export function BriefForm({ slug, initial }: { slug: ProjectRef; initial: MarketingBrief }) {
   const [brief, setBrief] = useState<MarketingBrief>(initial);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);

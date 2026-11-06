@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { marketingPath } from "@/lib/project-paths";
+import { marketingPath, type ProjectRef } from "@/lib/project-paths";
 
 const focus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-electric-blue";
 const action = `inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full text-sm font-bold transition ${focus}`;
@@ -11,7 +11,7 @@ const quiet = "border border-zk-border bg-zk-surface text-zk-text hover:bg-zk-ch
 const iconProps = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true, className: "h-4 w-4" } as const;
 
 /** The Marketing section's header: the tasks board is its home, with finished work, settings and proposing a task beside it. */
-export function MarketingNav({ slug }: { slug: string }) {
+export function MarketingNav({ slug }: { slug: ProjectRef }) {
   const pathname = usePathname()?.replace(/\/+$/, "") ?? "";
   const home = marketingPath(slug);
   const output = marketingPath(slug, "output-box");
