@@ -52,8 +52,6 @@ vi.mock("@/lib/prisma", () => ({
 
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
-import { currentOrganisationIdFor, NO_ORGANISATION_MESSAGE } from "@/lib/organisation-context";
-import { createBugAction, updateBugAction } from "@/app/actions/issues";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -71,7 +69,6 @@ const db = prisma as unknown as {
   projectArea: { findFirst: ReturnType<typeof vi.fn> };
   $executeRaw: ReturnType<typeof vi.fn>;
 };
-const organisationOf = currentOrganisationIdFor as unknown as ReturnType<typeof vi.fn>;
 
 const sharedIssuePath = "/ziki/app/482";
 const switchForm = () => form({
@@ -162,10 +159,3 @@ function form(values: Record<string, string>) {
   for (const [key, value] of Object.entries(values)) data.set(key, value);
   return data;
 }
-
-const report = form({
-  title: "Login button does nothing",
-  description: "Clicking Login on the sign-in page does nothing at all, on Chrome and Firefox.",
-  proofLinks: "",
-  projectId: "project-zedu",
-});

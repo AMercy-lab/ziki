@@ -18,7 +18,7 @@ export function parseIssueNumber(raw: string): number | null {
   return number > 0 ? number : null;
 }
 
-export type ProjectIssue = { id: string; number: number; ref: ProjectRef; isDeleted: boolean };
+export type ProjectIssue = { id: string; number: number; organisationId: string; ref: ProjectRef; isDeleted: boolean };
 
 export type ProjectIssueLookup =
   /** The issue, in the project the URL names. */
@@ -28,10 +28,10 @@ export type ProjectIssueLookup =
   /** Another organisation the viewer belongs to has it (#519): offer the switch. */
   | { kind: "elsewhere"; issueId: string };
 
-const select = { id: true, number: true, isDeleted: true, project: { select: { slug: true, organisation: { select: { slug: true } } } } } as const;
+const select = { id: true, number: true, organisationId: true, isDeleted: true, project: { select: { slug: true, organisation: { select: { slug: true } } } } } as const;
 
-function toIssue(row: { id: string; number: number; isDeleted: boolean; project: { slug: string; organisation: { slug: string } } }): ProjectIssue {
-  return { id: row.id, number: row.number, ref: refOf(row.project), isDeleted: row.isDeleted };
+function toIssue(row: { id: string; number: number; organisationId: string; isDeleted: boolean; project: { slug: string; organisation: { slug: string } } }): ProjectIssue {
+  return { id: row.id, number: row.number, organisationId: row.organisationId, ref: refOf(row.project), isDeleted: row.isDeleted };
 }
 
 /**
