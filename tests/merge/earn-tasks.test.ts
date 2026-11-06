@@ -196,6 +196,12 @@ describe("who sees $ and Withdraw in the header (#earnings)", () => {
     projectMembership: { findFirst: vi.fn(async () => (joined ? { id: "m" } : null)) },
   }) as never;
 
+  it("asks only for earnings from work: the sign-up bonus alone doesn't show it", async () => {
+    const d = db(false, false) as unknown as { pointEntry: { findFirst: ReturnType<typeof vi.fn> } };
+    await headerEarnings(d as never, "newcomer");
+    expect(d.pointEntry.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: "newcomer", role: { not: "signup" } } }));
+  });
+
   it("hides it from someone who has never earned and never joined a project", async () => {
     expect(await headerEarnings(db(false, false), "poster")).toBeNull();
   });

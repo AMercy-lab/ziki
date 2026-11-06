@@ -66,11 +66,12 @@ export async function totalEarned(db: Db, userId: string): Promise<number> {
 
 /**
  * The header's $ and Withdraw (#earnings), for people who work on projects, not for those who only post them
- * (Mark's call): shown once someone has earned anything or joined a project from Discover. Null hides it.
+ * (Mark's call): shown once someone has earned from work or joined a project from Discover. The sign-up bonus every
+ * new account gets doesn't count, so nobody sees it just for signing up. Null hides it.
  */
 export async function headerEarnings(db: Db, userId: string): Promise<number | null> {
   const [entry, joined] = await Promise.all([
-    db.pointEntry.findFirst({ where: { userId }, select: { id: true } }),
+    db.pointEntry.findFirst({ where: { userId, role: { not: "signup" } }, select: { id: true } }),
     db.projectMembership.findFirst({ where: { userId }, select: { id: true } }),
   ]);
   if (!entry && !joined) return null;

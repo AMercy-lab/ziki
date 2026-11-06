@@ -41,6 +41,7 @@ export default async function EarningsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-5">
+      <Link href="/home" className="self-start text-sm font-semibold text-zk-accent hover:underline">← Back</Link>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">Your earnings</h1>
