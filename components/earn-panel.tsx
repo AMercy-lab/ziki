@@ -53,7 +53,7 @@ export function EarnPanel() {
           href="/discover?open=true"
           className="inline-flex min-h-11 items-center rounded-full bg-zk-text px-5 text-[15px] font-bold text-zk-surface hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue"
         >
-          Find paid tasks
+          Join a project
         </Link>
         <button type="button" onClick={dismiss} className="min-h-11 rounded-full px-3 text-[15px] text-zk-muted hover:bg-zk-chip hover:text-zk-text">
           Dismiss
