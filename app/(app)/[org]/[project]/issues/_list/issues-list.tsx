@@ -114,6 +114,7 @@ import { EARN_PROJECT_SLUG, EARN_TASKS, tasksPaid } from "@/lib/earn/draft";
 import { isEarner } from "@/lib/earn/earner";
 import { earnState } from "@/lib/earn/state";
 import { ZikiTasksTable } from "@/components/ziki-tasks-table";
+import { activeIn } from "@/lib/agents/active-in";
 
 /* Distinct browser-tab title; the root layout appends "· Ziki". */
 export const metadata = { title: "Issues" };
@@ -659,7 +660,7 @@ export async function IssuesList({
       projectId: true, project: { select: { slug: true, organisation: { select: { slug: true } } } }, isDeleted: true, isBoosted: true, createdAt: true, updatedAt: true,
       pullRequestUrl: true, type: { select: { name: true } }, reporter: { select: { name: true, role: true, image: true } },
       assignee: { select: { name: true, role: true, image: true } },
-      claims: { where: { status: { in: ["active", "offered"] }, releasedAt: null }, select: { status: true, claimedAt: true, createdAt: true, deliverBy: true, beneficiaryUserId: true, beneficiary: { select: { name: true } } }, orderBy: { createdAt: "desc" }, take: 2 },
+      claims: { where: { status: { in: ["active", "offered", "planning"] }, releasedAt: null }, select: { status: true, claimedAt: true, createdAt: true, deliverBy: true, beneficiaryUserId: true, beneficiary: { select: { name: true } } }, orderBy: { createdAt: "desc" }, take: 2 },
       area: { select: { id: true, name: true } }, reward: true, rewardEstimateCount: true, rewardFixedAt: true,
       duplicateOf: showDuplicates ? { select: { number: true } } : false,
       _count: { select: { comments: true, attachments: true, bids: { where: OPEN_BID_WHERE } } },
@@ -732,7 +733,7 @@ export async function IssuesList({
           async () => {
             const agents = await prisma.agent.findMany({
               where: {
-                organisationId,
+                ...activeIn(organisationId),
                 ownerUserId: userId,
                 revokedAt: null,
                 OR: [{ tagline: null }, { about: null }, { skills: { none: {} } }, { tagline: "" }, { about: "" }],
@@ -758,7 +759,7 @@ export async function IssuesList({
         async () => {
           const now = new Date();
           const [agentCount, memberCount, pendingInvites] = await Promise.all([
-            prisma.agent.count({ where: { organisationId, ownerUserId: userId, revokedAt: null } }),
+            prisma.agent.count({ where: { ...activeIn(organisationId), ownerUserId: userId, revokedAt: null } }),
             prisma.membership.count({ where: { organisationId } }),
             prisma.organisationInvite.count({ where: { organisationId, acceptedAt: null, expiresAt: { gt: now } } }),
           ]);

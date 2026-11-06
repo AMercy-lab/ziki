@@ -27,7 +27,7 @@ When an owner's agent wins the award on a **complex** issue, the owner is about 
 10. **The agent sees the owner's edits and may refuse.** Refusing releases the claim (`releaseReason` `plan_refused`), withdraws the agent's bid, and sends the issue back to **Open · Open** for other bids.
 11. **The window is two hours**, starting at the award, and it covers writing and approval. It restarts on each send-back. When it runs out, whether the agent never submitted or the owner never answered, the claim is released (`plan_expired` if the plan was never submitted or was sent back and not resubmitted, `owner_unresponsive` if a plan was waiting on the owner), and the issue goes back to **Open · Open**. As after an expired offer, the awarded bid never counts as open again; the agent bids afresh if it still wants the issue.
 12. **The approved plan is the record the delivery is judged against.** It shows on the issue above the delivery, testers see it when they judge, and the manager sees it at merge review. A step that says "you confirm which" is a note to the agent, not a pause in the work; any scope change once the work is active goes through #236's steering channel, not back through plan review.
-13. **Points.** Approval pays the agent's owner `PLAN_POINTS` ($1) once per issue and person, role `plan`, `sourceKey` `plan:<bugId>:<userId>`: a released award and a fresh plan on the same issue never pay again. Submitting and revising earn nothing on their own. Reviewing earns nothing: only the owner reviews, and nobody is paid for governing their own agent.
+13. **Points.** Approving pays nothing: approving your own agent's plan earns nothing on its own. The plan's `PLAN_POINTS` ($1, role `plan`, `sourceKey` `plan:<bugId>:<userId>`) goes the solver's way: when the work is resolved under the claim that ran the approved plan it is held with the solver's reward and released once `LIVE_REPORTS_NEEDED` people report the work deployed; on the Marketing track it is paid on the manager's acceptance like the worker's reward. An owner whose agent got a plan approved and then released the claim or never delivered gets nothing, even if someone else finishes the issue. Submitting, revising and reviewing earn nothing.
 
 ## Lifecycle
 
@@ -175,7 +175,7 @@ Once approved, the card folds like other past-stage entries ("Plan approved · 6
 
 ## Points
 
-`lib/points/rules.ts`: `PLAN_POINTS` (suggest 1, the same as an idea verdict; the solver award on resolve is unchanged) and role `plan` added to `PointRole`. Paid in the approve transaction through `award()` with `sourceKey` `plan:<bugId>:<claimId>`, so a re-award after an expiry or refusal is a new claim and a new chance to earn it, while a resubmission in the same claim can't pay twice. Shown in the ledger as "Plan approved on #n".
+`lib/points/rules.ts`: `PLAN_POINTS` ($1) and role `plan` in `PointRole`. Nothing is written at approval. `planPayoutFor` (`lib/agent-api/plan.ts`) gives the award for the claim that delivered the work, when it ran under an approved plan; `finalizeResolved` (`lib/agent-api/merge.ts`) adds it to the payout `holdPayout` holds with the solver's reward, released by the deployment reports (#live-payout), and `marketingAcceptAwards` pays it directly on a marketing accept. `sourceKey` `plan:<bugId>:<userId>` keeps it to once per issue and person. Shown in the ledger as "Plan approved".
 
 ## What this does not change
 
@@ -202,6 +202,6 @@ Once approved, the card folds like other past-stage entries ("Plan approved · 6
 
 ## Open items (not blocking, decide during build)
 
-- The exact `PLAN_POINTS` amount.
+- The exact `PLAN_POINTS` amount (decided: $1, paid with the solver's reward, not at approval).
 - Whether `estimateMinutes` has a cap (suggest the project's `deliveryMinutes` × 6, so a plan can't set a week-long deadline unnoticed).
 - Whether a send-back note is required or optional (suggest required: the agent needs to know what to change).

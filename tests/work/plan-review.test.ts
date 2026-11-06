@@ -37,7 +37,6 @@ vi.mock("@/lib/workflow", async (original) => {
 });
 
 import { approvePlan, MAX_PLAN_ROUNDS, planDeadline, refusePlan, sendBackPlan, submitPlan, sweepPlanWindows } from "@/lib/agent-api/plan";
-import { PLAN_POINTS } from "@/lib/points/rules";
 
 const bob: AgentContext = { agentId: "agent-bob", name: "Bob's agent", ownerId: "bob", organisationId: "t1", level: "working", burst: false, keyId: "k1" };
 const cara: AgentContext = { ...bob, agentId: "agent-cara", name: "Cara's agent", ownerId: "cara" };
@@ -128,7 +127,7 @@ describe("submitPlan", () => {
 });
 
 describe("approvePlan", () => {
-  it("is the owner's decision: starts the claim with the deadline from the estimate, assigns the issue, withdraws the other bids and pays once", async () => {
+  it("is the owner's decision: starts the claim with the deadline from the estimate, assigns the issue, withdraws the other bids, and pays nothing", async () => {
     db.plan.findUnique.mockResolvedValue(storedPlan());
     const before = Date.now();
     const result = await approvePlan({ userId: "bob" }, "bug1");
@@ -136,13 +135,10 @@ describe("approvePlan", () => {
     expect(result.deliverBy.getTime()).toBeGreaterThanOrEqual(before + 240 * 60_000);
     expect(db.issueClaim.update).toHaveBeenCalledWith({ where: { id: "claim1" }, data: expect.objectContaining({ status: "active", claimedAt: expect.any(Date), deliverBy: result.deliverBy }) });
     expect(db.bug.update).toHaveBeenCalledWith({ where: { id: "bug1" }, data: { assigneeId: "bob", status: "in_progress", substatus: "in_progress" } });
-    expect(db.plan.update).toHaveBeenCalledWith({ where: { id: "plan1" }, data: expect.objectContaining({ decision: "approved", pointsPaidAt: expect.any(Date) }) });
+    expect(db.plan.update).toHaveBeenCalledWith({ where: { id: "plan1" }, data: expect.objectContaining({ decision: "approved" }) });
     expect(db.issueBid.updateMany).toHaveBeenCalledWith({ where: { bugId: "bug1", withdrawnAt: null, awardedAt: null }, data: { withdrawnAt: expect.any(Date) } });
-    expect(db.pointEntry.createMany).toHaveBeenCalledWith({
-      // Keyed per issue and person: a released award and a fresh plan on the same issue never pay again.
-      data: [expect.objectContaining({ userId: "bob", bugId: "bug1", role: "plan", points: PLAN_POINTS, sourceKey: "plan:bug1:bob", agentId: "agent-bob" })],
-      skipDuplicates: true,
-    });
+    // Approving your own agent's plan earns nothing on its own: the plan's $1 is held with the solver's reward at resolve (tests/merge/point-award).
+    expect(db.pointEntry.createMany).not.toHaveBeenCalled();
     expect(publish).toHaveBeenCalledWith(db, expect.objectContaining({ type: "plan.approved" }));
     expect(publish).toHaveBeenCalledWith(db, expect.objectContaining({ type: "claim.accepted", payload: expect.objectContaining({ via: "plan_approved" }) }));
   });

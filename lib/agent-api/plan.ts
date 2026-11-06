@@ -2,7 +2,7 @@ import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient, PlanScale } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { assertKeyProject, type AgentContext } from "@/lib/agents/require-agent";
+import type { AgentContext } from "@/lib/agents/require-agent";
 import { requireLevel } from "@/lib/agents/levels";
 import { IssueApiError } from "@/lib/agent-api/errors";
 import { publish } from "@/lib/agent-api/events";
@@ -10,7 +10,7 @@ import { workflowFor } from "@/lib/workflow";
 import { entryDescription, entryReplySelect, entrySummary, toEntryReplies, type EntryReply } from "@/lib/agent-api/entry-fields";
 import { issueIdFor } from "@/lib/issue-ref";
 import { moveTo } from "@/lib/issue-substatus";
-import { award } from "@/lib/points/award";
+import type { PointAward } from "@/lib/points/award";
 import { PLAN_POINTS, planSourceKey } from "@/lib/points/rules";
 import { assigneeChangedSummary, statusChangedSummary } from "@/lib/activity-log";
 import { ensureWatching } from "@/lib/watch";
@@ -22,10 +22,12 @@ import { notifyPlanSubmitted } from "@/lib/agent-notifications";
  * plan, the Plan review step's entry: how it read the task, its assumptions
  * and uncertainties, the steps, an estimate, a risk and a confidence. The
  * agent's owner, the claim's beneficiary, alone decides: approve starts the
- * claim with a deadline from the estimate and pays the plan's points; send
- * back returns it with the owner's edited steps (each change attributed to
- * them) and restarts the window, at most twice; the agent resubmits or
- * refuses. When the window runs out the award is released and the issue is
+ * claim with a deadline from the estimate; send back returns it with the
+ * owner's edited steps (each change attributed to them) and restarts the
+ * window, at most twice; the agent resubmits or refuses. Approving pays
+ * nothing: the plan's $1 is held with the solver's reward when the work is
+ * resolved under that claim (`planPayoutFor`) and released once enough people
+ * report it deployed (#live-payout); an abandoned plan earns nothing. When the window runs out the award is released and the issue is
  * Open for bids again; as after an expired offer, the awarded bid never
  * counts again (lib/open-bids.ts) and the agent bids afresh.
  */
@@ -94,7 +96,7 @@ const planSelect = {
   id: true, bugId: true, claimId: true, agentId: true, ownerId: true,
   summary: true, description: true, reading: true, assumptions: true, uncertainties: true,
   steps: true, estimateMinutes: true, risk: true, confidence: true, round: true,
-  submittedAt: true, decision: true, decidedAt: true, decisionNote: true, reviewBy: true, pointsPaidAt: true,
+  submittedAt: true, decision: true, decidedAt: true, decisionNote: true, reviewBy: true,
   createdAt: true, updatedAt: true,
   agent: { select: { name: true } },
   owner: { select: { name: true } },
@@ -153,7 +155,6 @@ export type PlanView = {
   /** Whether the claim this plan is for still holds the issue. */
   live: boolean;
   claimStatus: string;
-  pointsPaidAt: Date | null;
   revisions: PlanRevisionView[];
   replies: EntryReply[];
   createdAt: Date;
@@ -246,7 +247,6 @@ const withId = (text: string, by: PlanStep["by"], at: Date): PlanStep => ({ id: 
  */
 export async function submitPlan(agent: AgentContext, projectId: string, issueRef: string, raw: unknown) {
   requireLevel(agent, "working");
-  assertKeyProject(agent, projectId);
   const input = parsePlan(raw);
   const result = await prisma.$transaction(async (tx) => {
     const bugId = await issueIdFor(tx, issueRef, agent.organisationId);
@@ -319,8 +319,8 @@ async function lockWaitingPlan(tx: Tx, decider: Decider, bugId: string, expected
 /**
  * The owner approves the plan (browser only, never an agent key): the claim
  * becomes active with a deadline of now plus the estimate, the issue moves to
- * In progress · In progress, the other bids are withdrawn, and the plan's
- * points are paid once.
+ * In progress · In progress and the other bids are withdrawn. Nothing is paid
+ * here: approving your own agent's plan earns nothing on its own.
  */
 export async function approvePlan(decider: Decider, bugId: string, expectedVersion?: Date | string | null) {
   return prisma.$transaction(async (tx) => {
@@ -329,7 +329,7 @@ export async function approvePlan(decider: Decider, bugId: string, expectedVersi
     const beneficiary = await tx.user.findUniqueOrThrow({ where: { id: claim.beneficiaryUserId }, select: { name: true } });
     const now = new Date();
     const deliverBy = new Date(now.getTime() + plan.estimateMinutes * 60_000);
-    await tx.plan.update({ where: { id: plan.id }, data: { decision: "approved", decidedAt: now, decisionNote: null, pointsPaidAt: now } });
+    await tx.plan.update({ where: { id: plan.id }, data: { decision: "approved", decidedAt: now, decisionNote: null } });
     await tx.planRevision.create({
       data: {
         planId: plan.id, round: plan.round, kind: "approved", steps: plan.steps as Prisma.InputJsonValue, reading: plan.reading, assumptions: plan.assumptions, uncertainties: plan.uncertainties,
@@ -345,11 +345,6 @@ export async function approvePlan(decider: Decider, bugId: string, expectedVersi
     await ensureWatching(tx, bugId, [claim.beneficiaryUserId]);
     // The award is taken up: the other open bids on the issue are withdrawn, as on an accepted offer.
     await tx.issueBid.updateMany({ where: { bugId, withdrawnAt: null, awardedAt: null }, data: { withdrawnAt: now } });
-    // Once per issue and person (#plan-review rule 13): a released award and a fresh plan on the same issue never pay again.
-    await award(tx, {
-      organisationId: bug.organisationId, userId: claim.beneficiaryUserId, bugId, role: "plan", points: PLAN_POINTS,
-      sourceKey: planSourceKey(bugId, claim.beneficiaryUserId), agentId: claim.agentId,
-    });
     await publish(tx, {
       organisationId: bug.organisationId, type: "plan.approved", actorAgentId: null, bugId,
       payload: { planId: plan.id, claimId: claim.id, issueId: bugId, projectId: bug.projectId, beneficiaryUserId: claim.beneficiaryUserId, round: plan.round, deliverBy: deliverBy.toISOString(), decidedByUserId: decider.userId },
@@ -400,6 +395,33 @@ export async function sendBackPlan(decider: Decider, bugId: string, input: { ste
   }, { maxWait: 10000, timeout: 15000 });
 }
 
+/**
+ * The plan's award (#plan-review rule 13), held with the solver's reward when
+ * the work is resolved: $1 to the owner whose agent's approved plan the
+ * delivering claim ran under, keyed per issue and person. Null when the
+ * delivering claim had no approved plan, so an owner whose agent got a plan
+ * approved and then released the claim, or never delivered, earns nothing
+ * even if someone else finishes the issue.
+ */
+export async function planPayoutFor(
+  db: Db,
+  bug: { id: string; organisationId: string },
+  claim: { id: string } | null,
+): Promise<PointAward | null> {
+  if (!claim) return null;
+  const plan = await db.plan.findFirst({ where: { claimId: claim.id, decision: "approved" }, select: { ownerId: true, agentId: true } });
+  if (!plan) return null;
+  return {
+    organisationId: bug.organisationId,
+    userId: plan.ownerId,
+    bugId: bug.id,
+    role: "plan",
+    points: PLAN_POINTS,
+    sourceKey: planSourceKey(bug.id, plan.ownerId),
+    agentId: plan.agentId,
+  };
+}
+
 export type PlanReleaseReason = "plan_refused" | "plan_expired" | "owner_unresponsive" | "declined";
 
 /**
@@ -436,7 +458,6 @@ export async function releasePlanningClaim(
  */
 export async function refusePlan(agent: AgentContext, projectId: string, issueRef: string) {
   requireLevel(agent, "working");
-  assertKeyProject(agent, projectId);
   return prisma.$transaction(async (tx) => {
     const bugId = await issueIdFor(tx, issueRef, agent.organisationId);
     const bug = bugId ? await tx.bug.findFirst({ where: { id: bugId, organisationId: agent.organisationId, projectId, isDeleted: false }, select: { id: true, substatus: true, projectId: true } }) : null;

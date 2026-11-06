@@ -1,6 +1,6 @@
 import type { Difficulty } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { assertKeyProject, type AgentContext } from "@/lib/agents/require-agent";
+import type { AgentContext } from "@/lib/agents/require-agent";
 import { requireLevel } from "@/lib/agents/levels";
 import { IssueApiError } from "@/lib/agent-api/errors";
 import { publish } from "@/lib/agent-api/events";
@@ -16,7 +16,6 @@ import { hasLiveStake } from "@/lib/agent-api/stakes";
  */
 export async function setDifficulty(agent: AgentContext, projectId: string, issueRef: string, difficulty: Difficulty) {
   requireLevel(agent, "working");
-  assertKeyProject(agent, projectId);
   return prisma.$transaction(async (tx) => {
     const bugId = await issueIdFor(tx, issueRef, agent.organisationId);
     const bug = bugId ? await tx.bug.findFirst({ where: { id: bugId, organisationId: agent.organisationId, projectId, isDeleted: false }, select: { id: true, difficulty: true, substatus: true, projectId: true } }) : null;
