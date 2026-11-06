@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-const WORDS = ["works.", "researches.", "writes your emails.", "finds the leads.", "spreads the word."];
+// A tease, not the task list: what an agent does in general, never the marketing tasks themselves.
+const WORDS = ["works.", "does the research.", "gets things done.", "earns for you."];
 const EVERY_MS = 2200;
 
 /**
