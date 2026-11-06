@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { after } from "next/server";
 import { bugInOrganisation } from "@/lib/organisation-context";
 import { expireUnreadCounts } from "@/lib/cache-tags";
 import {
@@ -31,9 +32,9 @@ export async function notifySupportThread(
     recipientUserIds: string[];
     title: string;
   },
-): Promise<void> {
+): Promise<string[]> {
   const uniqueUserIds = [...new Set(recipientUserIds.filter(Boolean))];
-  if (uniqueUserIds.length === 0) return;
+  if (uniqueUserIds.length === 0) return [];
 
   await db.notification.createMany({
     data: uniqueUserIds.map((userId) => ({
@@ -45,7 +46,7 @@ export async function notifySupportThread(
       url: `/inbox?tab=requests&thread=${threadId}`,
     })),
   });
-  expireUnreadCounts(uniqueUserIds);
+  return uniqueUserIds;
 }
 
 /**
@@ -227,6 +228,7 @@ export async function addRequesterMessage(
   }
 
   const now = new Date();
+  let notifiedUserIds: string[] = [];
   await prisma.$transaction(async (tx) => {
     await tx.threadMessage.create({
       data: {
@@ -266,7 +268,7 @@ export async function addRequesterMessage(
         select: { ownerUserId: true },
       });
       if (assigneeAgent && assigneeAgent.ownerUserId !== user.id) {
-        await notifySupportThread(tx, {
+        notifiedUserIds = await notifySupportThread(tx, {
           organisationId,
           bugId: thread.bugId,
           threadId: thread.id,
@@ -276,6 +278,10 @@ export async function addRequesterMessage(
       }
     }
   });
+
+  if (notifiedUserIds.length > 0) {
+    expireUnreadCounts(notifiedUserIds);
+  }
 
   return { ok: true };
 }
@@ -327,13 +333,16 @@ export async function takeSupportThread(
     return { ok: false, error: "Someone already took this request." };
   }
 
-  await notifySupportThread(prisma, {
+  const notifiedUserIds = await notifySupportThread(prisma, {
     organisationId,
     bugId: thread.bugId,
     threadId: thread.id,
     recipientUserIds: [thread.requesterUserId],
     title: `${agent.name} took your request on #${thread.bug.number}`,
   });
+  if (notifiedUserIds.length > 0) {
+    expireUnreadCounts(notifiedUserIds);
+  }
 
   return { ok: true };
 }
@@ -361,6 +370,7 @@ export async function replySupportThread(
   }
 
   const now = new Date();
+  let notifiedUserIds: string[] = [];
   await prisma.$transaction(async (tx) => {
     await tx.threadMessage.create({
       data: {
@@ -375,7 +385,7 @@ export async function replySupportThread(
       where: { id: thread.id },
       data: { lastMessageAt: now },
     });
-    await notifySupportThread(tx, {
+    notifiedUserIds = await notifySupportThread(tx, {
       organisationId,
       bugId: thread.bugId,
       threadId: thread.id,
@@ -383,6 +393,10 @@ export async function replySupportThread(
       title: `${thread.assigneeAgent!.name} replied to your request on #${thread.bug.number}`,
     });
   });
+
+  if (notifiedUserIds.length > 0) {
+    expireUnreadCounts(notifiedUserIds);
+  }
 
   return { ok: true };
 }
@@ -479,6 +493,7 @@ export async function resolveSupportThread(
 
   const otherUserId = isRequester ? thread.assigneeAgent?.ownerUserId : thread.requesterUserId;
   const now = new Date();
+  let notifiedUserIds: string[] = [];
 
   await prisma.$transaction(async (tx) => {
     await tx.supportThread.update({
@@ -491,7 +506,7 @@ export async function resolveSupportThread(
     });
 
     if (otherUserId) {
-      await notifySupportThread(tx, {
+      notifiedUserIds = await notifySupportThread(tx, {
         organisationId,
         bugId: thread.bugId,
         threadId: thread.id,
@@ -500,6 +515,10 @@ export async function resolveSupportThread(
       });
     }
   });
+
+  if (notifiedUserIds.length > 0) {
+    expireUnreadCounts(notifiedUserIds);
+  }
 
   return { ok: true };
 }
@@ -512,72 +531,72 @@ export async function closeSupportThreadsForIssue(
   tx: Prisma.TransactionClient,
   { bugId, reason }: { bugId: string; reason: "fix_live" | "issue_closed" },
 ): Promise<void> {
-  try {
-    const threads = await tx.supportThread.findMany({
-      where: {
+  const threads = await tx.supportThread.findMany({
+    where: {
+      bugId,
+      status: { in: ["open", "taken"] },
+    },
+    select: {
+      id: true,
+      organisationId: true,
+      requesterUserId: true,
+      assigneeAgent: { select: { ownerUserId: true } },
+      bug: { select: { number: true, title: true } },
+    },
+  });
+  if (threads.length === 0) return;
+
+  const now = new Date();
+  await tx.supportThread.updateMany({
+    where: {
+      bugId,
+      status: { in: ["open", "taken"] },
+    },
+    data: {
+      status: "resolved",
+      resolvedAt: now,
+      resolvedReason: reason,
+    },
+  });
+
+  const notifications: {
+    userId: string;
+    organisationId: string;
+    bugId: string;
+    kind: string;
+    title: string;
+    url: string;
+  }[] = [];
+  const notifyUserIds: string[] = [];
+
+  const reasonText = reason === "fix_live" ? "fix is now live" : "issue was closed";
+  for (const t of threads) {
+    const title = `Request on #${t.bug.number} resolved (${reasonText})`;
+    const url = `/inbox?tab=requests&thread=${t.id}`;
+    const recipients = new Set<string>();
+    if (t.requesterUserId) recipients.add(t.requesterUserId);
+    if (t.assigneeAgent?.ownerUserId) recipients.add(t.assigneeAgent.ownerUserId);
+
+    for (const uid of recipients) {
+      notifications.push({
+        userId: uid,
+        organisationId: t.organisationId,
         bugId,
-        status: { in: ["open", "taken"] },
-      },
-      select: {
-        id: true,
-        organisationId: true,
-        requesterUserId: true,
-        assigneeAgent: { select: { ownerUserId: true } },
-        bug: { select: { number: true, title: true } },
-      },
-    });
-    if (threads.length === 0) return;
-
-    const now = new Date();
-    await tx.supportThread.updateMany({
-      where: {
-        bugId,
-        status: { in: ["open", "taken"] },
-      },
-      data: {
-        status: "resolved",
-        resolvedAt: now,
-        resolvedReason: reason,
-      },
-    });
-
-    const notifications: {
-      userId: string;
-      organisationId: string;
-      bugId: string;
-      kind: string;
-      title: string;
-      url: string;
-    }[] = [];
-    const notifyUserIds: string[] = [];
-
-    const reasonText = reason === "fix_live" ? "fix is now live" : "issue was closed";
-    for (const t of threads) {
-      const title = `Request on #${t.bug.number} resolved (${reasonText})`;
-      const url = `/inbox?tab=requests&thread=${t.id}`;
-      const recipients = new Set<string>();
-      if (t.requesterUserId) recipients.add(t.requesterUserId);
-      if (t.assigneeAgent?.ownerUserId) recipients.add(t.assigneeAgent.ownerUserId);
-
-      for (const uid of recipients) {
-        notifications.push({
-          userId: uid,
-          organisationId: t.organisationId,
-          bugId,
-          kind: "support_thread",
-          title,
-          url,
-        });
-        notifyUserIds.push(uid);
-      }
+        kind: "support_thread",
+        title,
+        url,
+      });
+      notifyUserIds.push(uid);
     }
+  }
 
-    if (notifications.length > 0) {
-      await tx.notification.createMany({ data: notifications });
+  if (notifications.length > 0) {
+    await tx.notification.createMany({ data: notifications });
+    try {
+      after(() => expireUnreadCounts(notifyUserIds));
+    } catch {
       expireUnreadCounts(notifyUserIds);
     }
-  } catch (error) {
-    console.error("[closeSupportThreadsForIssue] failed", error);
   }
 }
 

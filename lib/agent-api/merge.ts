@@ -742,6 +742,7 @@ async function acceptMarketing(
 ): Promise<AcceptFixResult> {
   const moved = moveTo(trackRules(bug.track).acceptMovesTo);
   await tx.bug.update({ where: { id: bug.id }, data: moved });
+  await closeSupportThreadsForIssue(tx, { bugId: bug.id, reason: "fix_live" });
   await tx.bugActivity.create({
     data: {
       bugId: bug.id,

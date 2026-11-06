@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
 import { currentOrganisationIdFor } from "@/lib/organisation-context";
 import { revalidateIssue } from "@/lib/revalidate-issue";
@@ -31,16 +32,27 @@ export async function createSupportThreadAction(input: unknown): Promise<ActionR
   const limit = await consumeRateLimit(`support-thread:${user.id}`, ACTION_RATE_LIMITS.supportThread);
   if (!limit.allowed) return { ok: false, error: RATE_LIMIT_MESSAGE };
 
-  const organisationId = await currentOrganisationIdFor(user.id);
-  if (!organisationId) return { ok: false, error: "Workspace membership required." };
-
   const parsed = createSupportThreadSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
+  const bug = await prisma.bug.findUnique({
+    where: { id: parsed.data.issueId, isDeleted: false },
+    select: { id: true, organisationId: true },
+  });
+  if (!bug) return { ok: false, error: "Issue not found." };
+
+  const isMember = await prisma.membership.findFirst({
+    where: { userId: user.id, organisationId: bug.organisationId },
+    select: { id: true },
+  });
+  if (!isMember) {
+    throw new Error("You must be a member of this organisation to ask about this issue.");
+  }
+
   try {
-    const result = await createSupportThread(user, organisationId, parsed.data.issueId, parsed.data.body);
+    const result = await createSupportThread(user, bug.organisationId, parsed.data.issueId, parsed.data.body);
     if (!result.ok) return result;
 
     revalidatePath("/inbox");

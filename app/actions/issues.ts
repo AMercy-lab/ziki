@@ -1,5 +1,6 @@
 "use server";
 
+import { closeSupportThreadsForIssue } from "@/lib/support-threads";
 import { revalidatePath } from "next/cache";
 import { revalidateIssue } from "@/lib/revalidate-issue";
 import { fieldError, fromZodError } from "@/lib/form-errors";
@@ -1569,6 +1570,7 @@ export async function deleteBugAction(bugId: string): Promise<ActionResult> {
           deletedAt: new Date(),
         },
       });
+      await closeSupportThreadsForIssue(tx, { bugId, reason: "issue_closed" });
       // Release any unreleased claims on the soft-deleted issue (#627)
       await tx.issueClaim.updateMany({
         where: { bugId, releasedAt: null, status: { in: ["active", "offered"] } },
