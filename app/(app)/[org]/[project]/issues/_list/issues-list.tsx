@@ -1244,7 +1244,7 @@ export async function IssuesList({
           />
         ) : null}
         {isIdeasView ? null : isFirstRun ? (
-          <FirstRunWelcome isAdmin={canDelete} hasTenant={Boolean(tenantId)} slug={ref} returnTo={returnTo} />
+          <FirstRunWelcome isAdmin={canDelete} hasTenant={Boolean(tenantId)} slug={ref} returnTo={returnTo} canContribute={canContribute} />
         ) : bugs.length === 0 ? (
           <WhimsicalEmptyState
             title={
@@ -1262,9 +1262,9 @@ export async function IssuesList({
                   : "Maybe the bugs went into hiding, or they've all been squashed! Try clearing your filters or create a new issue."
             }
             clearHref={issuesPath(ref, statusParam ?? ALL_STATUS)}
-            createHref={canContribute ? newIssueHref(ref, returnTo) : undefined}
+            createHref={newIssueHref(ref, returnTo)}
             showClear={Boolean((myWorkOn || !onlyStatusTab) && (qParam || statusParam || tagsParam || selectedMilestone || myWorkOn))}
-            showCreate={true}
+            showCreate={canContribute}
           />
         ) : (
           <section className="issues-results flex flex-col gap-3.5">
@@ -1599,11 +1599,13 @@ function FirstRunWelcome({
   hasTenant = true,
   slug,
   returnTo,
+  canContribute = true,
 }: {
   isAdmin: boolean;
   hasTenant?: boolean;
   slug: ProjectRef;
   returnTo: string;
+  canContribute?: boolean;
 }) {
   if (!hasTenant) {
     return (

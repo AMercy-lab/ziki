@@ -76,6 +76,7 @@ export async function GET(request: NextRequest, { params: routeParams }: { param
   if (!routeProject) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const tenantId = routeProject.tenantId;
   const projectId = routeProject.id;
+  const access = await tenantAccessFor(user.id, tenantId, user.role);
   const [tagTypes, milestones, areas] = await Promise.all([
     getIssueTypes(tenantId),
     tenantId

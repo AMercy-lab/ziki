@@ -124,9 +124,9 @@ export function notificationInTenant(
   allWorkspaces = false,
 ): Prisma.NotificationWhereInput {
   if (allWorkspaces) return {};
-  const globalKinds = { kind: { in: ["tenant_invite", "join_request_accepted", "join_request_rejected"] } };
-  if (!tenantId) return { OR: [{ tenantId: null }, globalKinds] };
-  return { OR: [{ tenantId: null }, { tenantId }, globalKinds] };
+  const invite = { kind: "tenant_invite" };
+  if (!tenantId) return { OR: [{ tenantId: null }, invite] };
+  return { OR: [{ tenantId: null }, { tenantId }, invite] };
 }
 
 /** Shown when someone without a tenant tries to file an issue. */

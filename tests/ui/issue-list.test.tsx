@@ -43,9 +43,16 @@ vi.mock("@/lib/project-route", () => ({
     user: { id: "dave", role: "user" },
     tenantId: "tenant-acme",
     project: { id: "project-acme", slug: "acme", name: "Acme Web", goal: null, tenantId: "tenant-acme", orgSlug: "zedu", ref: "zedu/acme" },
+    isOrgMember: true,
+    isOrgAdmin: false,
+    isProjectMember: false,
+    canContribute: true,
   })),
 }));
-vi.mock("@/lib/tenant-access", () => ({ currentTenantAccess: vi.fn(async () => ({ membershipRole: "member" })) }));
+vi.mock("@/lib/tenant-access", () => ({
+  currentTenantAccess: vi.fn(async () => ({ membershipRole: "member", admin: false })),
+  tenantAccessFor: vi.fn(async () => ({ membershipRole: "member", admin: false })),
+}));
 vi.mock("@/lib/lookups", () => ({
   getIssueTypes: vi.fn(async () => []),
 }));
