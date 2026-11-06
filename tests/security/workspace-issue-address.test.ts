@@ -37,6 +37,19 @@ describe("shared issue addresses across workspaces", () => {
     expect(await findProjectIssue("ziki", "app", 482)).toMatchObject({ kind: "found", issue: { id: "b-issue" } });
   });
 
+  it("allows direct public or member project access without workspace membership", async () => {
+    const target = { ...active, id: "project-issue", project: { slug: "app", organisation: { slug: "ziki" } } };
+    lookup.first.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce(target);
+    expect(await findProjectIssue("ziki", "app", 482)).toMatchObject({ kind: "found", issue: { id: "project-issue" } });
+    expect(lookup.first).toHaveBeenLastCalledWith(expect.objectContaining({ where: expect.objectContaining({
+      isDeleted: false,
+      organisation: { archivedAt: null },
+      project: expect.objectContaining({ slug: "app", organisation: { slug: "ziki" }, archivedAt: null,
+        OR: [{ visibility: "public" }, { memberships: { some: { userId: "u" } } }],
+      }),
+    }) }));
+  });
+
   it("preserves the deleted-issue Restore page in the active workspace", async () => {
     const deleted = { ...active, isDeleted: true };
     lookup.first.mockImplementation(async ({ where }) => where.organisationId === "a" && where.isDeleted !== false ? deleted : null);
