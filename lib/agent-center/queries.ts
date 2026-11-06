@@ -1,36 +1,36 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { isTenantAdminRole } from "@/lib/agents/membership";
+import { isOrganisationAdminRole } from "@/lib/agents/membership";
 import { auditWhere } from "@/lib/agent-audit/visibility";
 import { ACTIVITY_PAGE_SIZE, activityBefore, activityFilters, activityPage, type ActivityParams } from "./paging";
 
-const issueSelect = { id: true, number: true, title: true, status: true, pullRequestUrl: true, project: { select: { slug: true, tenant: { select: { slug: true } } } } } as const;
+const issueSelect = { id: true, number: true, title: true, status: true, pullRequestUrl: true, project: { select: { slug: true, organisation: { select: { slug: true } } } } } as const;
 const orderBy = [{ createdAt: "desc" }, { id: "desc" }] as const;
 
 /** Session-derived identity only. Membership is rechecked before any data read. */
-export async function loadAgentCenter(userId: string, tenantId: string | null, params: ActivityParams = {}) {
-  if (!tenantId) return null;
+export async function loadAgentCenter(userId: string, organisationId: string | null, params: ActivityParams = {}) {
+  if (!organisationId) return null;
   const member = await prisma.membership.findUnique({
-    where: { tenantId_userId: { tenantId, userId } },
+    where: { organisationId_userId: { organisationId, userId } },
     select: { role: true },
   });
   if (!member) return null;
-  // Workspace owners and admins see every agent's work, including site admins.
-  const isAdmin = isTenantAdminRole(member.role);
+  // Organisation owners and admins see every agent's work, including site admins.
+  const isAdmin = isOrganisationAdminRole(member.role);
   const filters = activityFilters(params);
   const bug: Prisma.BugWhereInput = {
-    tenantId, isDeleted: false,
+    organisationId, isDeleted: false,
     ...(filters.issueNumber !== undefined ? { number: filters.issueNumber } : {}),
   };
-  const agent: Prisma.AgentWhereInput = { tenantId, ...(isAdmin ? {} : { ownerUserId: userId }) };
+  const agent: Prisma.AgentWhereInput = { organisationId, ...(isAdmin ? {} : { ownerUserId: userId }) };
   const optionalBug = filters.issueNumber !== undefined ? { bug } : { OR: [{ bugId: null }, { bug }] };
 
   const [questions, work, events] = await Promise.all([
     prisma.agentQuestion.findMany({
       where: { AND: [
         // Even admins only read their own private requests. No answers selected.
-        { ownerUserId: userId, agent: { tenantId }, answeredAt: null },
+        { ownerUserId: userId, agent: { organisationId }, answeredAt: null },
         optionalBug, activityBefore(params.questions) ?? {},
       ] },
       orderBy: [...orderBy], take: ACTIVITY_PAGE_SIZE + 1,
@@ -50,7 +50,7 @@ export async function loadAgentCenter(userId: string, tenantId: string | null, p
     }),
     prisma.agentAuditEvent.findMany({
       where: { AND: [
-        auditWhere({ kind: "all", tenantId }), { agent }, optionalBug,
+        auditWhere({ kind: "all", organisationId }), { agent }, optionalBug,
         activityBefore(params.events) ?? {},
       ] },
       orderBy: [...orderBy], take: ACTIVITY_PAGE_SIZE + 1,

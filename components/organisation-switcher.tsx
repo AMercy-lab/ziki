@@ -2,11 +2,11 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { selectTenantAction } from "@/app/(app)/tenants/actions";
+import { selectOrganisationAction } from "@/app/(app)/organisations/actions";
 import { avatarTone } from "@/lib/avatar";
 
-/** A workspace's mark: its initial on a soft tile, the same colour every time for the same name. */
-function WorkspaceMark({ name, size = "sm" }: { name: string; size?: "sm" | "xs" }) {
+/** A option's mark: its initial on a soft tile, the same colour every time for the same name. */
+function OrganisationMark({ name, size = "sm" }: { name: string; size?: "sm" | "xs" }) {
   const initial = name.trim().charAt(0).toUpperCase() || "?";
   return (
     <span
@@ -20,37 +20,37 @@ function WorkspaceMark({ name, size = "sm" }: { name: string; size?: "sm" | "xs"
   );
 }
 
-/** A workspace the viewer belongs to and can open from the header. */
-export type WorkspaceChoice = {
+/** A option the viewer belongs to and can open from the header. */
+export type OrganisationOption = {
   id: string;
   name: string;
   slug: string;
 };
 
-function visibleName(workspace: WorkspaceChoice, shared: boolean): string {
-  return shared ? `${workspace.name} (${workspace.slug})` : workspace.name;
+function visibleName(option: OrganisationOption, shared: boolean): string {
+  return shared ? `${option.name} (${option.slug})` : option.name;
 }
 
 /**
- * The active workspace in the header. The closed control is only as wide as
- * the current name. Choosing another one submits selectTenantAction, the same
- * switch the workspaces page uses. The accessible name includes the workspace
+ * The active option in the header. The closed control is only as wide as
+ * the current name. Choosing another one submits selectOrganisationAction, the same
+ * switch the organisationOptions page uses. The accessible name includes the option
  * name on screen (WCAG 2.5.3); there is no aria-label to replace it.
  */
-export function WorkspaceSwitcher({
-  workspaces,
-  activeTenantId,
+export function OrganisationSwitcher({
+  organisationOptions,
+  activeOrganisationId,
   className = "",
   fullWidth = false,
   tone = "default",
   canManage = false,
   orgHref = null,
 }: {
-  workspaces: WorkspaceChoice[];
-  activeTenantId: string | null;
-  /** The viewer administers the current workspace: link to its organization page. */
+  organisationOptions: OrganisationOption[];
+  activeOrganisationId: string | null;
+  /** The viewer administers the current option: link to its organisation page. */
   canManage?: boolean;
-  /** The organization page under the current project, `/<slug>/org` (#project-urls). */
+  /** The organisation page under the current project, `/<slug>/org` (#project-urls). */
   orgHref?: string | null;
   className?: string;
   fullWidth?: boolean;
@@ -65,13 +65,13 @@ export function WorkspaceSwitcher({
   const [open, setOpen] = useState(false);
 
   const counts = new Map<string, number>();
-  for (const workspace of workspaces) {
-    const key = workspace.name.toLocaleLowerCase();
+  for (const option of organisationOptions) {
+    const key = option.name.toLocaleLowerCase();
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   const shared = (name: string) => (counts.get(name.toLocaleLowerCase()) ?? 0) > 1;
   const selected =
-    workspaces.find((workspace) => workspace.id === activeTenantId) ?? workspaces[0];
+    organisationOptions.find((option) => option.id === activeOrganisationId) ?? organisationOptions[0];
 
   useEffect(() => {
     if (!open) return;
@@ -92,14 +92,14 @@ export function WorkspaceSwitcher({
   if (!selected) {
     return (
       <Link
-        href="/tenants"
+        href="/organisations"
         className={`inline-flex h-8 items-center rounded-lg px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${
           chrome
             ? "border border-surface-border bg-[#132347] text-porcelain hover:bg-[#1a2d57]"
             : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
         } ${fullWidth ? "w-full" : ""} ${className}`}
       >
-        Workspaces
+        Organisations
       </Link>
     );
   }
@@ -110,7 +110,7 @@ export function WorkspaceSwitcher({
     setOpen(false);
     if (id === selected?.id) return;
     const form = formRef.current;
-    const input = form?.elements.namedItem("tenantId");
+    const input = form?.elements.namedItem("organisationId");
     if (!form || !(input instanceof HTMLInputElement)) return;
     input.value = id;
     form.requestSubmit();
@@ -118,8 +118,8 @@ export function WorkspaceSwitcher({
 
   return (
     <div ref={rootRef} className={`relative ${fullWidth ? "w-full" : "w-max max-w-40"} ${className}`}>
-      <form ref={formRef} action={selectTenantAction}>
-        <input type="hidden" name="tenantId" defaultValue={selected.id} />
+      <form ref={formRef} action={selectOrganisationAction}>
+        <input type="hidden" name="organisationId" defaultValue={selected.id} />
         <button
           type="button"
           aria-haspopup="listbox"
@@ -134,8 +134,8 @@ export function WorkspaceSwitcher({
                 : "h-9 rounded-full border-slate-200 bg-card py-0 pl-3 pr-2 text-xs text-slate-800 hover:bg-slate-50"
           } ${fullWidth ? "w-full justify-between" : ""}`}
         >
-          <span className="sr-only">Active workspace, </span>
-          {bar ? <WorkspaceMark name={selected.name} /> : null}
+          <span className="sr-only">Active option, </span>
+          {bar ? <OrganisationMark name={selected.name} /> : null}
           {chrome ? (
             <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
           ) : null}
@@ -158,19 +158,19 @@ export function WorkspaceSwitcher({
           <ul
             id={listId}
             role="listbox"
-            aria-label="Workspaces"
+            aria-label="Organisations"
             className="max-h-64 overflow-y-auto"
           >
-            {workspaces.map((workspace) => {
-              const label = visibleName(workspace, shared(workspace.name));
-              const current = workspace.id === selected.id;
+            {organisationOptions.map((option) => {
+              const label = visibleName(option, shared(option.name));
+              const current = option.id === selected.id;
               return (
-                <li key={workspace.id} role="presentation">
+                <li key={option.id} role="presentation">
                   <button
                     type="button"
                     role="option"
                     aria-selected={current}
-                    onClick={() => choose(workspace.id)}
+                    onClick={() => choose(option.id)}
                     className={`flex w-full items-center gap-2 truncate rounded-md px-2 py-1.5 text-left ${bar ? "text-sm" : "text-xs"} ${
                       current
                         ? chrome
@@ -185,7 +185,7 @@ export function WorkspaceSwitcher({
                             : "text-slate-700 hover:bg-slate-50"
                     }`}
                   >
-                    {bar ? <WorkspaceMark name={workspace.name} size="xs" /> : null}
+                    {bar ? <OrganisationMark name={option.name} size="xs" /> : null}
                     <span className="truncate">{label}</span>
                   </button>
                 </li>
@@ -193,7 +193,7 @@ export function WorkspaceSwitcher({
             })}
           </ul>
           {/* Outside the listbox: links, not options. Manage opens /org for the current
-              workspace; Add opens the create form on the workspaces page. */}
+              option; Add opens the create form on the organisationOptions page. */}
           <div className={`mt-1 border-t pt-1 ${chrome ? "border-surface-border" : bar ? "border-zk-divider" : "border-slate-200"}`}>
             {canManage && orgHref ? (
               <Link
@@ -205,11 +205,11 @@ export function WorkspaceSwitcher({
                   <circle cx="12" cy="12" r="3" />
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
                 </svg>
-                Manage organization
+                Manage organisation
               </Link>
             ) : null}
             <Link
-              href="/tenants#create-tenant"
+              href="/organisations#create-organisation"
               onClick={() => setOpen(false)}
               className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left ${bar ? "text-sm font-medium text-zk-accent hover:bg-zk-chip" : chrome ? "text-xs text-sky-tint hover:bg-white/5" : "text-xs text-teal-800 hover:bg-slate-50"}`}
             >

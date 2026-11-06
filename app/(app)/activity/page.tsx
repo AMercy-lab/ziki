@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth-helpers";
-import { currentTenantIdFor } from "@/lib/tenant-context";
+import { currentOrganisationIdFor } from "@/lib/organisation-context";
 import { isAgentPlatformEnabled } from "@/lib/feature-flags";
 import { loadAgentCenter } from "@/lib/agent-center/queries";
 import { activityFilters, activityHref, type ActivityParams, type ActivityStream } from "@/lib/agent-center/paging";
@@ -14,7 +14,7 @@ export const metadata = { title: "Human–Agent Activity" };
 const panel = "space-y-4 rounded-2xl border border-zk-border bg-zk-surface p-4 sm:p-6";
 const link = "font-semibold text-zk-accent underline-offset-2 hover:underline";
 
-function IssueLinks({ bug }: { bug: { id: string; number: number; title: string; pullRequestUrl: string | null; project: { slug: string; tenant: { slug: string } } } | null }) {
+function IssueLinks({ bug }: { bug: { id: string; number: number; title: string; pullRequestUrl: string | null; project: { slug: string; organisation: { slug: string } } } | null }) {
   if (!bug) return <p className="text-sm text-zk-muted">No linked issue</p>;
   return <div className="flex flex-wrap gap-3 text-sm">
     <Link className={link} href={issueHref(bug)}>#{bug.number} {bug.title}</Link>
@@ -33,14 +33,14 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   const user = await requireUser();
   if (!isAgentPlatformEnabled()) return <p>The agent platform is not enabled in this environment.</p>;
   const params = await searchParams;
-  const data = await loadAgentCenter(user.id, await currentTenantIdFor(user.id), params);
-  if (!data) return <div className={panel}><h1 className="text-2xl font-bold">Activity</h1><p>Join a workspace to view agent activity.</p><Link className={link} href="/tenants">Workspaces</Link></div>;
+  const data = await loadAgentCenter(user.id, await currentOrganisationIdFor(user.id), params);
+  if (!data) return <div className={panel}><h1 className="text-2xl font-bold">Activity</h1><p>Join a organisation to view agent activity.</p><Link className={link} href="/organisations">Organisations</Link></div>;
   const filters = activityFilters(params);
 
   return <div className="mx-auto max-w-5xl space-y-6 text-zk-text">
     <header className="space-y-2">
       <h1 className="text-2xl font-extrabold">Human–Agent Activity</h1>
-      <p className="text-sm text-zk-text2">{data.isAdmin ? "Workspace work and activity. Private escalations are limited to your own requests." : "Your agents’ work, requests and activity in this workspace."}</p>
+      <p className="text-sm text-zk-text2">{data.isAdmin ? "Organisation work and activity. Private escalations are limited to your own requests." : "Your agents’ work, requests and activity in this organisation."}</p>
     </header>
     <form method="get" className={`${panel} flex flex-wrap items-end gap-3`}>
       <label className="text-sm">Issue number<input name="issue" defaultValue={filters.issue} placeholder="123" className="mt-1 block rounded-lg border border-zk-border bg-zk-bg px-3 py-2" /></label>

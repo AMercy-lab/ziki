@@ -28,8 +28,8 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="space-y-1">
-        <Link href="/tenants" className="text-sm text-zk-accent hover:underline">
-          ← Your workspaces
+        <Link href="/organisations" className="text-sm text-zk-accent hover:underline">
+          ← Your organisations
         </Link>
         <h1 className="text-2xl font-extrabold tracking-tight text-zk-text">Invite</h1>
       </div>

@@ -4,9 +4,9 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FieldError, useFieldErrors } from "@/components/ui/field-errors";
 import { Input } from "@/components/ui/input";
-import { createTenantAction, type TenantFormResult } from "./actions";
+import { createOrganisationAction, type OrganisationFormResult } from "./actions";
 
-const FORM_ID = "create-tenant";
+const FORM_ID = "create-organisation";
 
 /** Keep a field's hint announced alongside its error, not replaced by it. */
 function withHint(hintId: string, errorAttrs: { "aria-invalid"?: true; "aria-describedby"?: string }) {
@@ -17,17 +17,17 @@ function withHint(hintId: string, errorAttrs: { "aria-invalid"?: true; "aria-des
 }
 
 /**
- * Create a tenant you own (#444). It starts with no projects: they are
+ * Create a organisation you own (#444). It starts with no projects: they are
  * created from the organisation's Projects page. `nameMax` comes
  * from the server, so this client file doesn't import the server-only rules.
  */
-export function CreateTenantForm({ nameMax }: { nameMax: number }) {
+export function CreateOrganisationForm({ nameMax }: { nameMax: number }) {
   const formRef = useRef<HTMLFormElement>(null);
   const { fieldErrors, show, clear, attrs } = useFieldErrors(FORM_ID, formRef);
   // Controlled, so a failed submit keeps what was typed.
   const [name, setName] = useState("");
-  const [result, action, pending] = useActionState<TenantFormResult | undefined, FormData>(
-    createTenantAction,
+  const [result, action, pending] = useActionState<OrganisationFormResult | undefined, FormData>(
+    createOrganisationAction,
     undefined,
   );
 
@@ -46,24 +46,24 @@ export function CreateTenantForm({ nameMax }: { nameMax: number }) {
   return (
     <form ref={formRef} action={action} className="mt-4 space-y-4" noValidate>
       <div className="space-y-1">
-        <label htmlFor="tenant-name" className="block text-sm font-medium text-zk-text">
-          Workspace name
+        <label htmlFor="organisation-name" className="block text-sm font-medium text-zk-text">
+          Organisation name
         </label>
-        <p id="tenant-name-hint" className="text-xs text-zk-muted">
+        <p id="organisation-name-hint" className="text-xs text-zk-muted">
           Usually your company or team, such as Acme.
         </p>
         <Input
-          id="tenant-name"
+          id="organisation-name"
           name="name"
           value={name}
           onChange={(event) => setName(event.target.value)}
           placeholder="Acme"
-          autoComplete="organization"
+          autoComplete="organisation"
           required
           maxLength={nameMax + 20}
           disabled={pending}
           className="sm:max-w-sm"
-          {...withHint("tenant-name-hint", attrs("name"))}
+          {...withHint("organisation-name-hint", attrs("name"))}
         />
         <FieldError formId={FORM_ID} field="name" errors={fieldErrors} />
       </div>
@@ -75,7 +75,7 @@ export function CreateTenantForm({ nameMax }: { nameMax: number }) {
       {confirmingDuplicate ? <input type="hidden" name="confirmDuplicate" value={result?.duplicateName} /> : null}
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={pending}>
-          {pending ? "Creating…" : confirmingDuplicate ? "Create anyway" : "Create workspace"}
+          {pending ? "Creating…" : confirmingDuplicate ? "Create anyway" : "Create organisation"}
         </Button>
         <p className="text-xs text-zk-muted">You&apos;ll be its owner.</p>
       </div>

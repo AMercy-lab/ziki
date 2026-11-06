@@ -13,7 +13,7 @@ export const AGENTS_DOCK_HEIGHT = 76;
  * Everything else hides it, including pages added later until they are named
  * here. The pages, matched on whole path segments (a trailing slash is fine):
  *
- * - the workspace's `/home`, `/feed`, `/activity` and `/inbox` (and below it);
+ * - the organisation's `/home`, `/feed`, `/activity` and `/inbox` (and below it);
  * - the earn pages (`isEarnPath`, lib/earn/paths.ts), where an earner keeps the
  *   bar for their agents (#earn-drafts);
  * - a project's landing page `/<org>/<project>`, its `/ideas` and `/issues`
@@ -43,7 +43,7 @@ export function dockVisibleOn(pathname: string | null | undefined, agentCount: n
 
 /**
  * Whether to show the Leaderboard link: "you can't be the only person on a
- * leaderboard", so not in a workspace of one member. When the count couldn't
+ * leaderboard", so not in a organisation of one member. When the count couldn't
  * be loaded the link stays, as it always was.
  */
 export function leaderboardVisible(memberCount: number | null | undefined): boolean {
@@ -51,7 +51,7 @@ export function leaderboardVisible(memberCount: number | null | undefined): bool
 }
 
 /**
- * Whether the account menu offers Leaderboard: when the workspace has more than
+ * Whether the account menu offers Leaderboard: when the organisation has more than
  * one member and the bar isn't already showing it. The bar carries the link
  * wherever it is drawn (dockVisibleOn), so the menu is where it lives otherwise.
  */

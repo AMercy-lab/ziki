@@ -11,11 +11,11 @@ import { acceptInviteAction, type AcceptInviteActionResult } from "./actions";
 export function AcceptInviteForm({
   token,
   inviteId,
-  tenantName,
+  organisationName,
 }: {
   token?: string;
   inviteId?: string;
-  tenantName: string;
+  organisationName: string;
 }) {
   const [result, action, pending] = useActionState<AcceptInviteActionResult | undefined, FormData>(
     acceptInviteAction,
@@ -27,7 +27,7 @@ export function AcceptInviteForm({
       {token ? <input type="hidden" name="token" value={token} /> : null}
       {inviteId ? <input type="hidden" name="inviteId" value={inviteId} /> : null}
       <Button type="submit" disabled={pending}>
-        {pending ? "Joining…" : `Join ${tenantName}`}
+        {pending ? "Joining…" : `Join ${organisationName}`}
       </Button>
       {result?.error ? (
         <p role="alert" className="text-sm text-zk-bad-fg">

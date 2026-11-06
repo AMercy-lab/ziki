@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { BASE_PATH } from "@/lib/base-path";
 import { resolveSessionUserId } from "@/lib/session-user";
-import { setActiveTenantCookie } from "@/lib/tenants";
+import { setActiveOrganisationCookie } from "@/lib/organisations";
 import { orgHomePath } from "@/lib/project-paths";
 
 /** A relative Location, so the browser stays on the host it asked (see notifications/[id]/route.ts, #416). */
@@ -26,12 +26,12 @@ export async function GET(request: Request) {
   if ("error" in resolved) return redirectTo("/login");
 
   const url = new URL(request.url);
-  const tenantId = url.searchParams.get("tenant") ?? "";
+  const organisationId = url.searchParams.get("organisation") ?? "";
   const user = await prisma.user.findUnique({ where: { id: resolved.userId }, select: { role: true } });
   const allowed = user?.role === "super_admin"
-    || Boolean(await prisma.membership.findUnique({ where: { tenantId_userId: { tenantId, userId: resolved.userId } }, select: { id: true } }));
-  const tenant = allowed ? await prisma.tenant.findFirst({ where: { id: tenantId, archivedAt: null }, select: { slug: true } }) : null;
-  if (!tenant) return redirectTo("/");
-  await setActiveTenantCookie(tenantId);
-  return redirectTo(safeNext(url.searchParams.get("next"), orgHomePath(tenant.slug)));
+    || Boolean(await prisma.membership.findUnique({ where: { organisationId_userId: { organisationId, userId: resolved.userId } }, select: { id: true } }));
+  const organisation = allowed ? await prisma.organisation.findFirst({ where: { id: organisationId, archivedAt: null }, select: { slug: true } }) : null;
+  if (!organisation) return redirectTo("/");
+  await setActiveOrganisationCookie(organisationId);
+  return redirectTo(safeNext(url.searchParams.get("next"), orgHomePath(organisation.slug)));
 }

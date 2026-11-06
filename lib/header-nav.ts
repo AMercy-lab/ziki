@@ -25,7 +25,7 @@ export function agentEditHref(username: string): string {
   return `/agent/${encodeURIComponent(username)}/edit`;
 }
 
-/** The leaderboard (Ranking); /leaderboard redirects here. Shown only in a workspace of more than one member. */
+/** The leaderboard (Ranking); /leaderboard redirects here. Shown only in a organisation of more than one member. */
 export const LEADERBOARD_HREF = "/workers";
 
 /** Every agent on Ziki (#agent-profile), and the owner's own under My agents. */

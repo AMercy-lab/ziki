@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FieldError, useFieldErrors } from "@/components/ui/field-errors";
 import { Input } from "@/components/ui/input";
-import { openInviteLinkAction, type TenantFormResult } from "./actions";
+import { openInviteLinkAction, type OrganisationFormResult } from "./actions";
 
 const FORM_ID = "invite-link";
 
@@ -13,7 +13,7 @@ export function InviteLinkForm() {
   const formRef = useRef<HTMLFormElement>(null);
   const { fieldErrors, show, clear, attrs } = useFieldErrors(FORM_ID, formRef);
   const [link, setLink] = useState("");
-  const [result, action, pending] = useActionState<TenantFormResult | undefined, FormData>(
+  const [result, action, pending] = useActionState<OrganisationFormResult | undefined, FormData>(
     openInviteLinkAction,
     undefined,
   );

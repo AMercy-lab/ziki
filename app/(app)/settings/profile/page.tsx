@@ -31,7 +31,7 @@ export default async function ProfilePage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-col gap-1">
             <h2 className="m-0 text-lg font-bold text-zk-text">Your profile</h2>
-            <span className="text-[13px] text-zk-muted">How you appear to everyone in the workspace.</span>
+            <span className="text-[13px] text-zk-muted">How you appear to everyone in the organisation.</span>
           </div>
           <Link
             href={`/users/${user.id}`}

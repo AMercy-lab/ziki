@@ -1,5 +1,5 @@
 /**
- * Two more workspaces for the Demo owner (demo@fixtures.local), to see the
+ * Two more organisations for the Demo owner (demo@fixtures.local), to see the
  * issue list's Your Work and Live stages, which show only when they hold
  * issues:
  *
@@ -8,7 +8,7 @@
  *
  * Each has the Demo owner as owner, one project, one set-up agent of theirs
  * that holds the claims, and a few issues in other states around them. Like
- * the Demo workspace they touch only their own rows (ids `fx-ws-*`) and a
+ * the Demo organisation they touch only their own rows (ids `fx-ws-*`) and a
  * rerun recreates them.
  */
 import type { PrismaClient, Status, Substatus } from "@prisma/client";
@@ -22,7 +22,7 @@ import type { PrismaClient, Status, Substatus } from "@prisma/client";
 type You = "bid" | "offered" | "assigned" | "overdue" | null;
 type IssueSpec = { title: string; summary: string; status: Status; substatus: Substatus; you: You };
 
-type WorkspaceSpec = { key: string; slug: string; name: string; issues: IssueSpec[] };
+type OrganisationSpec = { key: string; slug: string; name: string; issues: IssueSpec[] };
 
 const MINUTE = 60_000;
 
@@ -47,30 +47,30 @@ const LIVE_ISSUES: IssueSpec[] = [
   { title: "[Bug] Long titles overflow the issue row", summary: "Titles over 120 characters push the status chips off screen.", status: "resolved", substatus: "on_prod", you: "assigned" },
 ];
 
-const WORKSPACES: WorkspaceSpec[] = [
+const ORGANISATIONS: OrganisationSpec[] = [
   { key: "work", slug: "demo-work", name: "Demo Work", issues: WORK_ISSUES },
   { key: "live", slug: "demo-live", name: "Demo Live", issues: LIVE_ISSUES },
 ];
 
-export async function loadWorkWorkspaces(db: PrismaClient, ownerId: string, now: number): Promise<void> {
-  for (const ws of WORKSPACES) {
-    const tenantId = `fx-ws-${ws.key}-tenant`;
+export async function loadWorkOrganisations(db: PrismaClient, ownerId: string, now: number): Promise<void> {
+  for (const ws of ORGANISATIONS) {
+    const organisationId = `fx-ws-${ws.key}-organisation`;
     const projectId = `fx-ws-${ws.key}-project`;
     const agentId = `fx-ws-${ws.key}-agent`;
-    const existing = await db.tenant.findUnique({ where: { slug: ws.slug }, select: { id: true } });
-    if (existing && existing.id !== tenantId) throw new Error(`A "${ws.slug}" workspace exists that the fixtures didn't make; not touching it.`);
+    const existing = await db.organisation.findUnique({ where: { slug: ws.slug }, select: { id: true } });
+    if (existing && existing.id !== organisationId) throw new Error(`A "${ws.slug}" organisation exists that the fixtures didn't make; not touching it.`);
     if (existing) {
-      // Issues restrict deleting the workspace; everything else cascades.
-      await db.bug.deleteMany({ where: { tenantId } });
-      await db.tenant.delete({ where: { id: tenantId } });
+      // Issues restrict deleting the organisation; everything else cascades.
+      await db.bug.deleteMany({ where: { organisationId } });
+      await db.organisation.delete({ where: { id: organisationId } });
     }
 
-    await db.tenant.create({
+    await db.organisation.create({
       data: {
-        id: tenantId,
+        id: organisationId,
         slug: ws.slug,
         name: ws.name,
-        description: "Local fixtures: the Demo owner's assigned work (scripts/dev/fixtures/work-workspaces.ts).",
+        description: "Local fixtures: the Demo owner's assigned work (scripts/dev/fixtures/work-organisations.ts).",
         nextIssueNumber: 1,
         nextIdeaNumber: 1,
         memberships: { create: { userId: ownerId, role: "owner" } },
@@ -81,7 +81,7 @@ export async function loadWorkWorkspaces(db: PrismaClient, ownerId: string, now:
     await db.agent.create({
       data: {
         id: agentId,
-        tenantId,
+        organisationId,
         ownerUserId: ownerId,
         name: `${ws.name} Builder`,
         username: `${ws.slug}-builder`,
@@ -91,10 +91,10 @@ export async function loadWorkWorkspaces(db: PrismaClient, ownerId: string, now:
         createdAt: new Date(now - 30 * 24 * 60 * MINUTE),
       },
     });
-    const tag = await db.skillTag.create({ data: { id: `fx-ws-${ws.key}-tag`, tenantId, name: "TypeScript", slug: "typescript" } });
+    const tag = await db.skillTag.create({ data: { id: `fx-ws-${ws.key}-tag`, organisationId, name: "TypeScript", slug: "typescript" } });
     await db.agentSkill.create({ data: { agentId, tagId: tag.id, summary: "Strict types and small, tested fixes.", description: "I keep the types honest and add a test for every fix.", position: 0 } });
 
-    // In number order: a trigger numbers issues from the workspace's counter.
+    // In number order: a trigger numbers issues from the organisation's counter.
     for (const [index, issue] of ws.issues.entries()) {
       const n = index + 1;
       const bugId = `fx-ws-${ws.key}-bug-${n}`;
@@ -103,7 +103,7 @@ export async function loadWorkWorkspaces(db: PrismaClient, ownerId: string, now:
       await db.bug.create({
         data: {
           id: bugId,
-          tenantId,
+          organisationId,
           projectId,
           title: issue.title,
           summary: issue.summary,

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { orgPath, projectRef } from "@/lib/project-paths";
 
-/** The organization admin area's sections, one route each, under `/<slug>/org` (#project-urls). */
+/** The organisation admin area's sections, one route each, under `/<slug>/org` (#project-urls). */
 export const ORG_TABS = [
   { section: "", label: "Overview" },
   { section: "members", label: "Members" },
@@ -22,7 +22,7 @@ function isActive(pathname: string, href: string, overview: boolean): boolean {
 }
 
 /**
- * The segmented tab bar under the organization's name. On a phone it scrolls
+ * The segmented tab bar under the organisation's name. On a phone it scrolls
  * sideways inside itself, so the page never does.
  */
 export function OrgTabs() {
@@ -30,7 +30,7 @@ export function OrgTabs() {
   const params = useParams<{ org: string; project: string }>();
   const slug = projectRef(params.org, params.project);
   return (
-    <nav aria-label="Organization sections" className="-mx-1 overflow-x-auto px-1 pb-1">
+    <nav aria-label="Organisation sections" className="-mx-1 overflow-x-auto px-1 pb-1">
       <ul className="flex w-max gap-0.5 rounded-full bg-zk-seg p-1">
         {ORG_TABS.map((tab) => {
           const href = orgPath(slug, tab.section);

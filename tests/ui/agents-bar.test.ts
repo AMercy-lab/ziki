@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import { dockVisibleOn, leaderboardInMenu, leaderboardVisible } from "@/lib/agents-dock";
 import { projectRef } from "@/lib/project-paths";
 import { parseDismissed, withDismissed } from "@/lib/onboarding";
-import { NEXT_STEP_COOKIE, workspaceNextStep, type WorkspaceNextStepInput } from "@/lib/workspace-next-step";
+import { NEXT_STEP_COOKIE, organisationNextStep, type OrganisationNextStepInput } from "@/lib/organisation-next-step";
 
 const ref = projectRef("zedu", "acme");
 
 /**
  * The agents bar (#agents-dock): which pages draw it, when the Leaderboard
  * link is worth showing, and the one next step
- * a workspace card names in place of the empty bar. Pure rules.
+ * a organisation card names in place of the empty bar. Pure rules.
  */
 
 describe("dockVisibleOn: where the agents bar shows", () => {
@@ -61,8 +61,8 @@ describe("dockVisibleOn: where the agents bar shows", () => {
     "/superadmin",
     "/superadmin/users",
     "/superadmin/orgs/acme",
-    "/tenants",
-    "/tenants/invite/abc",
+    "/organisations",
+    "/organisations/invite/abc",
     "/security",
     "/points/disputes",
     "/points/disputes/new",
@@ -167,7 +167,7 @@ describe("dockVisibleOn: where the agents bar shows", () => {
 });
 
 describe("leaderboardVisible: you can't be the only person on a leaderboard", () => {
-  it("hides it for a one-member workspace", () => {
+  it("hides it for a one-member organisation", () => {
     expect(leaderboardVisible(1)).toBe(false);
     expect(leaderboardVisible(0)).toBe(false);
   });
@@ -195,7 +195,7 @@ describe("leaderboardInMenu: the account menu only offers what the bar isn't sho
     expect(leaderboardInMenu("/home", 3, 2)).toBe(false);
   });
 
-  it("is never offered in a workspace of one member, bar or no bar", () => {
+  it("is never offered in a organisation of one member, bar or no bar", () => {
     expect(leaderboardInMenu("/zedu/acme/issues", 0, 1)).toBe(false);
     expect(leaderboardInMenu("/settings", 2, 1)).toBe(false);
   });
@@ -206,8 +206,8 @@ describe("leaderboardInMenu: the account menu only offers what the bar isn't sho
   });
 });
 
-describe("workspaceNextStep: the one next thing, from who you are", () => {
-  const base: WorkspaceNextStepInput = {
+describe("organisationNextStep: the one next thing, from who you are", () => {
+  const base: OrganisationNextStepInput = {
     slug: ref,
     membershipRole: "owner",
     appRole: "user",
@@ -217,7 +217,7 @@ describe("workspaceNextStep: the one next thing, from who you are", () => {
     pendingInvites: 0,
     dismissed: false,
   };
-  const ask = (over: Partial<WorkspaceNextStepInput>) => workspaceNextStep({ ...base, ...over });
+  const ask = (over: Partial<OrganisationNextStepInput>) => organisationNextStep({ ...base, ...over });
 
   it("tells an owner with no agents to connect one", () => {
     const card = ask({});
@@ -254,7 +254,7 @@ describe("workspaceNextStep: the one next thing, from who you are", () => {
     expect(ask({ agentCount: 1, memberCount: 1, membershipRole: "admin" })).toBeNull();
   });
 
-  it("says nothing when you aren't a member of the workspace", () => {
+  it("says nothing when you aren't a member of the organisation", () => {
     expect(ask({ membershipRole: null })).toBeNull();
   });
 
@@ -264,13 +264,13 @@ describe("workspaceNextStep: the one next thing, from who you are", () => {
     expect(ask({ dismissed: true, agentCount: 1, memberCount: 1 })).toBeNull();
   });
 
-  it("treats the site super admin as an admin of the workspace", () => {
+  it("treats the site super admin as an admin of the organisation", () => {
     expect(ask({ membershipRole: "member", appRole: "super_admin" })?.id).toBe("connect-agent");
   });
 });
 
 describe("the next-step card's dismissal cookie", () => {
-  it("is kept per workspace, newest last", () => {
+  it("is kept per organisation, newest last", () => {
     expect(NEXT_STEP_COOKIE).toBe("ziki_next_step_dismissed");
     const once = withDismissed(undefined, "t1");
     const twice = withDismissed(once, "t2");

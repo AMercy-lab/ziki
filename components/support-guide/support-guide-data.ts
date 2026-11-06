@@ -1,6 +1,6 @@
 import { issuesPath, ideasPath, projectPath, projectRef, type ProjectRef } from "@/lib/project-paths";
 
-/** The project links point into when the page is in none: the local Demo workspace. */
+/** The project links point into when the page is in none: the local Demo organisation. */
 const FALLBACK_PROJECT = projectRef("demo", "demo");
 
 export interface FAQItem {

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FieldError, useFieldErrors } from "@/components/ui/field-errors";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
-import type { PromoteOwnerResult } from "@/lib/tenants";
+import type { PromoteOwnerResult } from "@/lib/organisations";
 import { promoteZeduOwnerAction } from "./actions";
 
 const FORM_ID = "zedu-owner";

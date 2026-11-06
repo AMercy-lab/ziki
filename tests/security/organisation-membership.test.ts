@@ -1,25 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Tenant membership (#425): reports are filed into the reporter's tenant,
+ * Organisation membership (#425): reports are filed into the reporter's organisation,
  * someone with no membership can't file at all, an area from another project
- * is refused, and an issue in another tenant is "not found".
+ * is refused, and an issue in another organisation is "not found".
  */
 
-vi.mock("@/lib/tenant-context", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/tenant-context")>()),
-  currentTenantIdFor: vi.fn(),
+vi.mock("@/lib/organisation-context", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/organisation-context")>()),
+  currentOrganisationIdFor: vi.fn(),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/notify", () => ({ notifyLater: vi.fn() }));
 vi.mock("@/lib/session-user", () => ({ resolveSessionUserId: vi.fn() }));
 vi.mock("@/lib/auth-helpers", () => ({ requireUser: vi.fn() }));
-vi.mock("@/lib/tenant-access", () => ({
-  currentTenantAccess: vi.fn(async () => ({
-    tenantId: "tenant-zedu",
-    tenantName: "Zedu",
-    tenantSlug: "zedu",
+vi.mock("@/lib/organisation-access", () => ({
+  currentOrganisationAccess: vi.fn(async () => ({
+    organisationId: "organisation-zedu",
+    organisationName: "Zedu",
+    organisationSlug: "zedu",
     membershipRole: "member",
     admin: false,
   })),
@@ -28,10 +28,10 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     bug: { findUnique: vi.fn(), create: vi.fn() },
     idea: { create: vi.fn() },
-    // #project-urls: the form names its project; only one in the reporter's tenant is used.
+    // #project-urls: the form names its project; only one in the reporter's organisation is used.
     project: {
-      findFirst: vi.fn(async ({ where }: { where: { id: string; tenantId: string } }) =>
-        where.id === "project-zedu" && where.tenantId === "tenant-zedu" ? { id: "project-zedu", slug: "zedu" } : null),
+      findFirst: vi.fn(async ({ where }: { where: { id: string; organisationId: string } }) =>
+        where.id === "project-zedu" && where.organisationId === "organisation-zedu" ? { id: "project-zedu", slug: "zedu" } : null),
     },
     projectArea: { findFirst: vi.fn() },
     user: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
@@ -42,7 +42,7 @@ vi.mock("@/lib/prisma", () => ({
 
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
-import { currentTenantIdFor, NO_TENANT_MESSAGE } from "@/lib/tenant-context";
+import { currentOrganisationIdFor, NO_ORGANISATION_MESSAGE } from "@/lib/organisation-context";
 import { createBugAction, updateBugAction } from "@/app/actions/issues";
 
 const db = prisma as unknown as {
@@ -52,7 +52,7 @@ const db = prisma as unknown as {
   projectArea: { findFirst: ReturnType<typeof vi.fn> };
   $executeRaw: ReturnType<typeof vi.fn>;
 };
-const tenantOf = currentTenantIdFor as unknown as ReturnType<typeof vi.fn>;
+const organisationOf = currentOrganisationIdFor as unknown as ReturnType<typeof vi.fn>;
 
 function form(values: Record<string, string>) {
   const data = new FormData();
@@ -67,7 +67,7 @@ const report = form({
   projectId: "project-zedu",
 });
 
-describe("issue actions are tenant-scoped (#425)", () => {
+describe("issue actions are organisation-scoped (#425)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (requireUser as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "user-1", role: "user" });
@@ -75,37 +75,37 @@ describe("issue actions are tenant-scoped (#425)", () => {
   });
 
   it("refuses to file a report for someone with no membership", async () => {
-    tenantOf.mockResolvedValue(null);
-    expect(await createBugAction(report)).toEqual({ error: NO_TENANT_MESSAGE });
+    organisationOf.mockResolvedValue(null);
+    expect(await createBugAction(report)).toEqual({ error: NO_ORGANISATION_MESSAGE });
     expect(db.idea.create).not.toHaveBeenCalled();
   });
 
-  it("files the report, as an idea, into the reporter's tenant and project", async () => {
-    tenantOf.mockResolvedValue("tenant-zedu");
+  it("files the report, as an idea, into the reporter's organisation and project", async () => {
+    organisationOf.mockResolvedValue("organisation-zedu");
     db.idea.create.mockRejectedValue(new Error("stop after create"));
     await createBugAction(report).catch(() => undefined);
     expect(db.idea.create).toHaveBeenCalledTimes(1);
     expect(db.idea.create.mock.calls[0][0].data).toMatchObject({
-      tenantId: "tenant-zedu",
+      organisationId: "organisation-zedu",
       projectId: "project-zedu",
       beneficiaryUserId: "user-1",
     });
   });
 
-  it("refuses a project from another tenant", async () => {
-    tenantOf.mockResolvedValue("tenant-zedu");
+  it("refuses a project from another organisation", async () => {
+    organisationOf.mockResolvedValue("organisation-zedu");
     const result = await createBugAction(form({
       title: "Login button does nothing",
       description: "Clicking Login on the sign-in page does nothing at all, on Chrome and Firefox.",
       proofLinks: "",
       projectId: "project-acme",
     }));
-    expect(result).toEqual({ error: NO_TENANT_MESSAGE });
+    expect(result).toEqual({ error: NO_ORGANISATION_MESSAGE });
     expect(db.idea.create).not.toHaveBeenCalled();
   });
 
   it("rejects an area from another project before saving", async () => {
-    tenantOf.mockResolvedValue("tenant-zedu");
+    organisationOf.mockResolvedValue("organisation-zedu");
     db.projectArea.findFirst.mockResolvedValue(null);
     const result = await createBugAction(form({
       title: "Login button does nothing",
@@ -118,12 +118,12 @@ describe("issue actions are tenant-scoped (#425)", () => {
     expect(db.idea.create).not.toHaveBeenCalled();
   });
 
-  it("treats an issue in another tenant as not found", async () => {
-    tenantOf.mockResolvedValue("tenant-zedu");
+  it("treats an issue in another organisation as not found", async () => {
+    organisationOf.mockResolvedValue("organisation-zedu");
     db.bug.findUnique.mockResolvedValue(null);
     expect(await updateBugAction("bug-in-acme", form({ status: "resolved" }))).toEqual({
       error: expect.any(String),
     });
-    expect(db.bug.findUnique.mock.calls[0][0].where).toEqual({ id: "bug-in-acme", tenantId: "tenant-zedu" });
+    expect(db.bug.findUnique.mock.calls[0][0].where).toEqual({ id: "bug-in-acme", organisationId: "organisation-zedu" });
   });
 });

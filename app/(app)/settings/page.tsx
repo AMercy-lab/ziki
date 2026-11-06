@@ -192,7 +192,7 @@ export default async function SettingsPage(props: {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-col gap-1">
                     <h2 className="m-0 text-lg font-bold text-zk-text">Profile</h2>
-                    <span className="text-[13px] text-zk-muted">How you appear to everyone in the workspace.</span>
+                    <span className="text-[13px] text-zk-muted">How you appear to everyone in the organisation.</span>
                   </div>
                   <Link
                     href={`/users/${user.id}`}
@@ -313,10 +313,10 @@ export default async function SettingsPage(props: {
                   <h2 className="m-0 text-[17px] font-bold text-zk-text">Team</h2>
                 </div>
                 <p className="m-0 text-[13px] leading-relaxed text-zk-muted">
-                  Workspace members and their active agents.
+                  Organisation members and their active agents.
                 </p>
                 <div className="flex flex-col gap-0.5">
-                  {projectSlug ? <LinkRow href={orgPath(projectSlug, "members")} label="Organization members" /> : null}
+                  {projectSlug ? <LinkRow href={orgPath(projectSlug, "members")} label="Organisation members" /> : null}
                   <LinkRow href="/workers" label="View ranking" />
                 </div>
               </section>

@@ -17,109 +17,109 @@ import {
 } from "@/lib/invites";
 import { acceptShareLink, createShareLink, revokeShareLink } from "@/lib/share-invites";
 import { prisma } from "@/lib/prisma";
-import { EARN_WORKSPACE_SLUG } from "@/lib/earn/draft";
+import { EARN_ORGANISATION_SLUG } from "@/lib/earn/draft";
 import { issueHref } from "@/lib/issue-ref";
 import { RATE_LIMIT_MESSAGE, consumeRateLimit } from "@/lib/rate-limit";
 import {
-  CREATE_TENANT_RATE_LIMIT,
-  createTenant,
-  createTenantSchema,
-  deleteTenant,
-  memberTenantById,
+  CREATE_ORGANISATION_RATE_LIMIT,
+  createOrganisation,
+  createOrganisationSchema,
+  deleteOrganisation,
+  memberOrganisationById,
   promoteFirstZeduOwner,
-  renameTenant,
-  setActiveTenantCookie,
-  setTenantArchived,
+  renameOrganisation,
+  setActiveOrganisationCookie,
+  setOrganisationArchived,
   type PromoteOwnerResult,
-} from "@/lib/tenants";
+} from "@/lib/organisations";
 import { refererProjectRef } from "@/lib/referer-path";
 import { orgPath } from "@/lib/project-paths";
 
 /**
- * The tenant picker's actions (#444), and the organization admin's actions
- * behind /org. Each acts as the signed-in person and only ever on tenants
- * they belong to; lib/tenants.ts and lib/invites.ts hold the rules.
+ * The organisation picker's actions (#444), and the organisation admin's actions
+ * behind /org. Each acts as the signed-in person and only ever on organisations
+ * they belong to; lib/organisations.ts and lib/invites.ts hold the rules.
  */
 
-/** The organization admin area. It always shows the tenant this device is working in. */
+/** The organisation admin area. It always shows the organisation this device is working in. */
 /** The org Settings page the action came from (`/<org>/<project>/org/settings`, #project-urls). */
 async function orgSettingsPath(): Promise<string> {
   const slug = await refererProjectRef();
   return slug ? orgPath(slug, "settings") : "/home";
 }
 
-export type TenantFormResult = {
+export type OrganisationFormResult = {
   error?: string;
   field?: string;
   fieldErrors?: Record<string, string>;
-  /** #537: the name to confirm before a second tenant with it is created. */
+  /** #537: the name to confirm before a second organisation with it is created. */
   duplicateName?: string;
 };
 
-/** Work in this tenant on this device, and open its project (#project-urls): the one given, else its first. */
-async function enterTenant(tenantId: string): Promise<never> {
-  await setActiveTenantCookie(tenantId);
+/** Work in this organisation on this device, and open its project (#project-urls): the one given, else its first. */
+async function enterOrganisation(organisationId: string): Promise<never> {
+  await setActiveOrganisationCookie(organisationId);
   revalidatePath("/", "layout");
-  // The Earn workspace opens on Earn's own default page, never the builders' Ideas.
-  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { slug: true } });
-  if (tenant?.slug === EARN_WORKSPACE_SLUG) redirect("/earn/home");
-  // /home opens the first project of the workspace just made current, or its Projects page when it has none.
+  // The Earn organisation opens on Earn's own default page, never the builders' Ideas.
+  const organisation = await prisma.organisation.findUnique({ where: { id: organisationId }, select: { slug: true } });
+  if (organisation?.slug === EARN_ORGANISATION_SLUG) redirect("/earn/home");
+  // /home opens the first project of the organisation just made current, or its Projects page when it has none.
   redirect("/home");
 }
 
 /**
- * Open one of the person's tenants. An id they aren't a member of changes
- * nothing and says nothing about whether that tenant exists.
+ * Open one of the person's organisations. An id they aren't a member of changes
+ * nothing and says nothing about whether that organisation exists.
  */
-export async function selectTenantAction(formData: FormData): Promise<void> {
+export async function selectOrganisationAction(formData: FormData): Promise<void> {
   const user = await requireUser();
-  const tenant = await memberTenantById(prisma, user.id, String(formData.get("tenantId") ?? ""));
-  if (!tenant) redirect("/tenants");
-  if (tenant.archivedAt) {
-    redirect(`/tenants?error=${encodeURIComponent("Restore this organization before opening it.")}`);
+  const organisation = await memberOrganisationById(prisma, user.id, String(formData.get("organisationId") ?? ""));
+  if (!organisation) redirect("/organisations");
+  if (organisation.archivedAt) {
+    redirect(`/organisations?error=${encodeURIComponent("Restore this organisation before opening it.")}`);
   }
-  await enterTenant(tenant.id);
+  await enterOrganisation(organisation.id);
 }
 
 /**
- * Switch to the tenant that owns an issue the viewer followed a link to
+ * Switch to the organisation that owns an issue the viewer followed a link to
  * (#519), then land on that issue. Membership is re-checked here: the hint
  * on the page is presentation, this is the guard.
  */
-export async function switchTenantForIssueAction(formData: FormData): Promise<void> {
+export async function switchOrganisationForIssueAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const issueId = String(formData.get("issueId") ?? "");
-  const tenant = await memberTenantById(prisma, user.id, String(formData.get("tenantId") ?? ""));
-  if (!tenant || tenant.archivedAt) redirect("/home");
-  await setActiveTenantCookie(tenant.id);
+  const organisation = await memberOrganisationById(prisma, user.id, String(formData.get("organisationId") ?? ""));
+  if (!organisation || organisation.archivedAt) redirect("/home");
+  await setActiveOrganisationCookie(organisation.id);
   revalidatePath("/", "layout");
   const bug = await prisma.bug.findFirst({
-    where: { id: issueId, tenantId: tenant.id },
-    select: { number: true, project: { select: { slug: true, tenant: { select: { slug: true } } } } },
+    where: { id: issueId, organisationId: organisation.id },
+    select: { number: true, project: { select: { slug: true, organisation: { select: { slug: true } } } } },
   });
   redirect(bug ? issueHref(bug) : "/home");
 }
 
-/** Create a tenant owned by the person and enter it, on its Projects page to create the first project. */
-export async function createTenantAction(
-  _previous: TenantFormResult | undefined,
+/** Create a organisation owned by the person and enter it, on its Projects page to create the first project. */
+export async function createOrganisationAction(
+  _previous: OrganisationFormResult | undefined,
   formData: FormData,
-): Promise<TenantFormResult> {
+): Promise<OrganisationFormResult> {
   const user = await requireUser();
   const input = { name: formData.get("name") ?? "" };
 
   // Typos don't count against the limit; only real attempts do.
-  const parsed = createTenantSchema.safeParse(input);
+  const parsed = createOrganisationSchema.safeParse(input);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     return fieldError("name", issue?.message ?? "Check the name.");
   }
-  if (!(await consumeRateLimit(`tenant-create:${user.id}`, CREATE_TENANT_RATE_LIMIT)).allowed) {
+  if (!(await consumeRateLimit(`organisation-create:${user.id}`, CREATE_ORGANISATION_RATE_LIMIT)).allowed) {
     return { error: RATE_LIMIT_MESSAGE };
   }
 
   const confirmDuplicate = formData.get("confirmDuplicate");
-  const result = await createTenant(prisma, user, {
+  const result = await createOrganisation(prisma, user, {
     ...input,
     ...(typeof confirmDuplicate === "string" && confirmDuplicate ? { confirmDuplicate } : {}),
   });
@@ -127,59 +127,59 @@ export async function createTenantAction(
     const error = fieldError(result.field ?? "name", result.error);
     return result.duplicateName ? { ...error, duplicateName: result.duplicateName } : error;
   }
-  return enterTenant(result.tenant.id);
+  return enterOrganisation(result.organisation.id);
 }
 
-/** Rename a tenant the person owns; the slug stays the same. */
-export async function renameTenantAction(formData: FormData): Promise<void> {
+/** Rename a organisation the person owns; the slug stays the same. */
+export async function renameOrganisationAction(formData: FormData): Promise<void> {
   const user = await requireUser();
-  const tenantId = String(formData.get("tenantId") ?? "");
-  const tenant = await memberTenantById(prisma, user.id, tenantId);
-  if (!tenant) redirect("/tenants");
+  const organisationId = String(formData.get("organisationId") ?? "");
+  const organisation = await memberOrganisationById(prisma, user.id, organisationId);
+  if (!organisation) redirect("/organisations");
 
-  const result = await renameTenant(prisma, user.id, tenantId, formData.get("name"));
+  const result = await renameOrganisation(prisma, user.id, organisationId, formData.get("name"));
   if (!result.ok) {
     redirect(`${await orgSettingsPath()}?error=${encodeURIComponent(result.error)}`);
   }
 
   revalidatePath("/", "layout");
-  redirect(`${await orgSettingsPath()}?notice=${encodeURIComponent("Organization renamed.")}`);
+  redirect(`${await orgSettingsPath()}?notice=${encodeURIComponent("Organisation renamed.")}`);
 }
 
 /**
- * Archive or restore a tenant the person owns. Archiving happens in /org;
- * an archived tenant can't be opened, so it is restored from /tenants.
+ * Archive or restore a organisation the person owns. Archiving happens in /org;
+ * an archived organisation can't be opened, so it is restored from /organisations.
  */
-export async function setTenantArchivedAction(formData: FormData): Promise<void> {
+export async function setOrganisationArchivedAction(formData: FormData): Promise<void> {
   const user = await requireUser();
-  const tenantId = String(formData.get("tenantId") ?? "");
-  const tenant = await memberTenantById(prisma, user.id, tenantId);
-  if (!tenant) redirect("/tenants");
+  const organisationId = String(formData.get("organisationId") ?? "");
+  const organisation = await memberOrganisationById(prisma, user.id, organisationId);
+  if (!organisation) redirect("/organisations");
 
   const archived = String(formData.get("archived") ?? "") === "true";
-  const result = await setTenantArchived(prisma, user.id, tenantId, archived);
+  const result = await setOrganisationArchived(prisma, user.id, organisationId, archived);
   if (!result.ok) {
-    redirect(`${archived ? await orgSettingsPath() : "/tenants"}?error=${encodeURIComponent(result.error)}`);
+    redirect(`${archived ? await orgSettingsPath() : "/organisations"}?error=${encodeURIComponent(result.error)}`);
   }
 
   revalidatePath("/", "layout");
-  redirect(`/tenants?notice=${encodeURIComponent(archived ? "Organization archived." : "Organization restored.")}`);
+  redirect(`/organisations?notice=${encodeURIComponent(archived ? "Organisation archived." : "Organisation restored.")}`);
 }
 
-/** Delete an empty tenant after the owner types its name. */
-export async function deleteTenantAction(formData: FormData): Promise<void> {
+/** Delete an empty organisation after the owner types its name. */
+export async function deleteOrganisationAction(formData: FormData): Promise<void> {
   const user = await requireUser();
-  const tenantId = String(formData.get("tenantId") ?? "");
-  const tenant = await memberTenantById(prisma, user.id, tenantId);
-  if (!tenant) redirect("/tenants");
+  const organisationId = String(formData.get("organisationId") ?? "");
+  const organisation = await memberOrganisationById(prisma, user.id, organisationId);
+  if (!organisation) redirect("/organisations");
 
-  const result = await deleteTenant(prisma, user.id, tenantId, formData.get("confirmName"));
+  const result = await deleteOrganisation(prisma, user.id, organisationId, formData.get("confirmName"));
   if (!result.ok) {
     redirect(`${await orgSettingsPath()}?error=${encodeURIComponent(result.error)}`);
   }
 
   revalidatePath("/", "layout");
-  redirect(`/tenants?notice=${encodeURIComponent("Organization deleted.")}`);
+  redirect(`/organisations?notice=${encodeURIComponent("Organisation deleted.")}`);
 }
 
 export type CreateInviteActionResult =
@@ -193,18 +193,18 @@ export type CreateInviteActionResult =
     }
   | { ok: false; error: string; field?: string };
 
-/** An owner or admin invites an email address into their tenant. */
+/** An owner or admin invites an email address into their organisation. */
 export async function createInviteAction(
   _previous: CreateInviteActionResult | undefined,
   formData: FormData,
 ): Promise<CreateInviteActionResult> {
   const user = await requireUser();
-  if (!(await consumeRateLimit(`tenant-invite:${user.id}`, CREATE_INVITE_RATE_LIMIT)).allowed) {
+  if (!(await consumeRateLimit(`organisation-invite:${user.id}`, CREATE_INVITE_RATE_LIMIT)).allowed) {
     return { ok: false, error: RATE_LIMIT_MESSAGE };
   }
 
   const result = await createInvite(prisma, user, {
-    tenantId: String(formData.get("tenantId") ?? ""),
+    organisationId: String(formData.get("organisationId") ?? ""),
     email: formData.get("email"),
   });
   if (!result.ok) return result;
@@ -214,8 +214,8 @@ export async function createInviteAction(
     delivery = await deliverInvite(prisma, {
       invite: result.invite,
       rawToken: result.rawToken,
-      tenantId: result.tenant.id,
-      tenantName: result.tenant.name,
+      organisationId: result.organisation.id,
+      organisationName: result.organisation.name,
       inviter: { id: user.id, name: user.name || user.email || "Someone" },
     });
   } catch (error) {
@@ -246,12 +246,12 @@ export async function createShareLinkAction(
   formData: FormData,
 ): Promise<CreateShareLinkActionResult> {
   const user = await requireUser();
-  if (!(await consumeRateLimit(`tenant-share:${user.id}`, CREATE_INVITE_RATE_LIMIT)).allowed) {
+  if (!(await consumeRateLimit(`organisation-share:${user.id}`, CREATE_INVITE_RATE_LIMIT)).allowed) {
     return { ok: false, error: RATE_LIMIT_MESSAGE };
   }
 
   const result = await createShareLink(prisma, user, {
-    tenantId: String(formData.get("tenantId") ?? ""),
+    organisationId: String(formData.get("organisationId") ?? ""),
     expiresDays: formData.get("expiresDays"),
     maxUses: formData.get("maxUses"),
     label: formData.get("label"),
@@ -277,13 +277,13 @@ export async function acceptShareLinkAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const token = String(formData.get("token") ?? "");
   const back = `/join/${token}`;
-  if (!(await consumeRateLimit(`tenant-share-accept:${user.id}`, ACCEPT_INVITE_RATE_LIMIT)).allowed) {
+  if (!(await consumeRateLimit(`organisation-share-accept:${user.id}`, ACCEPT_INVITE_RATE_LIMIT)).allowed) {
     redirect(`${back}?error=rate`);
   }
 
   const result = await acceptShareLink(prisma, token, user);
   if (!result.ok) redirect(`${back}?error=${result.reason}`);
-  return enterTenant(result.tenant.id);
+  return enterOrganisation(result.organisation.id);
 }
 
 /** Withdraw a link that hasn't been used. */
@@ -301,7 +301,7 @@ export async function acceptInviteAction(
   formData: FormData,
 ): Promise<AcceptInviteActionResult> {
   const user = await requireUser();
-  if (!(await consumeRateLimit(`tenant-accept:${user.id}`, ACCEPT_INVITE_RATE_LIMIT)).allowed) {
+  if (!(await consumeRateLimit(`organisation-accept:${user.id}`, ACCEPT_INVITE_RATE_LIMIT)).allowed) {
     return { error: RATE_LIMIT_MESSAGE };
   }
 
@@ -315,14 +315,14 @@ export async function acceptInviteAction(
     user,
   );
   if (!result.ok) return { error: result.error };
-  return enterTenant(result.tenant.id);
+  return enterOrganisation(result.organisation.id);
 }
 
 /** Paste an invite link to open it. */
 export async function openInviteLinkAction(
-  _previous: TenantFormResult | undefined,
+  _previous: OrganisationFormResult | undefined,
   formData: FormData,
-): Promise<TenantFormResult> {
+): Promise<OrganisationFormResult> {
   await requireUser();
   const destination = destinationForInviteInput(String(formData.get("link") ?? ""));
   if (!destination) {
@@ -338,6 +338,6 @@ export async function promoteZeduOwnerAction(
 ): Promise<PromoteOwnerResult> {
   const user = await requireUser();
   const result = await promoteFirstZeduOwner(prisma, user, formData.get("email"));
-  if (result.ok) revalidatePath("/tenants");
+  if (result.ok) revalidatePath("/organisations");
   return result;
 }

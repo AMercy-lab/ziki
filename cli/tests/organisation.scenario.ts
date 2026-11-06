@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it, type TestContext } from "vitest";
 import { fileIdea, fileIssue, ok, refused, unique, ziki, type Agent, type CliResult } from "./helpers";
 
 /** Everything around the issues: projects, notes, mistakes, goals, jobs, webhooks, points, missions, keys. */
-describe("the workspace around the issues", () => {
+describe("the organisation around the issues", () => {
   let projectId: string;
 
   beforeAll(async () => {
@@ -90,7 +90,7 @@ describe("the workspace around the issues", () => {
 
   describe("goals", () => {
     it("are created, read, listed, split across issues and completed", async () => {
-      const target = await fileIssue("ada", "CLI workspace: goal target", ["bob", "cara", "eli"]);
+      const target = await fileIssue("ada", "CLI organisation: goal target", ["bob", "cara", "eli"]);
       const created = await ok("ada", "create-goal", { title: unique("Ship the list fix"), description: "The blank list, fixed.", budgetPool: 100 });
       const goalId = created.goal?.id ?? created.id;
       expect(goalId, JSON.stringify(created)).toBeTruthy();
@@ -104,7 +104,7 @@ describe("the workspace around the issues", () => {
   });
 
   describe("research jobs", () => {
-    it("are posted by an agent whose owner is a workspace admin, and not otherwise", async () => {
+    it("are posted by an agent whose owner is a organisation admin, and not otherwise", async () => {
       const job = { brief: "List three competitors' pricing pages.", dedupeKey: "url", maxSubmissions: 5, pointsPerAccepted: 10 };
       await refused("bob", "create-job", job, 403);
       const created = await ok("ada", "create-job", job);
@@ -225,14 +225,14 @@ describe("the workspace around the issues", () => {
 
   describe("routes with local limits", () => {
     it("resolving needs a linked pull request reported merged, so an issue without one is refused clearly", async () => {
-      const issue = await fileIssue("ada", "CLI workspace: resolve without a pull request", ["bob", "cara", "eli"]);
+      const issue = await fileIssue("ada", "CLI organisation: resolve without a pull request", ["bob", "cara", "eli"]);
       const result = await ziki("resolve-issue", "--id", issue, "--pull-request-url", "https://github.com/emerjent/ziki/pull/1", "--as", "ada");
       expect(result.code).toBe(1);
       expect(result.json.status).toBe(409);
     });
 
     it("structures an open idea, and refuses one that is no longer open", async () => {
-      const idea = await fileIdea("ada", "CLI workspace: idea to structure");
+      const idea = await fileIdea("ada", "CLI organisation: idea to structure");
       const structured = await ok("bob", "structure-idea", { id: idea, summary: "Saving does nothing.", acceptanceCriteria: ["Save stores the form"] });
       expect(JSON.stringify(structured)).toContain("Saving does nothing.");
       await refused("bob", "structure-idea", { id: "no-such-issue", summary: "A summary." }, 404);

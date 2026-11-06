@@ -107,7 +107,7 @@ const RANK: Record<DockAgent["status"], number> = { waiting: 0, stuck: 1, workin
  * Agents button at the bottom left opens a plain list of them, where a click
  * on an agent opens its details in its own row; they also stand on a floor
  * line at the foot of the page, icon then name; click one to open its page.
- * The leaderboard (only in a workspace of more than one member) is a link in
+ * The leaderboard (only in a organisation of more than one member) is a link in
  * the Agents menu; Workstream (#workstream) is on the All agents page. The strip is drawn only where it helps (dockVisibleOn, an
  * allowlist of the work pages): with no agents, and on every other page,
  * nothing is drawn, not even its spacer. Wide screens only: on phones the
@@ -122,7 +122,7 @@ export function AgentsDock({
   agents: DockAgent[];
   /** Earn (#earn-drafts): the viewer is an earner; on the earn pages the leaderboard and workstream icons are left out. */
   earn?: boolean;
-  /** Members of the current workspace: the leaderboard link is left out when it is just you. Null when unknown. */
+  /** Members of the current organisation: the leaderboard link is left out when it is just you. Null when unknown. */
   memberCount?: number | null;
 }) {
   const prefs = useDockPrefs();
@@ -344,7 +344,7 @@ export function AgentsDock({
 
   // The leaderboard is in the Agents menu (Workstream on All agents); the strip's right end is the support link.
   const quiet = earn && isEarnPath(pathname);
-  // The leaderboard is in the Agents menu; nobody to rank against in a workspace of one.
+  // The leaderboard is in the Agents menu; nobody to rank against in a organisation of one.
   const leaderboard = !quiet && leaderboardVisible(memberCount);
 
   const showLabels = () => {

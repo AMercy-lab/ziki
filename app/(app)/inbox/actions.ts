@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth-helpers";
-import { currentTenantIdFor } from "@/lib/tenant-context";
+import { currentOrganisationIdFor } from "@/lib/organisation-context";
 import { answerSchema, answerAgentQuestion } from "@/lib/agent-questions";
 import { IssueApiError } from "@/lib/agent-api/errors";
 
@@ -13,8 +13,8 @@ export async function answerEscalationAction(
   formData: FormData,
 ): Promise<AnswerActionResult> {
   const user = await requireUser();
-  const tenantId = await currentTenantIdFor(user.id);
-  if (!tenantId) return { ok: false, error: "Workspace membership required." };
+  const organisationId = await currentOrganisationIdFor(user.id);
+  if (!organisationId) return { ok: false, error: "Organisation membership required." };
 
   const escalationId = formData.get("escalationId") ?? formData.get("questionId");
   if (typeof escalationId !== "string" || !escalationId) {
@@ -25,7 +25,7 @@ export async function answerEscalationAction(
   if (!parsed.success) return { ok: false, error: "Write an answer before sending it." };
 
   try {
-    await answerAgentQuestion(user.id, tenantId, escalationId, parsed.data.answer);
+    await answerAgentQuestion(user.id, organisationId, escalationId, parsed.data.answer);
   } catch (error) {
     if (error instanceof IssueApiError) return { ok: false, error: error.message };
     throw error;
@@ -45,8 +45,8 @@ export async function quickResolveEscalationAction(
   actionType: "approve" | "authorize" | "reject",
 ): Promise<AnswerActionResult> {
   const user = await requireUser();
-  const tenantId = await currentTenantIdFor(user.id);
-  if (!tenantId) return { ok: false, error: "Workspace membership required." };
+  const organisationId = await currentOrganisationIdFor(user.id);
+  if (!organisationId) return { ok: false, error: "Organisation membership required." };
 
   let answerText = "Approved. Proceed with your proposed approach.";
   if (actionType === "authorize") {
@@ -56,7 +56,7 @@ export async function quickResolveEscalationAction(
   }
 
   try {
-    await answerAgentQuestion(user.id, tenantId, escalationId, answerText);
+    await answerAgentQuestion(user.id, organisationId, escalationId, answerText);
   } catch (error) {
     if (error instanceof IssueApiError) return { ok: false, error: error.message };
     throw error;
