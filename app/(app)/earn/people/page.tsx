@@ -6,8 +6,13 @@ import { CONVERSION_BONUS, EARN_POST_OPENS, stagePeople, type Reached } from "@/
 import { earnBalanceFor } from "@/lib/earn/state";
 import { agentsLink, agentsMutedClass, agentsPrimaryBtn, agentsSecondaryBtn, agentsSurface } from "@/app/(app)/settings/agents/agents-ui";
 import { earnAgentWhere } from "@/lib/earn/earner";
+import { followUpDraft, isQuiet } from "@/lib/earn/outreach";
+import { getSiteUrl } from "@/lib/site-url";
+import { EarnCopyButton } from "@/components/earn-outreach";
 
 export const metadata = { title: "People you reached" };
+
+const dayLabel = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
 
 const STEPS = [
   { key: "emailed", label: "Emailed" },
@@ -33,7 +38,21 @@ export default async function EarnPeoplePage() {
     prisma.agent.findFirst({ where: earnAgentWhere(user.id), orderBy: { createdAt: "asc" }, select: { name: true } }).catch(() => null),
   ]);
   const agentName = agent?.name ?? "Your agent";
-  const people = stagePeople(balance.stage).sort((a, b) => reach(b) - reach(a));
+  // The businesses the earner emailed (#earn-outreach), with when each was sent and first opened. Before any,
+  // the demo people show in local preview only (stagePeople returns none in production).
+  const contacts = await prisma.earnContact.findMany({ where: { userId: user.id, sentAt: { not: null } }, orderBy: { sentAt: "asc" } }).catch(() => []);
+  const site = getSiteUrl();
+  const real = contacts.map((contact) => ({
+    name: contact.name,
+    contact: contact.contact ?? "",
+    emailed: contact.sentAt ? dayLabel.format(contact.sentAt) : null,
+    opened: contact.openedAt ? dayLabel.format(contact.openedAt) : null,
+    signedUp: null,
+    started: null,
+    followUp: followUpDraft(contact.name, `${site}/r/${contact.code}`, user.name ?? ""),
+    quiet: isQuiet(contact),
+  }));
+  const people: (Reached & { followUp?: string; quiet?: boolean })[] = (real.length > 0 ? real : stagePeople(balance.stage)).sort((a, b) => reach(b) - reach(a));
 
   // Nobody reached yet: say what fills this page, and the one step that starts it.
   if (people.length === 0) {
@@ -58,7 +77,7 @@ export default async function EarnPeoplePage() {
               </li>
             ))}
           </ol>
-          <Link href="/earn/who" className={`${agentsPrimaryBtn} mt-6`}>Start: who needs Ziki</Link>
+          <Link href="/earn/marketing/3" className={`${agentsPrimaryBtn} mt-6`}>Start: send 10 emails</Link>
         </section>
       </div>
     );
@@ -119,14 +138,18 @@ export default async function EarnPeoplePage() {
           <p className="min-w-60 flex-1 text-sm text-zk-text2">
             {started
               ? `${closest.name} started a project. Your ${formatZ(CONVERSION_BONUS)} is in, and you can withdraw.`
-              : `They signed up on ${closest.signedUp} but haven't started a project yet. A short, friendly follow-up from you is often all it takes.`}
+              : closest.signedUp
+                ? `They signed up on ${closest.signedUp} but haven't started a project yet. A short, friendly follow-up from you is often all it takes.`
+                : closest.opened
+                  ? `They opened your link on ${closest.opened}. A short, friendly follow-up from you is often all it takes.`
+                  : `You emailed them on ${closest.emailed}. Nobody has opened the link yet: give it a few days, then follow up.`}
           </p>
           {started ? (
             <Link href="/earn/withdraw" className={agentsPrimaryBtn}>Go to Withdraw</Link>
           ) : (
             <>
-              <Link href="/earn/emails?p=0" className={agentsSecondaryBtn}>See your email</Link>
-              <button type="button" className={agentsPrimaryBtn}>Send a follow-up</button>
+              <Link href="/earn/marketing/3" className={agentsSecondaryBtn}>See your emails</Link>
+              {closest.followUp ? <EarnCopyButton text={closest.followUp} label="Copy a follow-up" primary /> : null}
             </>
           )}
         </div>
@@ -143,7 +166,7 @@ export default async function EarnPeoplePage() {
                 <dt className="text-xs font-semibold text-zk-muted">{step.label}</dt>
                 <dd className={`m-0 mt-1 text-3xl font-extrabold tabular-nums ${last ? (counts[i] ? "text-zk-ok-fg" : "text-zk-warn-fg") : "text-zk-text"}`}>
                   {counts[i]}
-                  {step.key === "opened" && EARN_POST_OPENS > 0 ? <span className="ml-1.5 text-xs font-semibold text-zk-muted">+{EARN_POST_OPENS} from your post</span> : null}
+                  {step.key === "opened" && EARN_POST_OPENS > 0 && real.length === 0 ? <span className="ml-1.5 text-xs font-semibold text-zk-muted">+{EARN_POST_OPENS} from your post</span> : null}
                 </dd>
               </div>
             );
@@ -177,10 +200,10 @@ export default async function EarnPeoplePage() {
                 <span className="flex justify-end">
                   {person.started ? (
                     <span className="inline-flex items-center rounded-full bg-zk-ok-bg px-2.5 py-0.5 text-xs font-bold text-zk-ok-fg">+{formatZ(CONVERSION_BONUS)}</span>
-                  ) : r >= 2 ? (
-                    <button type="button" className="inline-flex min-h-9 items-center rounded-full border border-zk-border bg-zk-surface px-3 text-xs font-bold text-zk-text hover:bg-zk-chip focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue focus-visible:ring-offset-2">Follow up</button>
+                  ) : person.followUp && (r >= 2 || person.quiet) ? (
+                    <EarnCopyButton text={person.followUp} label="Follow up" primary={person.quiet} />
                   ) : (
-                    <span className="text-xs text-zk-muted">Waiting</span>
+                    <span className="text-xs text-zk-muted">{r >= 2 ? "Follow up soon" : "Give it a few days"}</span>
                   )}
                 </span>
               </li>
@@ -191,9 +214,9 @@ export default async function EarnPeoplePage() {
 
       <div className="flex flex-wrap items-center gap-3 rounded-[20px] border border-zk-border bg-zk-tint px-5 py-4">
         <p className="min-w-60 flex-1 text-sm text-zk-text2">
-          <span className="font-bold text-zk-text">{agentName} keeps this going.</span> It drafts a follow-up 3 days after each email, and a reply when someone answers. Nothing sends until you approve it.
+          <span className="font-bold text-zk-text">Keep it going.</span> Anyone who has not opened their link after 3 days gets a follow-up you can copy. {agentName} can make it sound like you. You send it from your own email.
         </p>
-        <Link href="/earn/post" className={agentsLink}>Reach more people →</Link>
+        <Link href="/earn/marketing/4" className={agentsLink}>Reach more people →</Link>
       </div>
       <p className={agentsMutedClass}>Each business counts once, however many times you reach it.</p>
     </div>
