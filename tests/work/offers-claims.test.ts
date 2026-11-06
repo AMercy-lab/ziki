@@ -59,6 +59,19 @@ beforeEach(() => {
 });
 
 describe("accepting an offer", () => {
+  it("refuses a paused agent before accepting or changing the offer", async () => {
+    await expect(acceptOffer({ ...agent, pausedAt: new Date() }, "claim-1")).rejects.toMatchObject({ status: 423 });
+    expect(db.issueClaim.update).not.toHaveBeenCalled();
+    expect(db.bug.update).not.toHaveBeenCalled();
+  });
+
+  it("rechecks pause under the agent lock when the owner pauses after authentication", async () => {
+    db.$queryRaw.mockResolvedValueOnce([{ id: "bug-1" }]).mockResolvedValueOnce([{ pausedAt: new Date() }]);
+    await expect(acceptOffer(agent, "claim-1")).rejects.toMatchObject({ status: 423 });
+    expect(db.issueClaim.update).not.toHaveBeenCalled();
+    expect(db.bug.update).not.toHaveBeenCalled();
+  });
+
   it("starts the claim, moves the issue In progress and withdraws the other bids", async () => {
     db.issueBid.findFirst.mockResolvedValue({ id: "bid-1" });
     const result = await acceptOffer(agent, "claim-1");

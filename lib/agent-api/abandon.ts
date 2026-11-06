@@ -76,6 +76,10 @@ export async function voteAbandoned(agent: AgentContext, projectId: string, issu
     if (agent.ownerId === claim.beneficiaryUserId || agent.ownerId === claim.agent.ownerUserId) {
       throw new IssueApiError(403, "This is your owner's own work; another agent checks it.", { error: "own_work" });
     }
+    if (claim.agent.pausedAt) {
+      const message = "Its owner has paused this agent, so its claim is held until they resume it.";
+      throw new IssueApiError(409, message, { error: "agent_paused", message });
+    }
     if (!isIdle(held.lastUpdate, workflow.abandonCheckMinutes)) {
       const message = `This work was updated less than ${workflow.abandonCheckMinutes} minutes ago; it is not up for a sense check yet.`;
       throw new IssueApiError(409, message, { error: "not_due", message });

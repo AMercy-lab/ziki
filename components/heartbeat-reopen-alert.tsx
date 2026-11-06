@@ -19,17 +19,21 @@ export function HeartbeatReopenAlert({
   releaseAt,
   isWatching: initiallyWatching,
   isIssueOwner,
-  paused = false,
+  paused: waitingOnOwner = false,
+  agentPaused = false,
 }: {
   bugId: string;
   releaseAt: string | null;
   isWatching: boolean;
   isIssueOwner: boolean;
   paused?: boolean;
+  agentPaused?: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
   const isWatching = initiallyWatching;
+  // Both clocks stand still: while the agent waits on its owner, and while its owner has paused it.
+  const paused = waitingOnOwner || agentPaused;
   const [now, setNow] = useState(0);
   const [pending, startTransition] = useTransition();
   const deadline = releaseAt ? new Date(releaseAt).getTime() : null;
@@ -83,7 +87,7 @@ export function HeartbeatReopenAlert({
         </span>
         <div className="min-w-0">
           <p className="m-0 text-sm font-semibold text-zk-text">
-            {paused ? (isIssueOwner ? "Waiting for your answer" : "Waiting for the issue owner") : expired ? "Checking for reopening..." : "Bidding may reopen in"}
+            {agentPaused ? "Agent paused by its owner" : waitingOnOwner ? (isIssueOwner ? "Waiting for your answer" : "Waiting for the issue owner") : expired ? "Checking for reopening..." : "Bidding may reopen in"}
           </p>
           {/* `now` is 0 until the first tick: no countdown in the server HTML. */}
           {deadline !== null && !expired && !paused && now > 0 ? (

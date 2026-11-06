@@ -41,6 +41,7 @@ function claimSweepWhere(
     status: "active",
     releasedAt: null,
     waitingOnOwnerSince: null,
+    agent: { pausedAt: null },
     bug: {
       isDeleted: false,
       status: "in_progress",
@@ -67,10 +68,12 @@ export async function heartbeatClaim(agent: AgentContext, projectId: string, iss
       SELECT "id" FROM "Bug" WHERE "id" = ${bugId} AND "tenantId" = ${agent.tenantId}
       AND "projectId" = ${projectId} AND "isDeleted" = false FOR NO KEY UPDATE`;
     if (!issues.length) throw new IssueApiError(404, "Issue not found in this project.");
+    const agents = await tx.$queryRaw<{ pausedAt: Date | null }[]>`SELECT "pausedAt" FROM "Agent" WHERE "id" = ${agent.agentId} FOR UPDATE`;
     const claim = await tx.issueClaim.findFirst({ where: { bugId, releasedAt: null }, orderBy: { createdAt: "desc" } });
     if (!claim) throw new IssueApiError(409, "This issue has no current claim.");
     if (claim.agentId !== agent.agentId) throw new IssueApiError(403, "Only the claiming agent can send a heartbeat.");
     if (claim.status !== "active") throw new IssueApiError(409, "Only active claims accept heartbeats.");
+    if (agents[0]?.pausedAt || agent.pausedAt) return claim;
     return tx.issueClaim.update({ where: { id: claim.id }, data: { lastHeartbeatAt: new Date() } });
   });
 }
@@ -105,9 +108,12 @@ async function releaseClaimIfStale(
   const projectId = claim.bug.projectId;
   const outcome = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "Bug" WHERE "id" = ${claim.bugId} FOR NO KEY UPDATE`;
+    // Pause/resume and releases serialize on the same agent row. The bug is
+    // always locked first by claim transitions; pause/resume never locks it.
+    await tx.$queryRaw`SELECT a."id" FROM "Agent" a JOIN "IssueClaim" c ON c."agentId" = a."id" WHERE c."id" = ${claim.id} FOR UPDATE OF a`;
     // Re-read after locking: a heartbeat or another sweep may have won the race.
     const fresh = await tx.issueClaim.findFirst({ where: { id: claim.id, status: "active", releasedAt: null,
-      bug: { projectId, tenantId, isDeleted: false, status: "in_progress" } },
+      agent: { pausedAt: null }, bug: { projectId, tenantId, isDeleted: false, status: "in_progress" } },
       include: { bug: { select: { pullRequestUrl: true, project: { select: { ownerWaitCapMinutes: true } } } } } });
     const now = new Date();
     if (!fresh) return { released: false, opened: false };
@@ -181,6 +187,7 @@ async function sweepOwnerWaits(
       status: "active",
       releasedAt: null,
       waitingOnOwnerSince: { not: null },
+      agent: { pausedAt: null },
       bug: {
         isDeleted: false,
         status: "in_progress",
