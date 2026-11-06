@@ -284,7 +284,7 @@ export async function IssuesList({
   // Search follows the same track as the list; "all" names none, so both come back.
   const trackSearch = trackFilter === "all" ? {} : { track: trackFilter };
   const isDeletedView = canDelete && deletedParam === "true";
-  // Organisation-wide view (`?all=1`). Absent → unchanged project scope.
+  // Organisation-wide view (`?project=all`). Absent → unchanged project scope.
   const allProjects = isOrgMember && showsAllProjects(params[PROJECT_ALL_PARAM]);
 
   // Column sort (#column-sort): the address wins, then the sort remembered in this list's cookie.

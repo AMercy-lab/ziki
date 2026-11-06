@@ -7,10 +7,12 @@ import { MEMBERSHIP_ROLE_LABELS } from "@/lib/organisations";
 import { Badge } from "@/components/ui/badge";
 import { SettingsNav } from "@/components/settings-nav";
 import { prisma } from "@/lib/prisma";
+import "@/app/(app)/settings/settings-design.css";
 
 /**
- * Organisation settings layout. Shows the organisation that the browser or
- * device is working in. Every member can open it; only owners and admins (and
+ * The organisation admin area (/<org>/<project>/org, #project-urls): everything an organisation's owners and
+ * admins manage, each in one place. It always shows the organisation this
+ * device is working in. A project's outside contributors don't get it. Every member can open it; only owners and admins (and
  * the site super admin) see controls. Site-wide staff pages stay under /superadmin.
  */
 export default async function OrgLayout({ children, params }: { children: React.ReactNode; params: Promise<{ org: string; project: string }> }) {
@@ -57,7 +59,7 @@ export default async function OrgLayout({ children, params }: { children: React.
       {/* One Settings area: your settings and the organisation's share this sidebar (components/settings-nav.tsx). */}
       <div className="settings-layout">
         <Suspense fallback={<nav aria-label="Settings sections" className="settings-navigation" />}>
-          <SettingsNav orgRef={current.ref} orgName={org.name} />
+          <SettingsNav orgRef={current.ref} orgName={org.name} pendingJoinCount={pendingJoinCount} />
         </Suspense>
         <div className="min-w-0 space-y-6">{children}</div>
       </div>

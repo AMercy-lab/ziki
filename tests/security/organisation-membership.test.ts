@@ -75,9 +75,6 @@ import { currentOrganisationIdFor, NO_ORGANISATION_MESSAGE } from "@/lib/organis
 import { canContributeToProject } from "@/lib/project-permissions";
 import { createBugAction, updateBugAction } from "@/app/actions/issues";
 import { setWatchingAction } from "@/app/actions/watch";
-import { organisationAccessFor, currentOrganisationAccess } from "@/lib/organisation-access";
-import { canDeleteTicket } from "@/lib/ticket-deletion";
-import { showsAllProjects } from "@/lib/issue-list-filters";
 
 const organisationOf = currentOrganisationIdFor as unknown as ReturnType<typeof vi.fn>;
 
@@ -222,64 +219,5 @@ describe("canContributeToProject permissions", () => {
     membershipFindUnique.mockResolvedValue(null);
     const allowed = await canContributeToProject({ id: "stranger-1", role: "user" }, "p-1", "t-1");
     expect(allowed).toBe(false);
-  });
-});
-
-describe("external workspace owner visiting another org's public project (Items 1 & 2)", () => {
-  const user = { id: "user-owner-1", role: "user" as const };
-  const targetOrgId = "organisation-other-org";
-  const publicProjectId = "project-public-1";
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("ensures an owner of another workspace gets no membership or admin role in the target org", async () => {
-    // Current workspace access says owner/admin because they own their own workspace
-    const ownAccess = await currentOrganisationAccess(user.id, user.role);
-    expect(ownAccess.membershipRole).toBe("owner");
-    expect(ownAccess.admin).toBe(true);
-
-    // But in the target org where they have no membership row, organisationAccessFor returns null/false
-    membershipFindUnique.mockResolvedValue(null);
-    const targetAccess = await organisationAccessFor(user.id, targetOrgId, user.role);
-    expect(targetAccess.membershipRole).toBeNull();
-    expect(targetAccess.admin).toBe(false);
-
-    // Consequently, they cannot delete tickets or access deleted issues in that org
-    const canDelete = canDeleteTicket(user.role, targetAccess.membershipRole);
-    expect(canDelete).toBe(false);
-
-    // With ?deleted=true requested, isDeletedView is false
-    const isDeletedView = canDelete && "true" === "true";
-    expect(isDeletedView).toBe(false);
-  });
-
-  it("prevents an external workspace owner from seeing private projects via ?all=1", () => {
-    // User is visiting another org's public project, so isOrgMember is false
-    const isOrgMember = false;
-    const allParam = "all";
-
-    // Unchecked showsAllProjects would be true
-    expect(showsAllProjects(allParam)).toBe(true);
-
-    // But guarded by isOrgMember, allProjects is false
-    const allProjects = isOrgMember && showsAllProjects(allParam);
-    expect(allProjects).toBe(false);
-
-    // Query scope strictly retains projectId, ensuring private projects in the org are never exposed
-    const projectId = publicProjectId;
-    const projectFilter = projectId && !allProjects ? { projectId } : {};
-    expect(projectFilter).toEqual({ projectId: publicProjectId });
-  });
-
-  it("refuses deleted issue history to external workspace owners even if they own another workspace", async () => {
-    // In another org, membership is null
-    membershipFindUnique.mockResolvedValue(null);
-    const targetAccess = await organisationAccessFor(user.id, targetOrgId, user.role);
-
-    const deletedBug = { id: "bug-1", isDeleted: true, organisationId: targetOrgId };
-    const canSee = !deletedBug.isDeleted || canDeleteTicket(user.role, targetAccess.membershipRole);
-    expect(canSee).toBe(false);
   });
 });

@@ -22,7 +22,7 @@ function OrganisationMark({ name, size = "sm" }: { name: string; size?: "sm" | "
   );
 }
 
-export type WorkspaceProject = {
+export type OrganisationProject = {
   id: string;
   name: string;
   slug: string;
@@ -33,10 +33,8 @@ export type OrganisationOption = {
   id: string;
   name: string;
   slug: string;
-  projects?: WorkspaceProject[];
+  projects?: OrganisationProject[];
 };
-
-export type WorkspaceChoice = OrganisationOption;
 
 export type ExternalProjectChoice = {
   id: string;
@@ -326,5 +324,3 @@ export function OrganisationSwitcher({
     </div>
   );
 }
-
-export const WorkspaceSwitcher = OrganisationSwitcher;

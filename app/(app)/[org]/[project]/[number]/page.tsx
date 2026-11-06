@@ -309,7 +309,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   }
 
   const projectContext = await requireProject(org, projectSlug);
-  const { user, organisationId, isOrgMember, isOrgAdmin } = projectContext;
+  const { user, organisationId, isOrgMember, isOrgAdmin, canContribute } = projectContext;
   const access = await organisationAccessFor(user.id, organisationId, user.role);
   const canTriage = isOrgAdmin;
   const canDelete = isOrgAdmin || (isOrgMember && canDeleteTicket(user.role, access.membershipRole));
@@ -915,7 +915,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   }
 
   // Comments on the issue itself, at every stage (lib/comment-placement.ts).
-  const takesComments = !bug.isDeleted;
+  const takesComments = !bug.isDeleted && canContribute;
   // Looked up here, not on `hold`: holder is also what agents read through the API.
   const workingAgent = hold?.status === "active"
     ? await loadOptional("working agent", null, () => prisma.agent.findFirst({
@@ -1402,7 +1402,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                 currentUserId={user.id}
                 currentUserRole={user.role}
                 organisationAdmin={access.admin}
-                readOnly={bug.isDeleted}
+                readOnly={bug.isDeleted || !canContribute}
                 markedImportantBy={importanceMarkers}
               >
                 {comments.hiddenThreads > 0 ? (
@@ -1445,7 +1445,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
             likeVoters={voterSummary.likes.voters}
             size="md"
             showAvatars={false}
-            readOnly={bug.isDeleted}
+            readOnly={bug.isDeleted || !canContribute}
           />
         }
         actionsMenuSlot={
@@ -1814,7 +1814,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
               likeVoters={voterSummary.likes.voters}
               size="md"
               showAvatars={false}
-              readOnly={bug.isDeleted}
+              readOnly={bug.isDeleted || !canContribute}
             />
             {canMarkDuplicate || canDeleteHere ? (
               <IssueActionsMenu>
@@ -1997,7 +1997,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                     currentUserId={user.id}
                     currentUserRole={user.role}
                     organisationAdmin={access.admin}
-                    readOnly={bug.isDeleted}
+                    readOnly={bug.isDeleted || !canContribute}
                     markedImportantBy={importanceMarkers}
                   >
                     {comments.hiddenThreads > 0 ? (
