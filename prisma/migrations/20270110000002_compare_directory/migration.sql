@@ -102,26 +102,38 @@ SELECT v.*, CURRENT_TIMESTAMP FROM (VALUES
 ) AS v("id", "slug", "name", "logoUrl", "websiteUrl", "category", "description", "useCases", "strengths", "limitations", "pricingSummary", "features", "sourceUrls", "isZiki", "popular", "published", "sortOrder", "lastVerifiedAt")
 ON CONFLICT ("slug") DO NOTHING;
 
--- /compare is now a top-level route (lib/project-slug.ts), so a project that
--- already uses the slug is renamed the way the reserved-slug migration did:
--- <slug>-project, then -project-2, -3, ... if that is taken in the tenant.
+-- /compare is now a top-level route (lib/project-slug.ts), so an organisation
+-- or project that already uses the slug is renamed the way the reserved-slug
+-- migrations do: <slug>-org / <slug>-project, then -2, -3, ... if taken.
 DO $$
 DECLARE
-  project RECORD;
+  rec RECORD;
   candidate TEXT;
   attempt INT;
 BEGIN
-  FOR project IN
-    SELECT "id", "tenantId", "slug" FROM "Project" WHERE "slug" = 'compare' ORDER BY "createdAt", "id"
+  FOR rec IN
+    SELECT "id", "slug" FROM "Organisation" WHERE "slug" = 'compare' ORDER BY "createdAt", "id"
   LOOP
-    candidate := project."slug" || '-project';
+    candidate := rec."slug" || '-org';
     attempt := 2;
-    WHILE EXISTS (
-      SELECT 1 FROM "Project" WHERE "tenantId" = project."tenantId" AND "slug" = candidate
-    ) LOOP
-      candidate := project."slug" || '-project-' || attempt;
+    WHILE EXISTS (SELECT 1 FROM "Organisation" WHERE "slug" = candidate) LOOP
+      candidate := rec."slug" || '-org-' || attempt;
       attempt := attempt + 1;
     END LOOP;
-    UPDATE "Project" SET "slug" = candidate, "updatedAt" = NOW() WHERE "id" = project."id";
+    UPDATE "Organisation" SET "slug" = candidate, "updatedAt" = NOW() WHERE "id" = rec."id";
+  END LOOP;
+
+  FOR rec IN
+    SELECT "id", "organisationId", "slug" FROM "Project" WHERE "slug" = 'compare' ORDER BY "createdAt", "id"
+  LOOP
+    candidate := rec."slug" || '-project';
+    attempt := 2;
+    WHILE EXISTS (
+      SELECT 1 FROM "Project" WHERE "organisationId" = rec."organisationId" AND "slug" = candidate
+    ) LOOP
+      candidate := rec."slug" || '-project-' || attempt;
+      attempt := attempt + 1;
+    END LOOP;
+    UPDATE "Project" SET "slug" = candidate, "updatedAt" = NOW() WHERE "id" = rec."id";
   END LOOP;
 END $$;

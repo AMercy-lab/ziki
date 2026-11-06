@@ -2716,7 +2716,7 @@ model AgentPicture {
 
 /// A standing instruction one person writes for every agent they own (#838).
 /// Scoped to the user alone, never to an agent or an issue, so the same set
-/// answers every key that user owns — across all their workspaces.
+/// answers every key that user owns — across all their organisations.
 model AgentPreference {
   id        String   @id @default(cuid())
   userId    String
