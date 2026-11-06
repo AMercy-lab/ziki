@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMarketingArea } from "@/components/marketing/marketing-area";
 import { ideasPath, orgPath, type ProjectRef } from "@/lib/project-paths";
 import { useProjectRef } from "@/lib/use-project-ref";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -13,6 +14,7 @@ import {
   LEADERBOARD_HREF,
   SITE_ADMIN_HREF,
   isNavItemActive,
+  marketingTabHref,
   realRoleOf,
   roleViewLabels,
 } from "@/lib/header-nav";
@@ -127,6 +129,10 @@ function TopNavLink({
 function TopNav({ pathname, projectSlug }: { pathname: string | null; projectSlug: ProjectRef | null }) {
   // Product opens the project the page is in, or the first one (#project-urls).
   const productHref = projectSlug ? ideasPath(projectSlug) : "/tenants";
+  const marketingHref = marketingTabHref(projectSlug);
+  // The section's address starts with the project's slug, but it isn't Your App.
+  const onMarketingWork = useMarketingArea();
+  const inMarketing = isNavItemActive(pathname, marketingHref) || onMarketingWork;
   return (
     <nav
       aria-label="Workspace"
@@ -134,13 +140,13 @@ function TopNav({ pathname, projectSlug }: { pathname: string | null; projectSlu
       // clear of the home indicator. From lg it sits inline in the top bar.
       className="flex items-center max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-40 max-lg:justify-around max-lg:border-t max-lg:border-zk-border max-lg:bg-zk-surface max-lg:px-2 max-lg:pt-1.5 max-lg:pb-[max(0.375rem,env(safe-area-inset-bottom))] max-lg:shadow-[0_-1px_3px_rgba(0,0,0,0.04)] lg:ml-6 lg:gap-1"
     >
-      <TopNavLink href={productHref} active={Boolean(projectSlug && pathname?.startsWith(`/${projectSlug}`))} label="Your App">
+      <TopNavLink href={productHref} active={Boolean(projectSlug && pathname?.startsWith(`/${projectSlug}`) && !inMarketing)} label="Your App">
         <NavIcon>
           <circle cx="12" cy="12" r="9" />
           <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
         </NavIcon>
       </TopNavLink>
-      <TopNavLink href="https://amp.ziki.dev" active={isNavItemActive(pathname, "/marketing")} label="Marketing">
+      <TopNavLink href={marketingHref} active={inMarketing} label="Marketing">
         <NavIcon>
           <path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Z" />
           <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />
@@ -279,6 +285,7 @@ export function AppHeader({
   organizationAdmin = false,
   defaultProjectSlug = null,
   earned = null,
+  inEarnWorkspace = false,
   withdraw = null,
   version,
   memberCount = null,
@@ -294,6 +301,8 @@ export function AppHeader({
   withdraw?: WithdrawInfo | null;
   /** Earn (#earn-drafts): an earner's dollars, shown with Withdraw in the header; null for everyone else. */
   earned?: number | null;
+  /** The person is working in the Earn workspace: the header is Earn's on every page there. */
+  inEarnWorkspace?: boolean;
   /** The first project in the current workspace, for pages whose URL names none yet. */
   defaultProjectSlug?: ProjectRef | null;
   userName?: string | null;
@@ -325,8 +334,8 @@ export function AppHeader({
   }
 
   const realRole = realRoleOf({ isRealSuperAdmin, isRealAdmin });
-  // Earn (#earn-drafts): an earner on the earn pages sees only what they came for.
-  const earnQuiet = earned !== null && isEarnPath(pathname);
+  // Earn (#earn-drafts): an earner on the earn pages, or anywhere in the Earn workspace, sees only what they came for.
+  const earnQuiet = earned !== null && (isEarnPath(pathname) || inEarnWorkspace);
 
   return (
     // Sticky only from lg: on phones and tablets the toolbar wraps onto rows,
@@ -336,7 +345,7 @@ export function AppHeader({
         {/* Below lg the nav lives in the bottom strip, leaving one row here.
             The logo (the mark alone) is the way to the Dashboard. */}
         <div className="flex min-w-0 items-center gap-2">
-          <Link href={projectSlug ? ideasPath(projectSlug) : "/home"} aria-label="Ziki" className={`flex shrink-0 items-center gap-2 rounded-full ${linkFocus}`}>
+          <Link href={earnQuiet ? "/earn/home" : projectSlug ? ideasPath(projectSlug) : "/home"} aria-label="Ziki" className={`flex shrink-0 items-center gap-2 rounded-full ${linkFocus}`}>
             {/* The mark alone; the link's name says Ziki. */}
             <ZikiMark className="h-8 w-auto text-zk-text max-sm:h-7" />
           </Link>
