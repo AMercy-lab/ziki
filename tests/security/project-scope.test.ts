@@ -314,7 +314,7 @@ describe("canManageProject permissions", () => {
     expect(await canManageProject({ id: "admin-1", role: "super_admin" }, "tenant-1")).toBe(true);
   });
 
-  it("allows tenant owners and admins", async () => {
+  it("allows organisation owners and admins", async () => {
     membershipFindUnique.mockResolvedValue({ role: "owner" });
     expect(await canManageProject({ id: "user-1", role: "user" }, "tenant-1")).toBe(true);
 
@@ -322,7 +322,7 @@ describe("canManageProject permissions", () => {
     expect(await canManageProject({ id: "user-1", role: "user" }, "tenant-1")).toBe(true);
   });
 
-  it("denies regular tenant members and outsiders", async () => {
+  it("denies regular organisation members and outsiders", async () => {
     membershipFindUnique.mockResolvedValue({ role: "member" });
     expect(await canManageProject({ id: "user-1", role: "user" }, "tenant-1")).toBe(false);
 
@@ -343,10 +343,10 @@ describe("requestToJoinProjectAction", () => {
       id: "p-1",
       name: "Test Project",
       slug: "test-p",
-      tenantId: "t-1",
+      organisationId: "t-1",
       isOpenForContributors: true,
       visibility: "public",
-      tenant: { slug: "test-org" },
+      organisation: { slug: "test-org" },
     });
     membershipFindUnique.mockResolvedValue({ id: "m-1" });
     projectMembershipFindUnique.mockResolvedValue(null);
@@ -362,10 +362,10 @@ describe("requestToJoinProjectAction", () => {
       id: "p-1",
       name: "Test Project",
       slug: "test-p",
-      tenantId: "t-1",
+      organisationId: "t-1",
       isOpenForContributors: false,
       visibility: "public",
-      tenant: { slug: "test-org" },
+      organisation: { slug: "test-org" },
     });
     membershipFindUnique.mockResolvedValue(null);
     projectMembershipFindUnique.mockResolvedValue(null);
@@ -381,10 +381,10 @@ describe("requestToJoinProjectAction", () => {
       id: "p-1",
       name: "Test Project",
       slug: "test-p",
-      tenantId: "t-1",
+      organisationId: "t-1",
       isOpenForContributors: true,
       visibility: "public",
-      tenant: { slug: "test-org" },
+      organisation: { slug: "test-org" },
     });
     membershipFindUnique.mockResolvedValue(null);
     projectMembershipFindUnique.mockResolvedValue(null);
@@ -403,10 +403,10 @@ describe("requestToJoinProjectAction", () => {
       id: "p-1",
       name: "Test Project",
       slug: "test-p",
-      tenantId: "t-1",
+      organisationId: "t-1",
       isOpenForContributors: true,
       visibility: "public",
-      tenant: { slug: "test-org" },
+      organisation: { slug: "test-org" },
     });
     membershipFindUnique.mockResolvedValue(null);
     projectMembershipFindUnique.mockResolvedValue(null);
