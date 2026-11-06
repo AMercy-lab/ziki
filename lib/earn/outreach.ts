@@ -117,3 +117,34 @@ export function followUpDraft(businessName: string, link: string, senderName: st
 export function isQuiet(contact: { sentAt: Date | null; openedAt: Date | null }): boolean {
   return Boolean(contact.sentAt && !contact.openedAt && Date.now() - contact.sentAt.getTime() > 3 * 24 * 60 * 60 * 1000);
 }
+
+/** The browser note a business's link leaves, so a sign-up that follows can be traced back to it. */
+export const EARN_REF_COOKIE = "earn-ref";
+/** How long the note lasts: a business that signs up within 30 days of opening the link counts. */
+export const EARN_REF_MAX_AGE = 60 * 60 * 24 * 30;
+
+/**
+ * Traces a new account back to the business link it came from (#earn-outreach): a signed-in person whose
+ * browser carries a link's note, whose account was made after that link was first opened, and who isn't the
+ * earner themselves, is that business signing up. Each account counts for one business, once. Then, once that
+ * account owns a workspace of its own (not Ziki Earn), the business has started a project. Safe to call on every
+ * page: it only writes the first time each thing happens.
+ */
+export async function syncReferral(db: Db, userId: string, code: string | null, earnTenantId: string | null) {
+  if (code) {
+    const [contact, user] = await Promise.all([
+      db.earnContact.findUnique({ where: { code }, select: { id: true, userId: true, signedUpUserId: true, openedAt: true, createdAt: true } }),
+      db.user.findUnique({ where: { id: userId }, select: { createdAt: true } }),
+    ]);
+    const opened = contact?.openedAt ?? contact?.createdAt;
+    if (contact && user && !contact.signedUpUserId && contact.userId !== userId && opened && user.createdAt >= opened) {
+      const already = await db.earnContact.findUnique({ where: { signedUpUserId: userId }, select: { id: true } });
+      if (!already) await db.earnContact.update({ where: { id: contact.id }, data: { signedUpUserId: userId, signedUpAt: new Date() } });
+    }
+  }
+  const signedUp = await db.earnContact.findUnique({ where: { signedUpUserId: userId }, select: { id: true, startedAt: true } });
+  if (signedUp && !signedUp.startedAt) {
+    const owned = await db.membership.count({ where: { userId, role: "owner", ...(earnTenantId ? { tenantId: { not: earnTenantId } } : {}) } });
+    if (owned > 0) await db.earnContact.update({ where: { id: signedUp.id }, data: { startedAt: new Date() } });
+  }
+}

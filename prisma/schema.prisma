@@ -2077,6 +2077,11 @@ model EarnContact {
   openedAt  DateTime?
   lastOpenAt DateTime?
   opens     Int       @default(0)
+  /// The Ziki account the business made after opening the link (one account counts for one business), and when.
+  signedUpUserId String?   @unique
+  signedUpAt     DateTime?
+  /// When that account started its first project of its own.
+  startedAt      DateTime?
   createdAt DateTime  @default(now())
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
