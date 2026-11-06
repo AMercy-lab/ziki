@@ -16,3 +16,9 @@
 - Checkpoint 8 — Updated base: applied all 185 migrations and confirmed the two test saved views survived the organisation rename. Lint and type checking passed on 22d65c8. The full unit run passed 958 of 963 tests, including all seven saved-view tests. Five report-form tests timed out under load and are being rechecked without changing their limits.
 - Checkpoint 9 — Final local review: the five report-form timeouts on 22d65c8 passed on the 10-test recheck. Updated to 2c08549 for the new project-access rules and bumped the version to 0.1.58. Resolved the schema conflict by retaining upstream models and appending the saved-view model. Prisma generation and migrations passed against the isolated 189-migration test database. Node 22 lint passed for the changed TypeScript files and 52 focused tests passed across the saved-view and issue-list suites. The final full type check ran out of memory before returning diagnostics. The production build and desktop/mobile browser checks passed on the earlier 7fb04b8 base. The final revision still needs CI type checking, full tests, build and browser checks.
 - Outcome: feature and documentation prepared for local review. Await the user’s go-ahead before submitting the PR to emerjent/ziki main from the fork.
+
+## 2026-11-06 — Prepare issue #850 for PR
+
+- Merged upstream main e71797d into the saved views branch. Resolved the only conflict in package.json by keeping upstream changes and raising the app version from 0.1.60 to 0.1.61.
+- The feature commit 55cfa37 remains in the branch history. Verification of the combined revision is pending.
+- The local full verification started on the combined revision. Its lint process exited with Windows status 3221226505 and no diagnostic. Final CI verification is required.
