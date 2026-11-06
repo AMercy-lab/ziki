@@ -40,6 +40,7 @@ import { type AgentDecision } from "@/components/issue-agent-activity";
 import { IssueProgressReport } from "@/components/issue-progress-report";
 import { IssueStageProvider } from "@/components/issue-stage-context";
 import { IssueComments } from "@/components/comment-thread";
+import { AgentSteerPanel } from "@/components/agent-steer-panel";
 import { CommentComposer } from "@/components/comment-composer";
 import { AwardBox } from "@/components/award-box";
 import { AwardStep, IdeaStep, IssueTimeline, TimelineStep, type AwardStepView } from "@/components/issue-timeline";
@@ -433,7 +434,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   // has it (its claims), then every bid it took (#issue-bids).
   const pastConfirmation = bug.substatus !== "requires_confirmation";
   // Bids come in from the start, while it awaits confirmation too.
-  const [hold, bidList, claimHistory] = await Promise.all([
+  const [hold, bidList, claimHistory, watchRow] = await Promise.all([
     pastConfirmation ? loadOptional<IssueHold | null>("holder", null, () => currentHold(bug.id)) : Promise.resolve(null as IssueHold | null),
     // While Open, an open bid whose bidder is at the project's capacity says so (#bidder-capacity).
     loadOptional<BidEntryView[]>("bids", [], async () => {
@@ -464,7 +465,12 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
         releasedAt: claim.releasedAt,
       }));
     }),
+    loadOptional("issue watch", null, () => prisma.issueWatch.findUnique({
+      where: { userId_bugId: { userId: user.id, bugId: bug.id } },
+      select: { watching: true },
+    })),
   ]);
+  const isWatchingIssue = watchRow?.watching ?? (bug.reporterId === user.id || bug.assigneeId === user.id);
   const awardClaim: AwardStepView | null = claimHistory[0] ?? null;
 
   const [users, voterSummary, activities, activityCount, comments, latestStatusChange, attachments, lastRevision, agentDecisions, escalations] =
@@ -904,6 +910,23 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
 
   // Comments on the issue itself, at every stage (lib/comment-placement.ts).
   const takesComments = !bug.isDeleted;
+  // Looked up here, not on `hold`: holder is also what agents read through the API.
+  const workingAgent = hold?.status === "active"
+    ? await loadOptional("working agent", null, () => prisma.agent.findFirst({
+        where: { tenantId: bug.tenantId, claims: { some: { bugId: bug.id, status: "active", releasedAt: null } } },
+        select: { id: true, ownerUserId: true, revokedAt: true, pausedAt: true },
+      }))
+    : null;
+  // Owner-only: steering, and what the agent answered.
+  const steeringAgent = workingAgent && workingAgent.ownerUserId === user.id && !workingAgent.revokedAt ? workingAgent : null;
+  const steerNotes = steeringAgent
+    ? await loadOptional("steer notes", [], () => prisma.agentInboxItem.findMany({
+        where: { agentId: steeringAgent.id, bugId: bug.id, eventType: "agent.steer" },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: { id: true, payload: true },
+      }))
+    : [];
   const commentCount = comments.shownThreads + comments.hiddenThreads;
   // #489: the Admin label follows each person's role in this issue's
   // organization, not their account-wide role, the same rule as admin powers.
@@ -1364,7 +1387,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
           {githubPanel ? <GitHubStatusPanel {...githubPanel} /> : null}
 
               {/* Who has the issue, while it is the latest thing (In progress); the timeline below keeps the award after that. */}
-              {hold?.status === "active" && bug.status === "in_progress" ? <AwardBox hold={hold} /> : null}
+              {hold?.status === "active" && bug.status === "in_progress" ? <AwardBox hold={hold} agentPaused={Boolean(workingAgent?.pausedAt)} bugId={bug.id} isWatching={isWatchingIssue} isIssueOwner={bug.reporterId === user.id} /> : null}
 
               {conversationHasContent ? (
                 <section
@@ -1434,6 +1457,17 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                   aria-label="Comments"
                   className="scroll-mt-24 rounded-[20px] border border-zk-border bg-zk-surface p-5 sm:p-[22px]"
                 >
+                  {steeringAgent ? (
+                    <AgentSteerPanel
+                      agentId={steeringAgent.id}
+                      issueId={bug.id}
+                      paused={steeringAgent.pausedAt !== null}
+                      notes={steerNotes.map((note) => {
+                        const payload = (note.payload ?? {}) as { body?: unknown; plan?: unknown };
+                        return { id: note.id, body: String(payload.body ?? ""), plan: typeof payload.plan === "string" ? payload.plan : null };
+                      })}
+                    />
+                  ) : null}
                   <IssueComments
                     count={commentCount}
                     composer={takesComments ? <CommentComposer bugId={bug.id} /> : null}
