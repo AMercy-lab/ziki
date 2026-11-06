@@ -62,7 +62,7 @@ export default async function EarnTaskPage({
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-5">
-      <Link href="/earn/marketing" className={`self-start text-sm font-semibold ${agentsLink}`}>← Back to Marketing</Link>
+      <Link href="/earn/marketing" className={`self-start text-sm ${agentsLink}`}>← Marketing</Link>
 
       <header className={`${agentsSurface} earn-rise relative flex flex-wrap items-center gap-5 overflow-hidden p-5 sm:p-7`}>
         <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-zk-tint/60" />
