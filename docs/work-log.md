@@ -22,3 +22,5 @@
 - Merged upstream main e71797d into the saved views branch. Resolved the only conflict in package.json by keeping upstream changes and raising the app version from 0.1.60 to 0.1.61.
 - The feature commit 55cfa37 remains in the branch history. Verification of the combined revision is pending.
 - The local full verification started on the combined revision. Its lint process exited with Windows status 3221226505 and no diagnostic. Final CI verification is required.
+- GitHub PR #500 opened. After regenerating Prisma, the full type check found three upstream enum compatibility errors. The activity board now skips planning claims it cannot display or nudge, and the points ledger names the plan approval role. Targeted lint and 19 tests passed before these compatibility edits. Remote checks require maintainer approval.
+- Regenerated Prisma against the merged schema. The full type check and lint on the compatibility files passed after the three enum fixes.
