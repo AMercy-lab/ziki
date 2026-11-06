@@ -24,3 +24,9 @@
 - The local full verification started on the combined revision. Its lint process exited with Windows status 3221226505 and no diagnostic. Final CI verification is required.
 - GitHub PR #500 opened. After regenerating Prisma, the full type check found three upstream enum compatibility errors. The activity board now skips planning claims it cannot display or nudge, and the points ledger names the plan approval role. Targeted lint and 19 tests passed before these compatibility edits. Remote checks require maintainer approval.
 - Regenerated Prisma against the merged schema. The full type check and lint on the compatibility files passed after the three enum fixes.
+
+## 2026-11-07 — Unblock PR #500
+
+- CI stopped at Version raised after main reached 0.1.61. Merged main at bf94f78, kept a single plan approval label to resolve the ledger conflict, and bumped to 0.1.62.
+- Preserved upstream activity visibility rules and its planning nudge guard. Removed the obsolete zikiTasks guard from saved views after the type check detected the upstream route change.
+- Version gate, full type check, focused lint and 21 affected tests passed locally. GitHub CI will rerun on the updated PR.
