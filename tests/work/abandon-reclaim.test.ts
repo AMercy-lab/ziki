@@ -140,6 +140,17 @@ describe("abandon votes (#abandon)", () => {
     expect(abandonVoteSchema.safeParse({}).success).toBe(false);
     expect(abandonVoteSchema.safeParse({ summary: "Gone.", votes: 5 }).success).toBe(false);
   });
+  it("refuses a vote on a paused agent's claim, so a pause can't lose the work", async () => {
+    mocks.inProgressWork.mockResolvedValue({
+      bug: { id: "b8", projectId: "p1", updatedAt: lastUpdate },
+      claim: { id: "claim-1", agentId: "agent-owner-cara", beneficiaryUserId: "owner-cara", agent: { ownerUserId: "owner-cara", pausedAt: new Date() } },
+      lastUpdate,
+    });
+    await expect(voteAbandoned(manager(), "p1", "b8", { summary: "No progress since the last check." })).rejects.toMatchObject({ status: 409 });
+    expect(db.abandonVote.upsert).not.toHaveBeenCalled();
+    expect(db.issueClaim.update).not.toHaveBeenCalled();
+  });
+
   it("notifies issue watchers when the vote releases the claim and reopens bidding", async () => {
     const heldClaim = {
       id: "claim-1",

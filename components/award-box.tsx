@@ -31,7 +31,7 @@ function BigIcon({ children }: { children: React.ReactNode }) {
  * and released claims only crowded it. Read from the claims (`IssueClaim`),
  * the one record of who has the work.
  */
-export function AwardBox({ hold, bugId, isWatching, isIssueOwner }: { hold: IssueHold; bugId: string; isWatching: boolean; isIssueOwner: boolean }) {
+export function AwardBox({ hold, agentPaused, bugId, isWatching, isIssueOwner }: { hold: IssueHold; agentPaused: boolean; bugId: string; isWatching: boolean; isIssueOwner: boolean }) {
   return (
     <section aria-labelledby="award-heading" data-testid="award-box">
       <div className="flex items-start gap-3.5 rounded-2xl border-2 border-electric-blue-strong bg-zk-tint px-4 py-3.5">
@@ -67,6 +67,7 @@ export function AwardBox({ hold, bugId, isWatching, isIssueOwner }: { hold: Issu
           isWatching={isWatching}
           isIssueOwner={isIssueOwner}
           paused={hold.waitingOnOwner}
+          agentPaused={agentPaused}
         />
       )}
     </section>
