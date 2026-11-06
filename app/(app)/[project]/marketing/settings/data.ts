@@ -50,7 +50,6 @@ export async function readMarketingSettings({ project, tenantId, user }: Project
     brief: {
       product: brief?.product ?? "",
       audience: brief?.audience ?? "",
-      website: brief?.website ?? "",
       currentFocus: brief?.currentFocus ?? "",
       outOfScope: brief?.outOfScope ?? "",
     },

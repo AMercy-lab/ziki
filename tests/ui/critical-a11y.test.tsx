@@ -18,8 +18,8 @@ import { Library } from "@/components/marketing/library/library";
 import { deliveryFiles } from "@/components/marketing/library/model";
 import { TasksBoard } from "@/components/marketing/tasks/tasks-board";
 import { TASK_TABS } from "@/components/marketing/tasks/model";
-import { Proposals } from "@/components/marketing/proposals/proposals";
-import type { ProposalItem, ProposalsResult } from "@/components/marketing/proposals/model";
+import { RejectedIdeas } from "@/components/marketing/rejected-ideas/rejected-ideas";
+import type { RejectedIdea } from "@/components/marketing/rejected-ideas/model";
 import { MarketingDeliverablesPanel } from "@/components/marketing/marketing-deliverables-panel";
 import { MarketingReviewsPanel } from "@/components/marketing/marketing-reviews-panel";
 import { createWebhookAction, listWebhooksAction } from "@/app/actions/webhooks";
@@ -37,7 +37,7 @@ vi.mock("@/app/actions/issues", () => ({
   createBugAction: vi.fn(),
   toggleVoteAction: vi.fn(),
 }));
-vi.mock("@/app/(app)/[project]/marketing/library/actions", () => ({ refreshLibrary: vi.fn() }));
+vi.mock("@/app/(app)/[project]/marketing/output-box/actions", () => ({ refreshLibrary: vi.fn() }));
 vi.mock("@/lib/project-route", () => ({
   requireProject: vi.fn(async () => ({
     tenantId: "tenant-1",
@@ -150,7 +150,7 @@ describe("component accessibility (axe)", () => {
       revisionLimit: 2,
       canManage: true,
       types: [{ id: "blog", name: "Blog post", description: null, isActive: true, usage: 1 }],
-      brief: { product: "Acme", audience: "", website: "https://example.com", currentFocus: "", outOfScope: "" },
+      brief: { product: "Acme", audience: "", currentFocus: "", outOfScope: "" },
     };
     const admin = render(<MarketingSettings slug="acme" projectName="Acme" data={data} />);
     await expectNoA11yViolations(admin.container);
@@ -173,10 +173,10 @@ describe("component accessibility (axe)", () => {
     }} />);
     await expectNoA11yViolations(container);
   });
-  it("keeps marketing proposals and their verdicts accessible", async () => {
-    const item: ProposalItem = {
+  it("keeps rejected marketing ideas and their verdicts accessible", async () => {
+    const item: RejectedIdea = {
       id: "idea1", number: 7, title: "Write a launch post", summary: "A post about the launch.",
-      description: "Explain what changed and why.", rationale: "People keep asking what changed.",
+      rationale: "People keep asking what changed.",
       typeName: "Blog post", reporterName: "Ada", createdAt: new Date("2026-11-04"),
       score: 1, threshold: 3, votes: { good: 1, bad: 0, neutral: 0 },
       verdicts: [{
@@ -184,14 +184,10 @@ describe("component accessibility (axe)", () => {
         description: "It serves the current focus.", by: "Bola", agentName: "Bola's agent",
         updatedAt: new Date("2026-11-04"),
       }],
-      status: "open", rejectedAt: null, rejectedBy: null, archivedAt: null, archivedBy: null,
-      archiveReason: null, convertible: false, bad: false, own: false, mine: null,
+      status: "rejected", rejectedAt: new Date("2026-11-05"), rejectedBy: "a manager agent", archivedAt: null, archivedBy: null,
+      archiveReason: null,
     };
-    const initial: ProposalsResult = {
-      ok: true, items: [item], threshold: 3, counts: { open: 1, rejected: 0 },
-      total: 1, page: 1, totalPages: 1, from: 1, to: 1,
-    };
-    const { container } = render(<Proposals slug="acme" projectName="Acme" view="open" initial={initial} />);
+    const { container } = render(<RejectedIdeas slug="acme" projectName="Acme" initial={{ ok: true, items: [item], total: 1, page: 1, totalPages: 1, from: 1, to: 1 }} />);
     await expectNoA11yViolations(container);
   });
   it("keeps a marketing task's deliverables and reviews accessible, full and empty", async () => {

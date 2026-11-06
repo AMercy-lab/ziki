@@ -10,7 +10,6 @@ import { TypesManager } from "./types-manager";
 const BRIEF_LABELS: { key: MarketingBriefKey; label: string }[] = [
   { key: "product", label: "Product" },
   { key: "audience", label: "Audience" },
-  { key: "website", label: "Website" },
   { key: "currentFocus", label: "Current focus" },
   { key: "outOfScope", label: "Out of scope" },
 ];

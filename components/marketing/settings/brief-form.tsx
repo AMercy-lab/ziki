@@ -32,17 +32,9 @@ const FIELDS: {
     placeholder: "e.g. Teams that run coding agents.",
   },
   {
-    key: "website",
-    label: "Website",
-    hint: "A full link, if there is one.",
-    max: 2048,
-    rows: 1,
-    placeholder: "e.g. https://ziki.dev",
-  },
-  {
     key: "currentFocus",
     label: "Current focus",
-    hint: "What the marketing work should serve right now. Proposals answer this with their rationale.",
+    hint: "What the marketing work should serve right now. Ideas answer this with their rationale.",
     max: 600,
     rows: 2,
     placeholder: "e.g. Getting the first ten teams onto the agent workflow.",
@@ -106,7 +98,7 @@ export function BriefForm({ slug, initial }: { slug: string; initial: MarketingB
             ) : (
               <Input
                 id={`marketing-brief-${field.key}`}
-                type={field.key === "website" ? "url" : "text"}
+                type="text"
                 maxLength={field.max}
                 placeholder={field.placeholder}
                 value={brief[field.key]}

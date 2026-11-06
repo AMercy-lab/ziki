@@ -1,6 +1,6 @@
-# Library (M-UI-5)
+# Output box (M-UI-5)
 
-Open `/<project>/marketing/library` directly. The Marketing landing page and shared navigation remain owned by M-LAUNCH-1. The existing app shell is reused; the reference design's sidebar is not duplicated. The Marketing breadcrumb and empty-state action use the existing landing page until the Tasks board ships. Task links use the shared `/<project>/<number>` issue route (D6).
+Open `/<project>/marketing/output-box`, linked from the Marketing header. The Marketing landing page and shared navigation remain owned by M-LAUNCH-1. The existing app shell is reused; the reference design's sidebar is not duplicated. The Marketing breadcrumb and empty-state action use the existing landing page until the Tasks board ships. Task links use the shared `/<project>/<number>` issue route (D6).
 
 The page checks `requireProject` before reading data. Reads are restricted to that tenant and project, non-deleted marketing tasks, `status: resolved`, and `substatus: published`. It uses the latest delivery and the accepting manager review's timestamp. Missing dates are left unknown. No lifecycle or payment writes happen here.
 

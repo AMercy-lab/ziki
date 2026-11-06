@@ -70,7 +70,7 @@ export function NewMarketingTaskForm({ projectId, types }: { projectId: string; 
           } catch (failure) {
             // The action redirects to the new idea, which arrives here as a throw.
             unstable_rethrow(failure);
-            setError("Your proposal couldn't be sent. Check your connection and try again.");
+            setError("Your idea couldn't be sent. Check your connection and try again.");
           }
         });
       }}

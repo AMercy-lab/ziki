@@ -1,3 +1,4 @@
+import { DEFAULT_MARKETING_TASK_TYPES } from "@/lib/marketing/default-task-types";
 import { randomInt } from "node:crypto";
 import { cookies } from "next/headers";
 import { awardSignupBonus } from "@/lib/points/signup-bonus";
@@ -423,6 +424,7 @@ export async function createTenant(
             // #platforms: each with the slug agents name it by.
             create: (["Desktop", "Web", "Mobile"] as const).map((name) => ({ name, slug: name.toLowerCase(), isActive: true })),
           },
+          issueTypes: { create: DEFAULT_MARKETING_TASK_TYPES.map((type) => ({ ...type, track: "marketing" as const })) },
         },
         select: { id: true, slug: true, name: true, projects: { select: { id: true } } },
       });

@@ -57,10 +57,6 @@ export const projectBriefSchema = z
   .object({
     product: briefText("product", 600),
     audience: briefText("audience", 300),
-    website: briefText("website", 2048).refine(
-      (value) => !value || /^https?:\/\/\S+$/i.test(value),
-      "Enter a full http or https link for the website.",
-    ),
     currentFocus: briefText("current focus", 600),
     outOfScope: briefText("out of scope", 600),
   })
@@ -68,7 +64,6 @@ export const projectBriefSchema = z
   .transform((brief) => ({
     product: brief.product || null,
     audience: brief.audience || null,
-    website: brief.website || null,
     currentFocus: brief.currentFocus || null,
     outOfScope: brief.outOfScope || null,
   }));

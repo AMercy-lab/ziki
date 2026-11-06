@@ -2309,6 +2309,7 @@ model ProjectBrief {
   projectId    String   @id
   product      String?
   audience     String?
+  /// No longer read or written: the project's siteUrl is the site. Drop it in a later migration.
   website      String?
   currentFocus String?
   outOfScope   String?

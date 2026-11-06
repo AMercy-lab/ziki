@@ -60,11 +60,12 @@ import { readProjectBrief, saveProjectBrief } from "@/lib/marketing/brief";
 import { NextRequest } from "next/server";
 
 describe("The project brief (M-API-8)", () => {
-  const stored = { product: "Ziki", audience: null, website: null, currentFocus: "First ten teams", outOfScope: null };
+  const stored = { product: "Ziki", audience: null, currentFocus: "First ten teams", outOfScope: null };
 
   beforeEach(() => {
     vi.clearAllMocks();
     briefFindUnique.mockResolvedValue(null);
+    findUnique.mockResolvedValue(null);
     transaction.mockImplementation(async (run: (tx: unknown) => unknown) =>
       run({ projectBrief: { upsert: briefUpsert }, projectAuditEvent: { create: auditCreate } }),
     );
@@ -77,15 +78,22 @@ describe("The project brief (M-API-8)", () => {
     });
   });
 
+  it("gives agents the project's own site link as the website, even before anyone writes a brief", async () => {
+    findUnique.mockResolvedValue({ siteUrl: "https://ziki.dev" });
+    await expect(readProjectBrief("p1")).resolves.toEqual({
+      product: null, audience: null, website: "https://ziki.dev", current_focus: null, out_of_scope: null,
+    });
+  });
+
   it("gives agents no brief when none exists or every field is blank", async () => {
     await expect(readProjectBrief("p1")).resolves.toBeNull();
-    briefFindUnique.mockResolvedValue({ product: null, audience: null, website: null, currentFocus: null, outOfScope: null });
+    briefFindUnique.mockResolvedValue({ product: null, audience: null, currentFocus: null, outOfScope: null });
     await expect(readProjectBrief("p1")).resolves.toBeNull();
   });
 
   it("stores blanks as nothing and audits which fields changed", async () => {
     await saveProjectBrief("tenant-1", "p1", "user-1", {
-      product: " Ziki ", audience: "", website: "", currentFocus: "First ten teams", outOfScope: "",
+      product: " Ziki ", audience: "", currentFocus: "First ten teams", outOfScope: "",
     });
     expect(briefUpsert).toHaveBeenCalledWith({
       where: { projectId: "p1" },
@@ -107,8 +115,8 @@ describe("The project brief (M-API-8)", () => {
     expect(auditCreate).not.toHaveBeenCalled();
   });
 
-  it("refuses a website that isn't a full link, and an unknown field", async () => {
-    await expect(saveProjectBrief("tenant-1", "p1", "user-1", { website: "javascript:alert(1)" })).rejects.toThrow("full http or https link");
+  it("refuses a website, which now lives in project settings, and an unknown field", async () => {
+    await expect(saveProjectBrief("tenant-1", "p1", "user-1", { website: "https://ziki.dev" })).rejects.toThrow();
     await expect(saveProjectBrief("tenant-1", "p1", "user-1", { points: 5 })).rejects.toThrow();
     expect(briefUpsert).not.toHaveBeenCalled();
   });

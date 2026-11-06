@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /** The issue page's stage panels: bids with their votes and the Award control only where it may be used, confirmations and their banner, and judgements and merge reviews with their replies. */
 const mocks = vi.hoisted(() => ({ addComment: vi.fn() }));
 const libraryRefresh = vi.hoisted(() => vi.fn());
-vi.mock("@/app/(app)/[project]/marketing/library/actions", () => ({ refreshLibrary: libraryRefresh }));
+vi.mock("@/app/(app)/[project]/marketing/output-box/actions", () => ({ refreshLibrary: libraryRefresh }));
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(window.location.search),
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),

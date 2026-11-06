@@ -30,7 +30,6 @@ export type MarketingSettingsData = {
 export type MarketingBrief = {
   product: string;
   audience: string;
-  website: string;
   currentFocus: string;
   outOfScope: string;
 };

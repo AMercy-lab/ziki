@@ -12,14 +12,17 @@ export type AgentBrief = {
 
 /** The project's brief for agents, or `null` when nobody has filled any of it in. */
 export async function readProjectBrief(projectId: string): Promise<AgentBrief | null> {
-  const row = await prisma.projectBrief.findUnique({ where: { projectId } });
-  if (!row) return null;
+  const [row, project] = await Promise.all([
+    prisma.projectBrief.findUnique({ where: { projectId } }),
+    prisma.project.findUnique({ where: { id: projectId }, select: { siteUrl: true } }),
+  ]);
   const brief: AgentBrief = {
-    product: row.product,
-    audience: row.audience,
-    website: row.website,
-    current_focus: row.currentFocus,
-    out_of_scope: row.outOfScope,
+    product: row?.product ?? null,
+    audience: row?.audience ?? null,
+    // The project's own site link (project settings) is the one site address.
+    website: project?.siteUrl ?? null,
+    current_focus: row?.currentFocus ?? null,
+    out_of_scope: row?.outOfScope ?? null,
   };
   return Object.values(brief).some(Boolean) ? brief : null;
 }
