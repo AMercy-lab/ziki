@@ -51,6 +51,13 @@ export function escalationOnTrack(bug: { track: WorkTrack } | null, track: WorkT
   return (bug?.track ?? "product") === track;
 }
 
+/** Filter linked escalations before their bounded query, keeping neutral items in Product. */
+export function escalationTrackWhere(track: WorkTrack | "all") {
+  if (track === "all") return {};
+  if (track === "marketing") return { bug: { is: { track } } };
+  return { OR: [{ bugId: null }, { bug: { is: { track } } }] };
+}
+
 /**
  * Your work: issues associated with you across the full lifecycle.
  * Includes:

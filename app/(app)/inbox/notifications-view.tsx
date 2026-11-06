@@ -56,7 +56,7 @@ export async function NotificationsView({
             {unread === 0 ? "You're all caught up." : `${unread} unread`}
           </p>
         </div>
-        {unread > 0 ? <MarkAllReadButton allWorkspaces={allWorkspaces} /> : null}
+        {unread > 0 ? <MarkAllReadButton allWorkspaces={allWorkspaces} track={track} /> : null}
       </div>
 
       {workspaceCount > 1 ? (
