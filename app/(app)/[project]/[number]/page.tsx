@@ -1526,6 +1526,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
             <IssueLinks
               links={proofLinks}
               linkedPullRequestUrl={bug.pullRequestUrl}
+              pullRequests={false}
               idea={sourceIdea ? { number: sourceIdea.number, slug: bug.project.slug } : null}
               repairs={linkRepairs}
             />
