@@ -11,6 +11,8 @@ const db = vi.hoisted(() => ({
   issueType: { findUnique: vi.fn() },
   bug: { findMany: vi.fn() },
   idea: { findMany: vi.fn(), findFirst: vi.fn(), findUniqueOrThrow: vi.fn() },
+  // #security-findings: no idea in these tests is a private finding.
+  securityFinding: { findUnique: vi.fn(async () => null) },
   ideaVerdict: { groupBy: vi.fn(async () => []) },
   projectWorkflow: { findUnique: vi.fn() },
   agentAuditEvent: { count: vi.fn() },

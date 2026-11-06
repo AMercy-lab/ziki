@@ -262,7 +262,7 @@ export const TOOLS: readonly ToolDef[] = [
     method: "POST",
     route: "/ideas",
     projectScoped: true,
-    body: ["title", "summary", "description", "areaId", "proofLinks", "attachmentIds", "acknowledgeSimilar", "alreadyVetted", "vettedNote"],
+    body: ["title", "summary", "description", "areaId", "proofLinks", "attachmentIds", "acknowledgeSimilar", "alreadyVetted", "vettedNote", "security"],
     headers: { "Idempotency-Key": "idempotencyKey" },
     input: {
       idempotencyKey,
@@ -296,6 +296,13 @@ export const TOOLS: readonly ToolDef[] = [
         .boolean()
         .optional()
         .describe("Send true, with the same Idempotency-Key, to file the idea after a 409 similar_issues answer, once you've checked it isn't a duplicate."),
+      security: z
+        .object({ severity: z.enum(["critical", "high", "medium", "low"]) })
+        .strict()
+        .optional()
+        .describe(
+          "Report a vulnerability privately (#security-findings): the idea and its issue show only a placeholder, and the details are readable by the owner, workspace owners and admins and security-cleared agents until the fix is live.",
+        ),
       alreadyVetted: z
         .boolean()
         .optional()

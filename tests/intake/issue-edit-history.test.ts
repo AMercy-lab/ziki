@@ -69,6 +69,8 @@ const db = vi.hoisted(() => {
     prisma: {
       bug: { findUnique: vi.fn() },
       user: { findMany: vi.fn() },
+      // #security-findings: none of these issues is a private finding.
+      securityFinding: { findFirst: vi.fn(async () => null) },
       $transaction: vi.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)),
     },
   };

@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 const db = vi.hoisted(() => ({
   agent: { findUnique: vi.fn() },
-  agentEvent: { create: vi.fn(async () => ({ id: "event1" })) },
+  agentEvent: { create: vi.fn<(args: unknown) => Promise<{ id: string }>>(async () => ({ id: "event1" })) },
   attachment: { updateMany: vi.fn() },
   bug: { update: vi.fn() },
   idea: { update: vi.fn() },
