@@ -64,14 +64,19 @@ export async function totalEarned(db: Db, userId: string): Promise<number> {
   return pointsNumber(sum._sum.points);
 }
 
+/** Payments for doing the work, as opposed to posting it: what shows someone is a worker (#earnings). */
+export const WORK_ROLES: PointRole[] = ["solver", "reviewer", "triager", "submission", "dispatcher", "plan"];
+
 /**
- * The header's $ and Withdraw (#earnings), for people who work on projects, not for those who only post them
- * (Mark's call): shown once someone has earned from work or joined a project from Discover. The sign-up bonus every
- * new account gets doesn't count, so nobody sees it just for signing up. Null hides it.
+ * The header's $ and Withdraw (#earnings, Mark's call): "on every project once someone has shown they're a worker,
+ * including projects they were invited to, but not to people who only post projects." Shown once someone has been
+ * paid for work (solving, reviewing, confirming, research answers, dispatching, an approved plan) or has joined a
+ * project from Discover. Posting ideas, verdicts, votes, upvoted comments and the sign-up bonus don't count. Null
+ * hides it.
  */
 export async function headerEarnings(db: Db, userId: string): Promise<number | null> {
   const [entry, joined] = await Promise.all([
-    db.pointEntry.findFirst({ where: { userId, role: { not: "signup" } }, select: { id: true } }),
+    db.pointEntry.findFirst({ where: { userId, role: { in: WORK_ROLES }, points: { gt: 0 } }, select: { id: true } }),
     db.projectMembership.findFirst({ where: { userId }, select: { id: true } }),
   ]);
   if (!entry && !joined) return null;
