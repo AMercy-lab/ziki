@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
-import { currentTenantIdFor, bugInTenant } from "@/lib/tenant-context";
-import { currentTenantAccess } from "@/lib/tenant-access";
+import { bugInOrganisation, currentOrganisationIdFor } from "@/lib/organisation-context";
+import { currentOrganisationAccess } from "@/lib/organisation-access";
 import { parseIssueRef } from "@/lib/duplicates";
 import { formatIssueNumber } from "@/lib/issue-number";
 import { revalidateIssue } from "@/lib/revalidate-issue";
@@ -18,7 +18,7 @@ const FORBIDDEN = "Only an owner or admin of this organization can change issue 
 
 async function requireOrgAdmin() {
   const user = await requireUser();
-  const access = await currentTenantAccess(user.id, user.role);
+  const access = await currentOrganisationAccess(user.id, user.role);
   return access.admin ? { user } : { error: FORBIDDEN };
 }
 
@@ -31,18 +31,18 @@ function revalidate() {
 export async function addIssueBlockerAction(blockedBugId: string, blockerRef: string): Promise<IssueBlockerActionResult> {
   const gate = await requireOrgAdmin();
   if ("error" in gate) return { error: gate.error };
-  const tenantId = await currentTenantIdFor(gate.user.id);
-  if (!tenantId) return { error: "Select an organization first." };
+  const organisationId = await currentOrganisationIdFor(gate.user.id);
+  if (!organisationId) return { error: "Select an organization first." };
   const ref = parseIssueRef(blockerRef ?? "");
   if (!ref) return { error: "Enter an issue number, like #12." };
 
   const blocked = await prisma.bug.findFirst({
-    where: { id: blockedBugId, ...bugInTenant(tenantId), isDeleted: false },
+    where: { id: blockedBugId, ...bugInOrganisation(organisationId), isDeleted: false },
     select: { id: true, number: true, projectId: true },
   });
   if (!blocked) return { error: "This issue no longer exists or was deleted." };
   const blocker = await prisma.bug.findFirst({
-    where: { ...bugInTenant(tenantId), isDeleted: false, ...("number" in ref ? { number: ref.number } : { id: ref.id }) },
+    where: { ...bugInOrganisation(organisationId), isDeleted: false, ...("number" in ref ? { number: ref.number } : { id: ref.id }) },
     select: { id: true, number: true, projectId: true },
   });
   if (!blocker) return { error: "That issue doesn't exist or was deleted." };
@@ -74,10 +74,10 @@ export async function addIssueBlockerAction(blockedBugId: string, blockerRef: st
 export async function removeIssueBlockerAction(blockedBugId: string, blockerBugId: string): Promise<IssueBlockerActionResult> {
   const gate = await requireOrgAdmin();
   if ("error" in gate) return { error: gate.error };
-  const tenantId = await currentTenantIdFor(gate.user.id);
-  if (!tenantId) return { error: "Select an organization first." };
+  const organisationId = await currentOrganisationIdFor(gate.user.id);
+  if (!organisationId) return { error: "Select an organization first." };
   const pair = await prisma.issueBlocker.findFirst({
-    where: { blockedBugId, blockerBugId, blockedBug: bugInTenant(tenantId), blockerBug: bugInTenant(tenantId) },
+    where: { blockedBugId, blockerBugId, blockedBug: bugInOrganisation(organisationId), blockerBug: bugInOrganisation(organisationId) },
     select: { blockedBug: { select: { id: true, number: true } }, blockerBug: { select: { id: true, number: true } } },
   });
   if (!pair) return { ok: true };
