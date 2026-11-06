@@ -361,7 +361,7 @@ export function AppHeader({
             // Earnings (#earnings), on every page: the amount opens Your earnings; Withdraw opens a window over the page.
             <div className="inline-flex h-10 shrink-0 items-center gap-1 rounded-full border border-zk-border bg-zk-surface p-1">
               <Link
-                href="/earnings"
+                href={projectSlug ? `/earnings?in=${projectSlug}` : "/earnings"}
                 aria-current={isNavItemActive(pathname, "/earnings") ? "page" : undefined}
                 className={`rounded-full px-2.5 py-1 text-sm font-bold tabular-nums text-zk-text hover:bg-zk-chip ${linkFocus}`}
               >

@@ -99,7 +99,7 @@ export async function beingChecked(db: Db, userId: string): Promise<number> {
 
 /** Where the money came from, in the few groups a person thinks in. Order is the bar's order. */
 export const SOURCE_GROUPS = [
-  { key: "solved", label: "Solved issues", roles: ["solver", "dispatcher", "submission"] },
+  { key: "solved", label: "Solved issues", roles: ["solver", "dispatcher", "submission", "plan"] },
   { key: "reviews", label: "Accepted reviews", roles: ["reviewer"] },
   { key: "confirmations", label: "Confirmations", roles: ["triager"] },
   { key: "reported", label: "Reported ideas", roles: ["reporter", "idea"] },
@@ -116,6 +116,7 @@ const DID: Record<PointRole, string> = {
   dispatcher: "dispatched",
   idea: "verdict on",
   signup: "",
+  plan: "plan approved on",
   comment: "comment upvoted on",
   vote: "vote on",
 };
@@ -128,9 +129,37 @@ export type EarningsActivity = { id: string; who: string; did: string; ref: stri
  * The Earnings page: the total and what is being checked, where the money came from, the open issues that pay the
  * most in the projects the person is in (the fastest way to the goal), and the latest payments.
  */
-export async function earningsSummary(db: Db, userId: string) {
+/**
+ * Which tasks "Fastest way to your goal" lists (#earnings): the workspace or project selected in the switcher. In a
+ * workspace you belong to, every project in it; in one you only joined a project of (from Discover), just the
+ * projects you joined there.
+ */
+export type TaskScope = { organisationId: string; name: string; projectIds: string[] | null };
+
+/**
+ * The scope for the switcher's selection, given as `<org>` or `<org>/<project>` (the header's current project), or
+ * the person's active workspace when nothing is selected. Null when they can't work anywhere in it.
+ */
+export async function taskScopeFor(db: Db, userId: string, selected: string | null, activeOrganisationId: string | null): Promise<TaskScope | null> {
+  const slug = selected ? decodeURIComponent(selected.split("/")[0] ?? "") : "";
+  const organisation = slug
+    ? await db.organisation.findUnique({ where: { slug }, select: { id: true, name: true } })
+    : activeOrganisationId
+      ? await db.organisation.findUnique({ where: { id: activeOrganisationId }, select: { id: true, name: true } })
+      : null;
+  if (!organisation) return null;
+  const [member, joined] = await Promise.all([
+    db.membership.findUnique({ where: { organisationId_userId: { organisationId: organisation.id, userId } }, select: { id: true } }),
+    db.projectMembership.findMany({ where: { userId, project: { organisationId: organisation.id, archivedAt: null } }, select: { projectId: true } }),
+  ]);
+  if (member) return { organisationId: organisation.id, name: organisation.name, projectIds: null };
+  if (joined.length) return { organisationId: organisation.id, name: organisation.name, projectIds: joined.map((row) => row.projectId) };
+  return null;
+}
+
+export async function earningsSummary(db: Db, userId: string, scope: TaskScope | null = null) {
   const weekStart = startOfWeek();
-  const [total, checking, week, goalRow, byRole, solvedCount, latest, memberships, projectMemberships] = await Promise.all([
+  const [total, checking, week, goalRow, byRole, solvedCount, latest, projectMemberships] = await Promise.all([
     totalEarned(db, userId),
     beingChecked(db, userId),
     db.pointEntry.aggregate({ where: { userId, createdAt: { gte: weekStart } }, _sum: { points: true } }),
@@ -151,7 +180,6 @@ export async function earningsSummary(db: Db, userId: string) {
         idea: { select: { number: true } },
       },
     }),
-    db.membership.findMany({ where: { userId }, select: { organisationId: true } }),
     db.projectMembership.findMany({ where: { userId }, select: { projectId: true } }),
   ]);
 
@@ -162,23 +190,25 @@ export async function earningsSummary(db: Db, userId: string) {
     amount: group.roles.reduce((sum, role) => sum + (amountOf.get(role) ?? 0), 0),
   })).filter((source) => source.amount > 0.004);
 
-  const organisationIds = memberships.map((row) => row.organisationId);
+  // The tasks that pay the most in the selected workspace or project; with nothing to work on there, the
+  // best-paying tasks in projects open to join, so there is always somewhere to start.
   const projectIds = projectMemberships.map((row) => row.projectId);
-  const open = organisationIds.length || projectIds.length
-    ? await db.bug.findMany({
+  const open = await db.bug.findMany({
         where: {
           status: "open",
           substatus: "open",
           isDeleted: false,
-          OR: [{ organisationId: { in: organisationIds } }, { projectId: { in: projectIds } }],
+          ...(scope
+            ? { organisationId: scope.organisationId, ...(scope.projectIds ? { projectId: { in: scope.projectIds } } : {}) }
+            : { project: { visibility: "public", isOpenForContributors: true, archivedAt: null } }),
         },
         orderBy: [{ reward: "desc" }, { createdAt: "desc" }],
         take: 4,
         select: { id: true, number: true, title: true, reward: true, _count: { select: { bids: true } }, project: { select: { name: true, slug: true, organisation: { select: { slug: true } } } } },
-      })
-    : [];
+      });
 
   return {
+    joinedProjects: projectIds.length,
     total,
     checking,
     earnedThisWeek: pointsNumber(week._sum.points),

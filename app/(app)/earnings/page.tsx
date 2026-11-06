@@ -3,7 +3,8 @@ import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { formatZ } from "@/lib/points/rules";
 import { LocalTime } from "@/components/local-time";
-import { earningsSummary, weeklyGoalState } from "@/lib/earnings";
+import { earningsSummary, taskScopeFor, weeklyGoalState } from "@/lib/earnings";
+import { currentOrganisationIdFor } from "@/lib/organisation-context";
 import { ChangeGoal } from "./goal-form";
 
 export const metadata = { title: "Your earnings" };
@@ -23,9 +24,11 @@ const CHECKING = "bg-[repeating-linear-gradient(45deg,#f2c14e_0,#f2c14e_6px,#f7d
  * "being checked" is money won on live work, paid once enough people report it deployed. Taking money out is its
  * own page, Withdraw.
  */
-export default async function EarningsPage() {
+export default async function EarningsPage({ searchParams }: { searchParams: Promise<{ in?: string | string[] }> }) {
   const user = await requireUser();
-  const { total, checking, earnedThisWeek, weeklyGoal, solvedCount, sources, tasks, activity } = await earningsSummary(prisma, user.id);
+  const { in: selected } = await searchParams;
+  const scope = await taskScopeFor(prisma, user.id, typeof selected === "string" ? selected : null, await currentOrganisationIdFor(user.id));
+  const { total, checking, earnedThisWeek, weeklyGoal, solvedCount, sources, tasks, activity } = await earningsSummary(prisma, user.id, scope);
   const week = Math.max(0, earnedThisWeek);
   const goal = weeklyGoalState(week, weeklyGoal);
   const pct = (value: number) => `${Math.min(100, (Math.max(0, value) / weeklyGoal) * 100)}%`;
@@ -52,7 +55,7 @@ export default async function EarningsPage() {
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
-        {/* Your own goal for the week. */}
+        {/* Your own goal for the week: always there, from $0 until you earn. */}
         <section aria-labelledby="goal" className={`${card} bg-[linear-gradient(160deg,var(--color-zk-surface)_60%,var(--color-zk-tint))]`}>
           <div className="flex items-start justify-between gap-3">
             <h2 id="goal" className={label}>Your goal this week</h2>
@@ -117,15 +120,15 @@ export default async function EarningsPage() {
         </section>
       </div>
 
-      {/* The fastest way there: the open issues that pay the most in your projects. */}
+      {/* The fastest way there: the open tasks that pay the most in the workspace or project selected in the switcher. */}
       <section aria-labelledby="fastest" className={card}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="fastest" className="text-lg font-extrabold text-zk-text">Fastest way to your goal</h2>
-          <p className="text-sm text-zk-text2">Open issues in your projects, highest reward first</p>
+          <p className="text-sm text-zk-text2">{scope ? `Open tasks in ${scope.name}, highest reward first` : "The best-paying tasks in projects open to join"}</p>
         </div>
         {tasks.length === 0 ? (
           <p className="mt-4 rounded-2xl bg-zk-chip px-4 py-3 text-sm text-zk-text2">
-            No open issues in your projects right now. <Link href="/discover?open=true" className="font-semibold text-zk-accent hover:underline">Find a project on Discover</Link> to earn on.
+            No open tasks right now. <Link href="/discover?open=true" className="font-semibold text-zk-accent hover:underline">Find a project on Discover</Link> to earn on.
           </p>
         ) : (
           <div className="mt-4 overflow-hidden rounded-2xl border border-zk-border">
@@ -144,7 +147,7 @@ export default async function EarningsPage() {
                     href={task.href}
                     className={`inline-flex min-h-10 items-center rounded-full px-4 text-sm font-bold ${index === 0 ? "bg-electric-blue-strong text-white hover:bg-[#2552af]" : "border border-zk-border bg-zk-surface text-zk-text hover:bg-zk-chip"}`}
                   >
-                    Place bid
+                    {scope ? "Place bid" : "See task"}
                   </Link>
                 </li>
               ))}
