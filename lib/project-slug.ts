@@ -15,6 +15,7 @@ export const RESERVED_PROJECT_SLUGS: ReadonlySet<string> = new Set([
   // app/
   "actions",
   "api",
+  "compare",
   "developers",
   "fonts",
   "for-agents",
@@ -26,6 +27,7 @@ export const RESERVED_PROJECT_SLUGS: ReadonlySet<string> = new Set([
   "superadmin",
   "agent",
   "agents",
+  "discover",
   "docs",
   "earn",
   "escalations",
@@ -44,6 +46,7 @@ export const RESERVED_PROJECT_SLUGS: ReadonlySet<string> = new Set([
   "points",
   "projects",
   "questions",
+  "skills",
   // Project pages that were once a second segment (`/<project>/tasks`):
   // lib/project-paths.ts reads `/<a>/<these>` as an old address.
   "tasks",

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { activeIn } from "@/lib/agents/active-in";
 import { revalidateIssue } from "@/lib/revalidate-issue";
 import { fieldError, fromZodError } from "@/lib/form-errors";
 import { redirect } from "next/navigation";
@@ -21,6 +22,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { readAgentResolution } from "@/lib/agent-resolution";
 import { requireUser } from "@/lib/auth-helpers";
+import { canContributeToProject } from "@/lib/project-permissions";
 import {
   resolveSessionUserId,
   SESSION_EXPIRED_MESSAGE,
@@ -38,6 +40,7 @@ import {
   createBugSchema,
   editBugContentSchema,
   editProofLinksSchema,
+  editPullRequestUrlSchema,
   updateBugSchema,
 } from "@/lib/validations/issue";
 import {
@@ -98,7 +101,9 @@ import { issueChangePayload, publishWebEvent } from "@/lib/agent-api/web-events"
 import { firstPullRequestLink } from "@/lib/github/pr-mention";
 import { CommentPlacementError, placeComment, type CommentPlacement } from "@/lib/comment-placement";
 import { standingAcceptance } from "@/lib/accepted-fix";
-import { reportedClosedUnmerged } from "@/lib/agent-api/pull-request-report";
+import { latestPullRequestReport, reportedClosedUnmerged } from "@/lib/agent-api/pull-request-report";
+import { isFormerNameOf } from "@/lib/github/former-repos";
+import { parseGitHubRepoUrl, parsePullRequestUrl, sameRepo } from "@/lib/github/pull-request-url";
 import {
   agentMentionNames,
   agentOwnerIds,
@@ -244,17 +249,33 @@ export async function createBugAction(
       ? parsed.data.typeId
       : null;
 
-  // #425: the idea goes into the reporter's organisation. No membership, no idea.
-  const organisationId = await currentOrganisationIdFor(userId);
-  // #project-urls: the project the form was opened in, and only if it is in this organisation.
-  const requestedProjectId = typeof formData.get("projectId") === "string" ? String(formData.get("projectId")) : "";
-  const targetProject = organisationId && requestedProjectId
-    ? await prisma.project.findFirst({ where: { id: requestedProjectId, organisationId, archivedAt: null }, select: { id: true, slug: true, organisation: { select: { slug: true } } } })
+  const requestedProjectId = typeof formData.get("projectId") === "string" ? String(formData.get("projectId")).trim() : "";
+  const targetProject = requestedProjectId
+    ? await prisma.project.findFirst({
+        where: { id: requestedProjectId, archivedAt: null },
+        select: { id: true, slug: true, organisationId: true, organisation: { select: { slug: true } } },
+      })
     : null;
-  if (!organisationId || !targetProject) {
+  if (!targetProject) {
     return { error: NO_ORGANISATION_MESSAGE };
   }
   const projectId = targetProject.id;
+  const organisationId = targetProject.organisationId;
+
+  const isDirectProjectMember = Boolean(
+    await prisma.projectMembership.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+      select: { id: true },
+    })
+  );
+  const currentOrganisation = await currentOrganisationIdFor(userId);
+  if (!currentOrganisation && !isDirectProjectMember && user.role !== "super_admin") {
+    return { error: NO_ORGANISATION_MESSAGE };
+  }
+
+  if (!(await canContributeToProject(user, projectId, organisationId))) {
+    return { error: "You must be a member of this project to submit issues." };
+  }
 
   if (typeId) {
     const issueType = await issueTypeForCreate(typeId, organisationId);
@@ -667,9 +688,9 @@ export async function updateBugAction(
       if (data.status === "resolved" || data.status === "closed") {
         const activeClaims = typeof tx.issueClaim?.findMany === "function"
           ? await tx.issueClaim.findMany({
-              where: { bugId, status: "active", releasedAt: null },
-              select: { id: true, agentId: true, beneficiaryUserId: true },
-            })
+            where: { bugId, status: "active", releasedAt: null },
+            select: { id: true, agentId: true, beneficiaryUserId: true },
+          })
           : [];
         await tx.issueClaim.updateMany({
           where: { bugId, status: "active", releasedAt: null },
@@ -701,14 +722,14 @@ export async function updateBugAction(
           const priorClaims =
             typeof tx.issueClaim.findMany === "function"
               ? await tx.issueClaim.findMany({
-                  where: {
-                    bugId,
-                    beneficiaryUserId: existing.assigneeId,
-                    status: { in: ["offered", "active"] },
-                    releasedAt: null,
-                  },
-                  select: { id: true, agentId: true, beneficiaryUserId: true },
-                })
+                where: {
+                  bugId,
+                  beneficiaryUserId: existing.assigneeId,
+                  status: { in: ["offered", "active"] },
+                  releasedAt: null,
+                },
+                select: { id: true, agentId: true, beneficiaryUserId: true },
+              })
               : [];
           await tx.issueClaim.updateMany({
             where: {
@@ -732,7 +753,9 @@ export async function updateBugAction(
         // Create an offered claim for the new assignee's agent, if any.
         if (data.assigneeId && typeof tx.issueClaim?.create === "function") {
           const agent = await tx.agent.findFirst({
-            where: { ownerUserId: data.assigneeId, defaultProjectId: existing.projectId },
+            // #user-agents: their oldest agent active in this organisation.
+            where: { ownerUserId: data.assigneeId, revokedAt: null, ...activeIn(existing.organisationId) },
+            orderBy: { createdAt: "asc" },
             select: { id: true },
           });
           if (agent) {
@@ -1232,6 +1255,233 @@ export async function editProofLinksAction(
 }
 
 /**
+ * Updates or replaces the submitted GitHub pull request URL on an issue
+ * (#edit-pr-link). Allowed for the contributor who submitted the PR (or whose
+ * agent delivered it / holds the claim), the assignee, the reporter, or a
+ * tenant admin. Validates that the URL is a pull request in the project's
+ * repository and refreshes `pullRequestHeadSha`.
+ */
+export async function editPullRequestUrlAction(
+  bugId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const user = await requireUser();
+  const userId = user.id;
+
+  const limit = checkRateLimit(
+    `edit-bug:${userId}`,
+    ACTION_RATE_LIMITS.editBug,
+  );
+  if (!limit.allowed) {
+    return { error: RATE_LIMIT_MESSAGE };
+  }
+
+  const existing = await prisma.bug.findUnique({
+    where: { id: bugId, ...bugInOrganisation(await currentOrganisationIdFor(userId)) },
+    select: {
+      id: true,
+      status: true,
+      proofLinks: true,
+      pullRequestUrl: true,
+      pullRequestHeadSha: true,
+      reporterId: true,
+      assigneeId: true,
+      isDeleted: true,
+      project: { select: { repoUrl: true } },
+      claims: {
+        where: { releasedAt: null, status: { in: ["active", "offered"] } },
+        select: { status: true, beneficiaryUserId: true, agent: { select: { ownerUserId: true } } },
+      },
+      deliveries: {
+        select: { beneficiaryUserId: true, pullRequestUrl: true, agent: { select: { ownerUserId: true } } },
+      },
+    },
+  });
+
+  if (!existing || existing.isDeleted) {
+    return { error: TICKET_EDIT_ERRORS.notFound };
+  }
+
+  if (existing.status === "resolved" || existing.status === "closed") {
+    return { error: "A resolved or closed issue's pull request link can't be replaced." };
+  }
+
+  const activeClaim = existing.claims.find(
+    (c) => c.status === "active" || c.status === "offered",
+  );
+  const holdsActiveClaim = existing.claims.some(
+    (c) => c.beneficiaryUserId === userId || c.agent.ownerUserId === userId,
+  );
+  const currentDelivery = existing.pullRequestUrl
+    ? existing.deliveries.find(
+      (d) => d.pullRequestUrl === existing.pullRequestUrl,
+    )
+    : null;
+  const deliveredCurrent = Boolean(
+    currentDelivery &&
+    (currentDelivery.beneficiaryUserId === userId ||
+      currentDelivery.agent.ownerUserId === userId),
+  );
+  const isAssignee = Boolean(existing.assigneeId && existing.assigneeId === userId);
+
+  // An actor owns the current contribution if they hold the active claim, or,
+  // when no active claim exists, if they are the current assignee or delivered
+  // the currently linked pull request. A former deliverer whose delivery was
+  // for an earlier pull request or who lost their claim is refused once another
+  // contributor owns the work.
+  const isCurrentContributor =
+    holdsActiveClaim || (!activeClaim && (isAssignee || deliveredCurrent));
+
+  const mayEditPullRequest =
+    isCurrentContributor ||
+    canEditTicket({
+      actorId: userId,
+      actorRole: user.role,
+      membershipRole: (await currentOrganisationAccess(userId, user.role)).membershipRole,
+      reporterId: existing.reporterId,
+    });
+  if (!mayEditPullRequest) {
+    return { error: TICKET_EDIT_ERRORS.unauthorized };
+  }
+
+  const parsed = editPullRequestUrlSchema.safeParse({
+    pullRequestUrl: formData.get("pullRequestUrl") ?? "",
+  });
+  if (!parsed.success) {
+    return fromZodError(parsed.error);
+  }
+
+  const parsedPr = parsePullRequestUrl(parsed.data.pullRequestUrl);
+  if (!parsedPr) {
+    return fieldError(
+      "pullRequestUrl",
+      "Enter a valid GitHub pull request URL (https://github.com/owner/repo/pull/123).",
+    );
+  }
+
+  const repo = parseGitHubRepoUrl(existing.project?.repoUrl);
+  if (repo && !sameRepo(parsedPr, repo)) {
+    return fieldError(
+      "pullRequestUrl",
+      "That pull request is not in this project's repository.",
+    );
+  }
+
+  const nextPullRequestUrl = `https://github.com/${repo ? repo.owner : parsedPr.owner}/${repo ? repo.repo : parsedPr.repo}/pull/${parsedPr.number}`;
+  const previousPullRequestUrl = existing.pullRequestUrl;
+  if (nextPullRequestUrl === previousPullRequestUrl) {
+    return { ok: true };
+  }
+
+  const oldPr = previousPullRequestUrl ? parsePullRequestUrl(previousPullRequestUrl) : null;
+  const samePullRequest = Boolean(
+    oldPr &&
+    oldPr.number === parsedPr.number &&
+    repo &&
+    (sameRepo(oldPr, repo) || isFormerNameOf(oldPr, repo)),
+  );
+
+  const accepted = await standingAcceptance(prisma, bugId);
+  if (accepted && previousPullRequestUrl && !samePullRequest) {
+    return {
+      error:
+        "This issue's accepted fix is bound to a different pull request — link the accepted one again.",
+    };
+  }
+
+  const latestReport = !samePullRequest
+    ? await latestPullRequestReport(bugId, nextPullRequestUrl)
+    : null;
+  const nextHeadSha = samePullRequest
+    ? existing.pullRequestHeadSha
+    : (latestReport?.headSha ?? null);
+
+  const existingProofLinks = existing.proofLinks ?? [];
+  const nextProofLinks =
+    previousPullRequestUrl && existingProofLinks.includes(previousPullRequestUrl)
+      ? [...new Set(existingProofLinks.map((link) => (link === previousPullRequestUrl ? nextPullRequestUrl : link)))]
+      : existingProofLinks;
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const changed = await tx.bug.updateMany({
+      where: { id: bugId, pullRequestUrl: previousPullRequestUrl },
+      data: {
+        pullRequestUrl: nextPullRequestUrl,
+        pullRequestHeadSha: nextHeadSha,
+        proofLinks: nextProofLinks,
+        updatedAt: new Date(),
+      },
+    });
+    if (changed.count !== 1) return false;
+
+    if (previousPullRequestUrl) {
+      if (samePullRequest) {
+        await tx.delivery.updateMany({
+          where: { bugId, pullRequestUrl: previousPullRequestUrl },
+          data: { pullRequestUrl: nextPullRequestUrl },
+        });
+      } else if (isCurrentContributor) {
+        await tx.delivery.updateMany({
+          where: {
+            bugId,
+            pullRequestUrl: previousPullRequestUrl,
+            OR: [
+              { beneficiaryUserId: userId },
+              { agent: { ownerUserId: userId } },
+            ],
+          },
+          data: {
+            pullRequestUrl: nextPullRequestUrl,
+            headSha: nextHeadSha,
+          },
+        });
+      }
+    }
+
+    await publishWebEvent(tx, {
+      bugId,
+      type: "issue.updated",
+      actorUserId: userId,
+      payload: issueChangePayload({
+        pullRequestUrl: nextPullRequestUrl,
+        ...(nextProofLinks !== existingProofLinks ? { proofLinks: nextProofLinks } : {}),
+      }),
+    });
+
+    await tx.bugActivity.create({
+      data: {
+        bugId,
+        actorId: userId,
+        type: "edited",
+        summary: previousPullRequestUrl
+          ? `updated PR link to ${nextPullRequestUrl}`
+          : `linked PR ${nextPullRequestUrl}`,
+        metadata: {
+          field: "pullRequestUrl",
+          from: previousPullRequestUrl,
+          to: nextPullRequestUrl,
+          pullRequestUrl: nextPullRequestUrl,
+          headSha: nextHeadSha,
+          via: "editPullRequest",
+        },
+      },
+    });
+
+    return true;
+  });
+
+  if (!updated) {
+    return { error: "The pull request link was modified by another update. Please refresh the page." };
+  }
+
+  revalidatePath("/[project]", "layout");
+  revalidateIssue();
+  revalidatePath("/bugs");
+  revalidatePath(`/bugs/${bugId}`);
+  return { ok: true };
+}
+
+/**
  * Adds a comment to a bug and records the activity: a reply to one stage
  * entry, or a comment on the issue itself (at any stage) or a reply to one.
  */
@@ -1264,7 +1514,7 @@ export async function addCommentAction(
   }
 
   const bug = await prisma.bug.findUnique({
-    where: { id: bugId, ...bugInOrganisation(await currentOrganisationIdFor(userId)) },
+    where: { id: bugId },
     select: {
       id: true,
       isDeleted: true,
@@ -1272,6 +1522,7 @@ export async function addCommentAction(
       reporterId: true,
       assigneeId: true,
       organisationId: true,
+      projectId: true,
       status: true,
       substatus: true,
       pullRequestUrl: true,
@@ -1279,6 +1530,11 @@ export async function addCommentAction(
   });
   if (!bug || bug.isDeleted) {
     return { error: "Issue not found" };
+  }
+
+  const currentUser = await requireUser();
+  if (!(await canContributeToProject(currentUser, bug.projectId, bug.organisationId))) {
+    return { error: "You must be a member of this project to comment." };
   }
 
   // One rule for where a comment may go, as for agents (lib/comment-placement.ts).
@@ -1428,11 +1684,15 @@ export async function toggleVoteAction(
   }
 
   const bug = await prisma.bug.findUnique({
-    where: { id: bugId, ...bugInOrganisation(await currentOrganisationIdFor(userId)) },
-    select: { id: true, isDeleted: true, organisationId: true },
+    where: { id: bugId },
+    select: { id: true, isDeleted: true, organisationId: true, projectId: true },
   });
   if (!bug || bug.isDeleted) {
     return { error: "Issue not found" };
+  }
+  const votingUser = await requireUser();
+  if (!(await canContributeToProject(votingUser, bug.projectId, bug.organisationId))) {
+    return { error: "You must be a member of this project to vote." };
   }
 
   const result = await prisma.$transaction(async (tx) => {

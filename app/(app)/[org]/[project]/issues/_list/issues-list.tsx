@@ -75,7 +75,7 @@ import {
   parseBugSort,
 } from "@/lib/issues-sort";
 import { canDeleteTicket } from "@/lib/ticket-deletion";
-import { currentOrganisationAccess } from "@/lib/organisation-access";
+import { organisationAccessFor } from "@/lib/organisation-access";
 import type { OrganisationRole } from "@/lib/organisation-role";
 import { defaultSortFor, mineFilterWhere, parseMineFilter } from "@/lib/mine-filter";
 import { finishedWatchedWhere } from "@/lib/watching";
@@ -88,7 +88,7 @@ import { RichText } from "@/components/rich-text";
 import { isOrganisationAdmin } from "@/lib/organisation-role";
 import { cookies } from "next/headers";
 import { parseDismissed } from "@/lib/onboarding";
-import { liveCheck, liveConfirmLabel, liveFactLabel, type LiveCheck, type LiveFact } from "@/lib/live-check";
+import { liveCheck, liveConfirmLabel, liveFactLabel, type LiveCheck } from "@/lib/live-check";
 import { latestPullRequestReports } from "@/lib/agent-api/pull-request-report";
 import { parseGitHubRepoUrl } from "@/lib/github/pull-request-url";
 import { IssueRowStatus } from "@/components/issue-row-status";
@@ -113,6 +113,7 @@ import { EARN_PROJECT_SLUG, EARN_TASKS, tasksPaid } from "@/lib/earn/draft";
 import { isEarner } from "@/lib/earn/earner";
 import { earnState } from "@/lib/earn/state";
 import { ZikiTasksTable } from "@/components/ziki-tasks-table";
+import { activeIn } from "@/lib/agents/active-in";
 
 /* Distinct browser-tab title; the root layout appends "· Ziki". */
 export const metadata = { title: "Issues" };
@@ -250,11 +251,11 @@ export async function IssuesList({
   returnTo: string;
   searchParams: SearchParams;
 }) {
-  const { user, organisationId, project } = await requireProject(org, slug);
+  const { user, organisationId, project, isOrgMember, canContribute, isOrgAdmin } = await requireProject(org, slug);
   const ref = project.ref;
   const userId: string | undefined = user.id;
   const effectiveRole: AppRole | null | undefined = user.role;
-  const membershipRole: OrganisationRole | null = (await currentOrganisationAccess(user.id, user.role)).membershipRole;
+  const membershipRole: OrganisationRole | null = (await organisationAccessFor(user.id, organisationId, user.role)).membershipRole;
   // #425: only this project's issues, in its organisation.
   const projectId: string | null = project.id;
   const activeProject = project;
@@ -284,8 +285,8 @@ export async function IssuesList({
   // Search follows the same track as the list; "all" names none, so both come back.
   const trackSearch = trackFilter === "all" ? {} : { track: trackFilter };
   const isDeletedView = canDelete && deletedParam === "true";
-  // Organisation-wide view (`?all=1`). Absent → unchanged project scope.
-  const allProjects = showsAllProjects(params[PROJECT_ALL_PARAM]);
+  // Organisation-wide view (`?project=all`). Absent → unchanged project scope.
+  const allProjects = isOrgMember && showsAllProjects(params[PROJECT_ALL_PARAM]);
 
   // Column sort (#column-sort): the address wins, then the sort remembered in this list's cookie.
   const sortCookies = await cookies();
@@ -409,34 +410,10 @@ export async function IssuesList({
     if (asNumber !== null) where.OR.push({ number: asNumber });
   }
 
-  // #live-confirm: on the Live tab, narrow to the issues three agents have
-  // found on prod, or the ones still short. The counts are of the unnarrowed list.
-  // The line above the list describes every Live issue the other filters match, whichever confirmation filter is on.
-  const liveSummaryWhere: Prisma.BugWhereInput = { ...where };
-  const confirmFilter = statusParam === "resolved" && !isDeletedView ? (["done", "more"] as const).find((value) => value === toSingleQueryParam(params.confirm)) ?? null : null;
-  let confirmCounts: { all: number; done: number } | null = null;
-  if (statusParam === "resolved" && !isDeletedView) {
-    confirmCounts = await loadOrEmpty("live confirmations", async () => {
-      const ids = (await prisma.bug.findMany({ where, select: { id: true } })).map((bug) => bug.id);
-      const confirmers = await loadProdConfirmers(ids);
-      const done = ids.filter((id) => (confirmers.get(id)?.length ?? 0) >= PROD_CONFIRMATIONS_NEEDED);
-      if (confirmFilter) where.id = confirmFilter === "done" ? { in: done } : { in: ids.filter((id) => !done.includes(id)) };
-      return { all: ids.length, done: done.length };
-    }, null);
-  }
-  const confirmHref = (value: "done" | "more" | null) => {
-    const [path, query = ""] = returnTo.split("?");
-    const next = new URLSearchParams(query);
-    if (value) next.set("confirm", value);
-    else next.delete("confirm");
-    next.delete("page");
-    const text = next.toString();
-    return text ? `${path}?${text}` : path;
-  };
   const complexBugSearchFilter = Boolean(
     mineFilter || (parseMyWorkFilter(params[MY_WORK_PARAM]) && userId)
       || statusParam === REJECTED_STATUS || statusParam === POSSIBLY_DELIVERED
-      || toSingleQueryParam(params.stage) || confirmFilter,
+      || toSingleQueryParam(params.stage),
   );
   const bugSearchExtraFilters = ["status", "substatus", "typeId", "areaId", "milestoneId", "reporterId", "assigneeId", "duplicateOfId", "isBoosted", "isDeleted"]
     .map((field) => typesenseFilter(field, (where as Record<string, unknown>)[field]))
@@ -624,10 +601,7 @@ export async function IssuesList({
         },
       },
       // A personal list reads newest-activity-first; boosts are for the shared one.
-      // #live-confirm: "Needs more" puts the issues closest to confirmed first.
-      orderBy: confirmFilter === "more"
-        ? [{ deploymentReports: { _count: "desc" } }, ...getBugOrderBy(currentSort, { boostFirst: false })]
-        : getBugOrderBy(currentSort, { boostFirst: !isWatchingView }),
+      orderBy: getBugOrderBy(currentSort, { boostFirst: !isWatchingView }),
       skip: indexedBugIds ? 0 : pagination.skip,
       take: indexedBugIds ? indexedBugIds.length : pagination.take,
     })
@@ -670,17 +644,8 @@ export async function IssuesList({
     return issuesQueryError(listed.reference);
   }
   const bugs = listed.bugs;
-  // #live-check: on the Live tab, every Live issue the filters match (for the
-  // line above the list); elsewhere, just the Live rows on this page.
-  const liveTabChecks = statusParam === "resolved" && !isDeletedView
-    ? await loadOrEmpty("live checks", async () => loadLiveChecks(await prisma.bug.findMany({
-        where: liveSummaryWhere,
-        select: { id: true, pullRequestUrl: true, projectId: true },
-      })), new Map<string, LiveCheck>())
-    : new Map<string, LiveCheck>();
-  const liveChecks = liveTabChecks.size > 0
-    ? liveTabChecks
-    : await loadOrEmpty("live checks", () => loadLiveChecks(bugs.filter((bug) => bug.status === "resolved")), new Map<string, LiveCheck>());
+  // #live-check: where each Live row on this page has its fix.
+  const liveChecks = await loadOrEmpty("live checks", () => loadLiveChecks(bugs.filter((bug) => bug.status === "resolved")), new Map<string, LiveCheck>());
   // #live-confirm: what each agent found, for the Live rows on this page, shown when a row is opened.
   const liveConfirmations = await loadOrEmpty("live confirmations", () => loadProdConfirmations(bugs.filter((bug) => liveChecks.has(bug.id)).map((bug) => bug.id)), new Map<string, ProdConfirmation[]>());
   // Your Work: which rows are there because of your bid, for each row's tag.
@@ -731,7 +696,7 @@ export async function IssuesList({
           async () => {
             const agents = await prisma.agent.findMany({
               where: {
-                organisationId,
+                ...activeIn(organisationId),
                 ownerUserId: userId,
                 revokedAt: null,
                 OR: [{ tagline: null }, { about: null }, { skills: { none: {} } }, { tagline: "" }, { about: "" }],
@@ -757,7 +722,7 @@ export async function IssuesList({
         async () => {
           const now = new Date();
           const [agentCount, memberCount, pendingInvites] = await Promise.all([
-            prisma.agent.count({ where: { organisationId, ownerUserId: userId, revokedAt: null } }),
+            prisma.agent.count({ where: { ...activeIn(organisationId), ownerUserId: userId, revokedAt: null } }),
             prisma.membership.count({ where: { organisationId } }),
             prisma.organisationInvite.count({ where: { organisationId, acceptedAt: null, expiresAt: { gt: now } } }),
           ]);
@@ -1176,10 +1141,6 @@ export async function IssuesList({
   const listContent = onZikiTasks && earnStage ? <ZikiTasksTable stage={earnStage} done={earn?.balance.done} /> : (
     <div className="space-y-4">
         {statusParam === "resolved" && !isDeletedView ? <LiveRefresh /> : null}
-        {statusParam === "resolved" && liveTabChecks.size > 0 ? (
-          <LiveShipped checks={[...liveTabChecks.values()]} filter={confirmFilter} confirmTotals={confirmCounts}
-            hrefs={{ all: confirmHref(null), done: confirmHref("done"), more: confirmHref("more") }} />
-        ) : null}
 
         {/* #project-links: the site/code panel renders here (from ProjectLinks in the top right) while it is open. */}
         <div id={PROJECT_LINKS_SLOT_ID} className="empty:hidden" />
@@ -1244,7 +1205,7 @@ export async function IssuesList({
           />
         ) : null}
         {isIdeasView ? null : isFirstRun ? (
-          <FirstRunWelcome isAdmin={canDelete} hasOrganisation={Boolean(organisationId)} slug={ref} returnTo={returnTo} />
+          <FirstRunWelcome isAdmin={canDelete} hasOrganisation={Boolean(organisationId)} slug={ref} returnTo={returnTo} canContribute={canContribute} />
         ) : bugs.length === 0 ? (
           <WhimsicalEmptyState
             title={
@@ -1264,7 +1225,7 @@ export async function IssuesList({
             clearHref={issuesPath(ref, statusParam ?? ALL_STATUS)}
             createHref={newIssueHref(ref, returnTo)}
             showClear={Boolean((myWorkOn || !onlyStatusTab) && (qParam || statusParam || tagsParam || selectedMilestone || myWorkOn))}
-            showCreate={true}
+            showCreate={canContribute}
           />
         ) : (
           <section className="issues-results flex flex-col gap-3.5">
@@ -1550,7 +1511,7 @@ export async function IssuesList({
         ) : null}
         {/* Project notes and settings, as icons, beside the tabs. */}
         {!isDeletedView ? (
-          <ProjectIconLinks notesHref={projectPath(ref, "/notes")} settingsHref={`/projects/${encodeURIComponent(slug)}/settings`} />
+          <ProjectIconLinks notesHref={canContribute ? projectPath(ref, "/notes") : undefined} settingsHref={isOrgAdmin ? `/projects/${encodeURIComponent(slug)}/settings` : undefined} />
         ) : null}
       </div>
     </div>
@@ -1599,11 +1560,13 @@ function FirstRunWelcome({
   hasOrganisation = true,
   slug,
   returnTo,
+  canContribute = true,
 }: {
   isAdmin: boolean;
   hasOrganisation?: boolean;
   slug: ProjectRef;
   returnTo: string;
+  canContribute?: boolean;
 }) {
   if (!hasOrganisation) {
     return (
@@ -1632,14 +1595,16 @@ function FirstRunWelcome({
         This is where reported issues will appear. A good report says what you
         expected, what happened instead, and how to make it happen again.
       </p>
-      <div className="mt-5">
-        <Link
-          href={newIssueHref(slug, returnTo)}
-          className="inline-flex h-[42px] items-center justify-center rounded-full bg-electric-blue-strong px-5 text-sm font-bold text-white shadow-[0_8px_20px_rgba(46,111,239,0.35)]"
-        >
-          Report the first issue
-        </Link>
-      </div>
+      {canContribute ? (
+        <div className="mt-5">
+          <Link
+            href={newIssueHref(slug, returnTo)}
+            className="inline-flex h-[42px] items-center justify-center rounded-full bg-electric-blue-strong px-5 text-sm font-bold text-white shadow-[0_8px_20px_rgba(46,111,239,0.35)]"
+          >
+            Report the first issue
+          </Link>
+        </div>
+      ) : null}
       {isAdmin ? (
         <p className="mx-auto mt-6 max-w-md text-sm text-zk-muted">
           Before people start reporting, you may want to set up your{" "}
@@ -1715,63 +1680,4 @@ function LiveRowDetails({ check, confirmations }: { check: LiveCheck; confirmati
   );
 }
 
-/** Each reason a Live issue isn't released, as the end of a sentence: "18 have no pull request linked". */
-const NOT_RELEASED_BECAUSE: Record<Exclude<LiveFact, "released">, (n: number) => string> = {
-  no_pr: (n) => `${n} ${n === 1 ? "has" : "have"} no pull request linked`,
-  not_released: (n) => `${n} ${n === 1 ? "is" : "are"} merged but not released`,
-  other_repository: (n) => `${n} ${n === 1 ? "is" : "are"} in another repository`,
-  unchecked: (n) => `${n} ${n === 1 ? "hasn't" : "haven't"} been checked`,
-  pr_open: (n) => `${n} still ${n === 1 ? "has" : "have"} an open pull request`,
-  pr_closed: (n) => `${n} had ${n === 1 ? "its" : "their"} pull request closed unmerged`,
-  pr_missing: (n) => `${n} link to a pull request that doesn't exist`,
-};
-
-/**
- * Above the Live list (#live-check): how much of the Live work has really
- * shipped, and the biggest reasons the rest hasn't.
- */
-function LiveShipped({ checks, filter, confirmTotals, hrefs }: {
-  checks: LiveCheck[];
-  filter: "done" | "more" | null;
-  confirmTotals: { all: number; done: number } | null;
-  hrefs: { all: string; done: string; more: string };
-}) {
-  const counts = new Map<LiveFact, number>();
-  for (const check of checks) counts.set(check.fact, (counts.get(check.fact) ?? 0) + 1);
-  const released = counts.get("released") ?? 0;
-  const reasons = (Object.keys(NOT_RELEASED_BECAUSE) as Exclude<LiveFact, "released">[])
-    .map((fact) => ({ fact, n: counts.get(fact) ?? 0 }))
-    .filter(({ n }) => n > 0)
-    .sort((a, b) => b.n - a.n)
-    .slice(0, 3)
-    .map(({ fact, n }) => NOT_RELEASED_BECAUSE[fact](n));
-  const rest = reasons.length > 1 ? `${reasons.slice(0, -1).join(", ")} and ${reasons[reasons.length - 1]}` : reasons[0];
-  return (
-    <p data-testid="live-shipped" className="m-0 px-1 text-sm leading-6 text-zk-text2">
-      <b className="font-bold text-zk-text">{released} of {checks.length}</b> Live issues are released: the default branch has their fix.
-      {rest ? <> Of the rest, {rest}.</> : null}
-      {confirmTotals ? (
-        <>
-          {" "}<b className="font-bold text-zk-text">{confirmTotals.done}</b> {confirmTotals.done === 1 ? "has" : "have"} been found on prod by {PROD_CONFIRMATIONS_NEEDED} different agents.
-        </>
-      ) : null}
-      {confirmTotals ? (
-        <span className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="confirm-filters">
-          {([
-            { value: null, label: "All", n: confirmTotals.all, href: hrefs.all },
-            { value: "done", label: `Found by ${PROD_CONFIRMATIONS_NEEDED}`, n: confirmTotals.done, href: hrefs.done },
-            { value: "more", label: "Needs more", n: confirmTotals.all - confirmTotals.done, href: hrefs.more },
-          ] as const).map(({ value, label, n, href }) => (
-            <Link key={label} href={href} aria-current={filter === value ? "page" : undefined}
-              className={`inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-semibold ${
-                filter === value ? "border-zk-accent bg-zk-accent text-white" : "border-zk-border bg-zk-surface text-zk-text2 hover:bg-zk-chip"
-              }`}>
-              {label} <span className="tabular-nums opacity-80">{n}</span>
-            </Link>
-          ))}
-        </span>
-      ) : null}
-    </p>
-  );
-}
 

@@ -1,3 +1,5 @@
+import { MergerTransparencyCard } from "@/components/merger-transparency-card";
+import { requireProject } from "@/lib/project-route";
 import Link from "next/link";
 import { ideaPath, issuesPath, projectRef, refOf } from "@/lib/project-paths";
 import { MarketingAreaMarker } from "@/components/marketing/marketing-area";
@@ -68,6 +70,11 @@ import { mergeReviewEntries } from "@/lib/agent-api/merge";
 import { DeliveriesPanel, MergeReviewsPanel, TestVerdictsPanel, type DeliveryView, type MergeReviewView, type TestVerdictView } from "@/components/issue-review-entries";
 import { Badge } from "@/components/ui/badge";
 import { VoteButton } from "@/components/vote-button";
+import { SpeedButton } from "@/components/speed-button";
+import {
+  InsufficientVotesAuditBanner,
+  WORK_READINESS_VOTE_THRESHOLD,
+} from "@/components/insufficient-votes-audit-banner";
 import { IssueConfirmationsPanel, type ConfirmationBlock, type ConfirmationsData } from "@/components/issue-confirmations";
 import { CONFIRMATION_SUMMARY_MAX_CHARS, listConfirmations, takesConfirmations } from "@/lib/agent-api/confirmations";
 import { DisputeAwardDialog, type DisputeRole } from "@/components/dispute-award-dialog";
@@ -83,7 +90,7 @@ import {
   deletedSummary,
   deletionCounts,
 } from "@/lib/ticket-deletion";
-import { currentOrganisationAccess } from "@/lib/organisation-access";
+import { organisationAccessFor } from "@/lib/organisation-access";
 import { MilestoneDue } from "@/components/milestone-due";
 import { LoadError } from "@/components/load-error";
 import { logLoadFailure } from "@/lib/load-error";
@@ -94,8 +101,10 @@ import { RestoreIssueButton } from "@/components/restore-issue-button";
 import { canAssignTicket } from "@/lib/ticket-assignment";
 import { SelfAssignButton } from "@/components/self-assign-button";
 import { IssueActionsMenu } from "@/components/issue-actions-menu";
+import { CopyIssueSummaryButton } from "@/components/copy-issue-summary-button";
 import { EditableIssueDescription } from "@/components/editable-issue-description";
 import { IssueLinks } from "@/components/issue-links";
+import { parsePullRequestUrl } from "@/lib/github/pull-request-url";
 import { NextStepBar } from "@/components/next-step-bar";
 import { liveCheck, liveConfirmLabel, liveFactLabel, liveNextStep, liveStepState } from "@/lib/live-check";
 import { loadProdConfirmers } from "@/lib/live-confirm-data";
@@ -138,6 +147,7 @@ import "./issue-detail.css";
 import { stateLabel } from "@/lib/labels";
 import { IssueRewardPanel } from "@/components/issue-reward-panel";
 import { rewardEstimatesFor } from "@/lib/agent-api/reward-estimates";
+import { activeIn, activeLevels, levelIn } from "@/lib/agents/active-in";
 
 type BugPageProps = {
   params: Promise<{ org: string; project: string; number: string }>;
@@ -307,21 +317,29 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     );
   }
 
-  const user = await requireUser();
-  const access = await currentOrganisationAccess(user.id, user.role);
-  const canTriage = access.admin;
-  const canDelete = canDeleteTicket(user.role, access.membershipRole);
+  const projectContext = await requireProject(org, projectSlug);
+  const { user, organisationId, isOrgMember, isOrgAdmin, canContribute } = projectContext;
+  const access = await organisationAccessFor(user.id, organisationId, user.role);
+  const canTriage = isOrgAdmin;
+  const canDelete = isOrgAdmin || (isOrgMember && canDeleteTicket(user.role, access.membershipRole));
   if (!lookup) notFound();
   if (lookup.kind === "elsewhere") {
     // A link into another of the viewer's organisations should not dead-end (#519):
     // name the organisation and offer the switch. Non-members still get the 404.
+    const activeOrganisationId = await currentOrganisationIdFor(userId);
     const hint = await issueOrganisationHintFor(prisma, {
       userId,
-      activeOrganisationId: await currentOrganisationIdFor(userId),
+      activeOrganisationId,
       issueId: lookup.issueId,
     });
     if (!hint) notFound();
-    return <IssueOrganisationSwitch issueId={lookup.issueId} organisation={hint} />;
+    const currentWorkspace = activeOrganisationId ? await loadOptional("current workspace", null, () =>
+      prisma.organisation.findFirst({
+        where: { id: activeOrganisationId, archivedAt: null, memberships: { some: { userId } } },
+        select: { name: true },
+      }),
+    ) : null;
+    return <IssueOrganisationSwitch issueId={lookup.issueId} organisation={hint} currentWorkspace={currentWorkspace?.name} destination={`${issuePath(projectRef(org, projectSlug), number)}${queryString(query)}`} />;
   }
   if (lookup.kind === "moved") {
     // #project-urls: the number lives in another project of this organisation.
@@ -339,7 +357,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   // missing used to reject this whole Promise and blank the page.
   let loadedBug = await prisma.bug
     .findUnique({
-      where: { id, ...bugInOrganisation(await currentOrganisationIdFor(userId)) },
+      where: { id, organisationId },
       include: {
         type: { select: { id: true, name: true, isActive: true } },
         reporter: { select: { name: true, email: true, role: true, image: true } },
@@ -375,7 +393,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   if ("detail" in loadedBug && /milestoneId|Milestone/i.test(loadedBug.detail)) {
     loadedBug = await prisma.bug
       .findUnique({
-        where: { id, ...bugInOrganisation(await currentOrganisationIdFor(userId)) },
+        where: { id, organisationId },
         include: {
           type: { select: { id: true, name: true, isActive: true } },
           reporter: { select: { name: true, email: true, role: true, image: true } },
@@ -420,7 +438,6 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     notFound();
   }
 
-  const organisationId = await currentOrganisationIdFor(userId);
   // These tables arrived after the issue row. A missing one must not blank the page.
   const [redesignProposals, membership] = organisationId ? await Promise.all([
     loadOptional("redesigns", [], () =>
@@ -606,7 +623,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                 id: true,
                 createdAt: true,
                 action: true,
-                agent: { select: { name: true, level: true } },
+                agent: { select: { name: true, activations: activeLevels } },
                 payload: true,
               },
             }),
@@ -726,7 +743,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
           ]);
           if (workedOn > 0 || myOpenBid > 0) return [];
           return prisma.agent.findMany({
-            where: { organisationId: bug.organisationId, ownerUserId: user.id, revokedAt: null },
+            where: { ...activeIn(bug.organisationId), ownerUserId: user.id, revokedAt: null },
             orderBy: { name: "asc" },
             select: { id: true, name: true },
           });
@@ -737,7 +754,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   const mentionAgents = canTriage
     ? await loadOptional("mention agents", [], () =>
         prisma.agent.findMany({
-          where: { organisationId: bug.organisationId, revokedAt: null },
+          where: { ...activeIn(bug.organisationId), revokedAt: null },
           orderBy: { name: "asc" },
           select: { id: true, name: true, owner: { select: { name: true } } },
         }),
@@ -883,7 +900,9 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     const [githubStatus, myAgents, latestReport] = await Promise.all([
       loadOptional("GitHub status", null, () => storedGitHubStatus({ id: bug.id, pullRequestUrl })),
       loadOptional("agent levels", [] as { level: "working" | "manager" | "merger" }[], () =>
-        prisma.agent.findMany({ where: { organisationId: bug.organisationId, ownerUserId: user.id, revokedAt: null }, select: { level: true } }),
+        prisma.agent
+          .findMany({ where: { ...activeIn(bug.organisationId), ownerUserId: user.id, revokedAt: null }, select: { activations: activeLevels } })
+          .then((rows) => rows.map((row) => ({ level: levelIn(row, bug.organisationId) }))),
       ),
       loadOptional("latest pull request report", null, () =>
         prisma.pullRequestReport.findFirst({
@@ -914,11 +933,11 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   }
 
   // Comments on the issue itself, at every stage (lib/comment-placement.ts).
-  const takesComments = !bug.isDeleted;
+  const takesComments = !bug.isDeleted && canContribute;
   // Looked up here, not on `hold`: holder is also what agents read through the API.
   const workingAgent = hold?.status === "active"
     ? await loadOptional("working agent", null, () => prisma.agent.findFirst({
-        where: { organisationId: bug.organisationId, claims: { some: { bugId: bug.id, status: "active", releasedAt: null } } },
+        where: { ...activeIn(bug.organisationId), claims: { some: { bugId: bug.id, status: "active", releasedAt: null } } },
         select: { id: true, ownerUserId: true, revokedAt: true, pausedAt: true },
       }))
     : null;
@@ -959,6 +978,15 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     if (typeof value === "string") pageQuery.set(key, value);
   }
   const proofLinks = bug.proofLinks ?? [];
+  const hasLinkedPullRequest = Boolean(bug.pullRequestUrl || proofLinks.some((link) => parsePullRequestUrl(link)));
+  const isDeliverer = Boolean(userId && deliveryList.some((d) => d.beneficiaryUserId === userId || d.by === user.name));
+  const isHolder = Boolean(userId && hold && hold.personName === user.name);
+  const canEditPullRequest =
+    !bug.isDeleted &&
+    bug.status !== "resolved" &&
+    bug.status !== "closed" &&
+    hasLinkedPullRequest &&
+    (isAssignee || isHolder || isDeliverer || canEdit);
   const prActivity = activities.find((a) => {
     const meta = a.metadata as Record<string, unknown> | null;
     return meta && (meta.screenshots || meta.testResults || meta.field === "pullRequestUrl");
@@ -973,6 +1001,32 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   const agentResolution =
     bug.status === "resolved" && !bug.isDeleted ? readAgentResolution(latestStatusChange?.metadata) : null;
 
+    let queuePosition: number | null = null;
+  let totalInQueue = 0;
+  let estimatedWaitMinutes: number | null = null;
+  let mergerAgentName: string | null = null;
+  let precedingPrNumber: number | null = null;
+  let queueLocked = false;
+  let ciPassed = true;
+  let verdictsPassed = true;
+  let rebaseClean = true;
+  if (currentStage === "ready") {
+    const [readyBugs, mergerAgent] = await Promise.all([
+      prisma.bug.findMany({ where: { projectId: bug.projectId, substatus: { in: ["ready_to_merge", "error"] }, isDeleted: false }, orderBy: { updatedAt: "asc" }, select: { id: true, number: true, pullRequestUrl: true } }),
+      prisma.agent.findFirst({ where: { ...activeIn(bug.organisationId), revokedAt: null }, select: { name: true } }),
+    ]);
+    totalInQueue = readyBugs.length;
+    const qIdx = readyBugs.findIndex((b) => b.id === bug.id);
+    if (qIdx !== -1) {
+      queuePosition = qIdx + 1;
+      estimatedWaitMinutes = qIdx * 3;
+      if (qIdx > 0) { precedingPrNumber = readyBugs[qIdx - 1].number; queueLocked = true; }
+    } else { queuePosition = 1; totalInQueue = Math.max(1, totalInQueue); estimatedWaitMinutes = 0; }
+    mergerAgentName = mergerAgent?.name ?? null;
+    verdictsPassed = testVerdictList.filter((v) => v.goodToMerge).length >= 3;
+    ciPassed = bug.substatus !== "error";
+    rebaseClean = bug.substatus !== "error";
+  }
   // "Dispute award", for the issue's reporter and assignee: its own button now
   // that issues take no free-standing comments (#entry-replies-only).
   const disputeRoles: DisputeRole[] = bug.isDeleted
@@ -1401,7 +1455,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                 currentUserId={user.id}
                 currentUserRole={user.role}
                 organisationAdmin={access.admin}
-                readOnly={bug.isDeleted}
+                readOnly={bug.isDeleted || !canContribute}
                 markedImportantBy={importanceMarkers}
               >
                 {comments.hiddenThreads > 0 ? (
@@ -1444,7 +1498,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
             likeVoters={voterSummary.likes.voters}
             size="md"
             showAvatars={false}
-            readOnly={bug.isDeleted}
+            readOnly={bug.isDeleted || !canContribute}
           />
         }
         actionsMenuSlot={
@@ -1813,10 +1867,32 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
               likeVoters={voterSummary.likes.voters}
               size="md"
               showAvatars={false}
-              readOnly={bug.isDeleted}
+              readOnly={bug.isDeleted || !canContribute}
             />
-            {canMarkDuplicate || canDeleteHere ? (
+            {!bug.isDeleted ? (
+              <SpeedButton
+                bugId={bug.id}
+                issueNumber={bug.number}
+                issueTitle={bug.title}
+                isExpedited={bug.isBoosted}
+              />
+            ) : null}
+            {!bug.isDeleted ? (
               <IssueActionsMenu>
+                <CopyIssueSummaryButton
+                  issue={{
+                    number: bug.number,
+                    title: bug.title,
+                    substatus: bug.substatus,
+                    summary: bug.summary,
+                    description: bug.description,
+                    orgSlug: bug.project.organisation.slug,
+                    projectSlug: bug.project.slug,
+                    canonicalPath: issueHref(bug),
+                    assigneeName: assignee?.name ?? null,
+                    pullRequestUrl: bug.pullRequestUrl ?? null,
+                  }}
+                />
                 {canMarkDuplicate ? <MarkDuplicateButton bugId={bug.id} /> : null}
                 {canDeleteHere ? (
                   <DeleteIssueButton bugId={bug.id} bugTitle={bug.title} counts={keptCounts} variant="danger" size="sm" />
@@ -1830,6 +1906,15 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
       <div className="flex flex-wrap items-start gap-5">
         {/* MAIN COLUMN */}
         <div className="flex min-w-0 flex-[999_1_600px] flex-col gap-5">
+          {bug.status === "open" && bug.voteCount < WORK_READINESS_VOTE_THRESHOLD ? (
+            <InsufficientVotesAuditBanner
+              issueId={bug.id}
+              voteCount={bug.voteCount}
+              threshold={WORK_READINESS_VOTE_THRESHOLD}
+              canRequestAudit={canTriage || bug.reporterId === user.id}
+            />
+          ) : null}
+
           {/* #1446: the progress report's stage filters the Conversation (#186). */}
           <IssueStageProvider initialStage={currentStage}>
           <EditableIssueDescription
@@ -1915,9 +2000,26 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                   </div>
                   <IssueTimeline>
                     {mergeReviewing || timelineReviews.length > 0 ? (
-                      <TimelineStep>
-                        <MergeReviewsPanel at={firstAt(timelineReviews)} bugId={bug.id} reviews={timelineReviews} canReply={mergeReviewing} history={!mergeReviewing} />
-                      </TimelineStep>
+                      <>
+                        {currentStage === "ready" ? (
+                          <TimelineStep>
+                            <MergerTransparencyCard
+                              queuePosition={queuePosition}
+                              totalInQueue={totalInQueue}
+                              estimatedWaitMinutes={estimatedWaitMinutes}
+                              mergerAgentName={mergerAgentName}
+                              precedingPrNumber={precedingPrNumber}
+                              ciPassed={ciPassed}
+                              verdictsPassed={verdictsPassed}
+                              rebaseClean={rebaseClean}
+                              queueLocked={queueLocked}
+                            />
+                          </TimelineStep>
+                        ) : null}
+                        <TimelineStep>
+                          <MergeReviewsPanel at={firstAt(timelineReviews)} bugId={bug.id} reviews={timelineReviews} canReply={mergeReviewing} history={!mergeReviewing} />
+                        </TimelineStep>
+                      </>
                     ) : null}
                     {testing || timelineVerdicts.length > 0 ? (
                       <TimelineStep>
@@ -1996,7 +2098,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                     currentUserId={user.id}
                     currentUserRole={user.role}
                     organisationAdmin={access.admin}
-                    readOnly={bug.isDeleted}
+                    readOnly={bug.isDeleted || !canContribute}
                     markedImportantBy={importanceMarkers}
                   >
                     {comments.hiddenThreads > 0 ? (
@@ -2155,6 +2257,8 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
             linkedPullRequestUrl={bug.pullRequestUrl}
             idea={sourceIdea ? { number: sourceIdea.number, slug: refOf(bug.project) } : null}
             repairs={linkRepairs}
+            bugId={bug.id}
+            canEditPullRequest={canEditPullRequest}
           />
 
           <SubmissionEvidence
