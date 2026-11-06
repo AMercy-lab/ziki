@@ -109,10 +109,6 @@ import { ExpandableRow, RowToggle } from "@/components/expandable-row";
 import { PROJECT_ALL_PARAM, showsAllProjects } from "@/lib/issue-list-filters";
 import { ideaVoteTotals, NO_VOTES } from "@/lib/idea-vote-totals";
 import { bugSearchSort, ideaSearchSort, searchWorkItems, typesenseFilter } from "@/lib/search-index";
-import { EARN_PROJECT_SLUG, EARN_TASKS, tasksPaid } from "@/lib/earn/draft";
-import { isEarner } from "@/lib/earn/earner";
-import { earnState } from "@/lib/earn/state";
-import { ZikiTasksTable } from "@/components/ziki-tasks-table";
 import { activeIn } from "@/lib/agents/active-in";
 
 /* Distinct browser-tab title; the root layout appends "· Ziki". */
@@ -237,10 +233,7 @@ export async function IssuesList({
   ideas,
   returnTo,
   searchParams,
-  zikiTasks = false,
 }: {
-  /** Earn (#earn-drafts): `/<slug>/issues/ziki-tasks` lists the Ziki tasks in place of the issues. */
-  zikiTasks?: boolean;
   org: string;
   slug: string;
   /** The list the path names: a status, `ideas` or `rejected_ideas` (#project-urls). */
@@ -714,7 +707,7 @@ export async function IssuesList({
   // The next-step card (#agents-dock) where the empty agents bar used to be: the one next thing for you, from your role and what the
   // organisation has. Never beside AgentSetupNotice, and dismissable per organisation.
   let nextStep: OrganisationNextStep | null = null;
-  if (organisationId && userId && membershipRole && slug !== EARN_PROJECT_SLUG && !isDeletedView) {
+  if (organisationId && userId && membershipRole && !isDeletedView) {
     const dismissed = parseDismissed((await cookies()).get(NEXT_STEP_COOKIE)?.value).includes(organisationId);
     if (!dismissed) {
       const counts = await loadOrEmpty(
@@ -945,9 +938,7 @@ export async function IssuesList({
   // same scope the list shows, including ?project=all, so an empty filter
   // across a busy organisation is "no issues match", not "no issues yet".
   let isFirstRun = false;
-  // Earn: the earner's organisation keeps the normal toolbar (Add Idea at the far left, filter and
-  // search at the right) even while it has no issues, since the Ziki tasks fill the list.
-  if (totalCount === 0 && !isDeletedView && slug !== EARN_PROJECT_SLUG) {
+  if (totalCount === 0 && !isDeletedView) {
     try {
       isFirstRun = (await prisma.bug.count({
         where: {
@@ -1129,16 +1120,7 @@ export async function IssuesList({
     </>
   );
 
-  // Earn (#earn-drafts, Mark's review): Ziki tasks live in the main list, as a green step
-  // above Open, only for someone earning and only while tasks are left.
-  const earn = slug === EARN_PROJECT_SLUG && (await isEarner(user.id).catch(() => false)) ? await earnState(user.id) : null;
-  const earnStage = earn?.stage ?? null;
-  const zikiTasksLeft = earnStage ? EARN_TASKS.length - tasksPaid(earnStage) : 0;
-  const showZikiTasks = earnStage !== null && (zikiTasksLeft > 0 || zikiTasks);
-  // The In Progress tab opens on the Ziki tasks (its link points there); Open and the rest stay normal.
-  const onZikiTasks = zikiTasks;
-
-  const listContent = onZikiTasks && earnStage ? <ZikiTasksTable stage={earnStage} done={earn?.balance.done} /> : (
+  const listContent = (
     <div className="space-y-4">
         {statusParam === "resolved" && !isDeletedView ? <LiveRefresh /> : null}
 
@@ -1486,8 +1468,7 @@ export async function IssuesList({
             const stage = {
               label: group.label,
               // Error is part of Merge, so the stage total counts it once.
-              // Earn: the Ziki tasks still to do count as work in progress.
-              count: group.statuses.reduce((sum, value) => sum + (value === ERROR_STATUS || value === POSSIBLY_DELIVERED ? 0 : statusCount(value)), 0) + (showZikiTasks && group.label === "In Progress" ? zikiTasksLeft : 0),
+              count: group.statuses.reduce((sum, value) => sum + (value === ERROR_STATUS || value === POSSIBLY_DELIVERED ? 0 : statusCount(value)), 0),
               href: statusLink(group.statuses[0]),
               selected: index === stageIndex,
             };
@@ -1532,7 +1513,7 @@ export async function IssuesList({
                 label: value === IDEAS_STATUS ? "New ideas" : value === REJECTED_IDEAS_STATUS ? "Rejected ideas" : statusFilterLabel(value),
                 count: statusCount(value),
                 href: statusLink(value),
-                selected: !onZikiTasks && value === currentStatus,
+                selected: value === currentStatus,
               })),
             ]}
           />

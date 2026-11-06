@@ -21,10 +21,10 @@ export const metadata = { title: "Connect your agent" };
 export default async function ConnectAgentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ code?: string | string[]; from?: string | string[] }>;
+  searchParams: Promise<{ code?: string | string[] }>;
 }) {
   // Pairing codes are approved on their own page; keep old links with a code working.
-  const { code, from } = await searchParams;
+  const { code } = await searchParams;
   if (typeof code === "string" && code) {
     redirect(`/settings/agents/pair?code=${encodeURIComponent(code.slice(0, 20))}`);
   }
@@ -71,8 +71,7 @@ export default async function ConnectAgentPage({
           </>
         ) : (
           <>
-            {/* From Earn (#earn-drafts), connecting goes straight on to My agents. */}
-            <ConnectAgentFlow ready next={from === "earn" ? "/earn/home" : undefined} />
+            <ConnectAgentFlow ready />
             <p className="text-xs text-zk-muted">It will work in every project of {organisation.name}. Bring it into your other organisations from their Agents settings.</p>
           </>
         )}
