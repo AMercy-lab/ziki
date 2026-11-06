@@ -235,6 +235,7 @@ enum GoalAllocationTarget {
 }
 
 model User {
+  savedIssueViews           SavedIssueView[]
   id                        String                  @id @default(cuid())
   name                      String
   email                     String                  @unique
@@ -768,6 +769,7 @@ model Organisation {
 /// A project inside an organisation (organisation), e.g. Zedu Web or Zedu Desktop.
 /// Organisations hold projects and nothing in between (#no-platforms).
 model Project {
+  savedIssueViews        SavedIssueView[]
   agentNotes            AgentNote[]
   id                    String                @id @default(cuid())
   organisationId              String
@@ -2798,4 +2800,19 @@ model Comparison {
 
   @@unique([platformAId, platformBId])
   @@index([published])
+}
+
+model SavedIssueView {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String
+  name      String   @db.VarChar(60)
+  status    String
+  query     String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId, name])
+  @@index([projectId])
 }
