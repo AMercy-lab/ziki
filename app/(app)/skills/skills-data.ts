@@ -83,20 +83,28 @@ function mapSubmissionToSkill(sub: {
   };
 }
 
-export async function getSkills(): Promise<SkillItem[]> {
+export interface GetSkillsResult {
+  skills: SkillItem[];
+  error?: string | null;
+}
+
+export async function getSkills(): Promise<GetSkillsResult> {
   try {
     const approved = await prisma.skillSubmission.findMany({
       where: { status: "approved" },
       orderBy: { createdAt: "desc" },
       include: {
-        submittedBy: { select: { name: true, email: true } },
+        submittedBy: { select: { name: true } },
       },
     });
 
-    return approved.map(mapSubmissionToSkill);
+    return { skills: approved.map(mapSubmissionToSkill) };
   } catch (error) {
-    console.error("[skills] failed to load approved skills from db", error);
-    return [];
+    console.error("[skills] failed to load approved skills from db:", error);
+    return {
+      skills: [],
+      error: "Unable to load approved skills from the database. Please try again later.",
+    };
   }
 }
 
@@ -109,7 +117,7 @@ export async function getSkillBySlug(slug: string): Promise<SkillItem | undefine
         status: "approved",
       },
       include: {
-        submittedBy: { select: { name: true, email: true } },
+        submittedBy: { select: { name: true } },
       },
     });
 

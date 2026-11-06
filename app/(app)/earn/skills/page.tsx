@@ -13,6 +13,7 @@ export default async function EarnSkillsPage() {
   const user = await requireUser();
 
   let userSubmissions: ContributorSubmission[] = [];
+  let loadError: string | null = null;
   try {
     const raw = await prisma.skillSubmission.findMany({
       where: { submittedById: user.id },
@@ -57,7 +58,8 @@ export default async function EarnSkillsPage() {
       maintainerFeedback: sub.rejectionReason ?? undefined,
     }));
   } catch (err) {
-    console.error("[earn-skills] failed to fetch user submissions", err);
+    console.error("[earn-skills] failed to fetch user submissions:", err);
+    loadError = "Unable to load submissions from the database. Please try again later.";
   }
 
   return (
@@ -69,6 +71,7 @@ export default async function EarnSkillsPage() {
           email: user.email || "",
         }}
         initialSubmissions={userSubmissions}
+        loadError={loadError}
       />
     </div>
   );

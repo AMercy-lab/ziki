@@ -12,7 +12,7 @@ interface SkillsDirectoryProps {
  * Public directory panel for the Skills Library.
  * Handles category filtering, real-time keyword search, and prompt copying.
  */
-export function SkillsDirectory({ skills }: SkillsDirectoryProps) {
+export function SkillsDirectory({ skills, loadError }: SkillsDirectoryProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -149,7 +149,14 @@ export function SkillsDirectory({ skills }: SkillsDirectoryProps) {
       </div>
 
       {/* Empty State */}
-      {filteredSkills.length === 0 ? (
+      {loadError ? (
+        <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-12 text-center space-y-3">
+          <p className="text-base font-semibold text-rose-600 dark:text-rose-400">Failed to load skills library</p>
+          <p className="text-xs text-zk-muted max-w-sm mx-auto">
+            {loadError}
+          </p>
+        </div>
+      ) : filteredSkills.length === 0 ? (
         <div className="rounded-2xl border border-zk-border bg-zk-surface/50 p-12 text-center space-y-3">
           <p className="text-base font-semibold text-zk-text">No skills found</p>
           <p className="text-xs text-zk-muted max-w-sm mx-auto">

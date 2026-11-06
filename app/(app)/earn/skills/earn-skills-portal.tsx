@@ -11,6 +11,7 @@ export interface EarnSkillsPortalProps {
     email: string;
   };
   initialSubmissions?: ContributorSubmission[];
+  loadError?: string | null;
 }
 
 export interface ContributorSubmission {
@@ -38,7 +39,7 @@ const CATEGORY_OPTIONS: { id: SkillCategory; label: string }[] = [
   { id: "marketing", label: "SEO & Marketing" },
 ];
 
-export function EarnSkillsPortal({ user, initialSubmissions = [] }: EarnSkillsPortalProps) {
+export function EarnSkillsPortal({ user, initialSubmissions = [], loadError }: EarnSkillsPortalProps) {
   const [activeTab, setActiveTab] = useState<"submit" | "submissions">("submit");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selectedSubmission, setSelectedSubmission] = useState<ContributorSubmission | null>(null);
@@ -466,7 +467,14 @@ Confirm passing test suite`}
             </button>
           </div>
 
-          {submissions.length === 0 ? (
+          {loadError ? (
+            <div className="p-12 text-center space-y-2">
+              <h3 className="text-sm font-semibold text-rose-600 dark:text-rose-400">Failed to load submissions</h3>
+              <p className="text-xs text-zk-muted max-w-sm mx-auto">
+                {loadError}
+              </p>
+            </div>
+          ) : submissions.length === 0 ? (
             <div className="p-12 text-center space-y-3">
               <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-zk-chip text-zk-muted">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
