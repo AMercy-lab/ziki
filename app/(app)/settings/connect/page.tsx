@@ -42,9 +42,10 @@ export default async function ConnectAgentPage({
   }
 
   const organisationId = await currentOrganisationIdFor(user.id);
-  const context = await projectContextFor(prisma, organisationId);
-  const activeProject =
-    context.projects.find((p) => p.id === context.activeProjectId) ?? context.projects[0] ?? null;
+  const { projects } = await projectContextFor(prisma, organisationId);
+  const organisation = organisationId
+    ? await prisma.organisation.findUnique({ where: { id: organisationId }, select: { name: true } })
+    : null;
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
@@ -63,16 +64,9 @@ export default async function ConnectAgentPage({
           <p className={agentsMutedClass}>Name it, copy one piece of text into it, and you&apos;re connected.</p>
         </div>
 
-        {!organisationId ? (
+        {!organisation ? (
           <>
             <p className="text-sm text-zk-text2">Join or create an organisation before you connect an agent.</p>
-            <Link href="/organisations" className={agentsPrimaryBtn}>
-              Organisations →
-            </Link>
-          </>
-        ) : !activeProject ? (
-          <>
-            <p className="text-sm text-zk-text2">Create a project first. Your agent works inside a project.</p>
             <Link href="/organisations" className={agentsPrimaryBtn}>
               Organisations →
             </Link>
@@ -80,24 +74,17 @@ export default async function ConnectAgentPage({
         ) : (
           <>
             {/* From Earn (#earn-drafts), connecting goes straight on to My agents. */}
-            {/* From Earn (#earn-drafts), connecting goes straight on to My agents. */}
-            <ConnectAgentFlow projectId={activeProject.id} next={from === "earn" ? "/earn/home" : undefined} />
-            <p className="text-xs text-zk-muted">It will work in <strong className="text-zk-text font-medium">{activeProject.name}</strong>.</p>
-            {activeProject.goal ? (
-              <div className="w-full text-left mt-2 rounded-xl border border-zk-border/60 bg-zk-subtle/40 p-4 text-xs">
+            <ConnectAgentFlow ready next={from === "earn" ? "/earn/home" : undefined} />
+            <p className="text-xs text-zk-muted">It will work in every project of {organisation.name}. Bring it into your other organisations from their Agents settings.</p>
+            {projects.map((project) => (
+              <div key={project.id} className="w-full text-left rounded-xl border border-zk-border/60 bg-zk-subtle/40 p-4 text-xs">
                 <div className="font-semibold text-zk-text flex items-center justify-between pb-1 mb-1 border-b border-zk-border/40">
-                  <span>Project Context (Brief)</span>
-                  <Link href={`/projects/${activeProject.slug}/settings`} className="text-zk-accent hover:underline text-[11px] font-normal">Edit brief</Link>
+                  <span>{project.name} — Project Context (Brief)</span>
+                  <Link href={`/projects/${project.slug}/settings`} className="text-zk-accent hover:underline text-[11px] font-normal">{project.goal ? "Edit brief" : "Add brief"}</Link>
                 </div>
-                <p className="text-zk-text2 whitespace-pre-wrap line-clamp-4">{activeProject.goal}</p>
-                <p className="mt-2 text-[11px] text-zk-muted italic">This context is automatically provided to connected agents when they pick up tasks in this project.</p>
+                <p className="text-zk-text2 whitespace-pre-wrap line-clamp-4">{project.goal || "No project brief set yet. Describe the final build to guide your agents."}</p>
               </div>
-            ) : (
-              <div className="w-full text-left mt-2 rounded-xl border border-dashed border-zk-border p-3 text-xs text-zk-muted flex items-center justify-between">
-                <span>No project brief set yet. Agents perform better with context on the final build.</span>
-                <Link href={`/projects/${activeProject.slug}/settings`} className="text-zk-accent hover:underline shrink-0 ml-2 font-medium">Add brief →</Link>
-              </div>
-            )}
+            ))}
           </>
         )}
       </section>
