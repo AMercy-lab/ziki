@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   requireSuperAdmin: vi.fn(),
   requireUser: vi.fn(),
   prismaFindUnique: vi.fn(),
+  prismaFindFirst: vi.fn(),
   prismaFindMany: vi.fn(),
   prismaUpdate: vi.fn(),
 }));
@@ -17,6 +18,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     skillSubmission: {
       findUnique: mocks.prismaFindUnique,
+      findFirst: mocks.prismaFindFirst,
       findMany: mocks.prismaFindMany,
       update: mocks.prismaUpdate,
     },
@@ -24,7 +26,8 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 import { reviewSkillSubmissionAction } from "@/app/actions/skill-submissions";
-import { createSubmissionSchema } from "@/app/api/v1/skills/submissions/route";
+import { createSubmissionSchema, POST } from "@/app/api/v1/skills/submissions/route";
+import { NextRequest } from "next/server";
 
 describe("Skill Submissions Review Authorization", () => {
   beforeEach(() => {
@@ -166,5 +169,86 @@ describe("Skill Submission Input Validation", () => {
         tags: ["bad tag with spaces"],
       }).success
     ).toBe(false);
+  });
+});
+
+describe("Skill Submission Revisions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("preserves checklist and tags in createSubmissionSchema during revision", () => {
+    const revision = {
+      title: "Revised Test Runner",
+      category: "testing",
+      summary: "Revised summary with enhanced checks.",
+      tags: ["vitest", "ci", "revised"],
+      prompt: "You are a runner.",
+      checklist: ["Assertion 1: Passes all tests", "Assertion 2: Clean exit"],
+      sampleCommand: "npm test",
+      revisionOfId: "sub-rejected-123",
+    };
+    const parsed = createSubmissionSchema.safeParse(revision);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.tags).toEqual(["vitest", "ci", "revised"]);
+      expect(parsed.data.checklist).toEqual(["Assertion 1: Passes all tests", "Assertion 2: Clean exit"]);
+      expect(parsed.data.revisionOfId).toBe("sub-rejected-123");
+    }
+  });
+
+  it("updates existing rejected submission with new tags and checklist upon revision", async () => {
+    mocks.requireUser.mockResolvedValue({ id: "user-123", email: "user@example.com" });
+    mocks.prismaFindFirst.mockResolvedValue({
+      id: "sub-rejected-123",
+      submittedById: "user-123",
+      status: "rejected",
+    });
+    mocks.prismaUpdate.mockResolvedValue({
+      id: "sub-rejected-123",
+      slug: "revised-test-runner",
+      title: "Revised Test Runner",
+      category: "testing",
+      categoryLabel: "Testing & Test Runners",
+      summary: "Revised summary with enhanced checks.",
+      tags: ["vitest", "ci", "revised"],
+      prompt: "You are a runner.",
+      checklist: ["Assertion 1: Passes all tests", "Assertion 2: Clean exit"],
+      sampleCommand: "npm test",
+      documentationUrl: null,
+      status: "pending",
+      submittedById: "user-123",
+      createdAt: new Date(),
+    });
+
+    const req = new NextRequest("http://localhost/api/v1/skills/submissions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Revised Test Runner",
+        category: "testing",
+        summary: "Revised summary with enhanced checks.",
+        tags: ["vitest", "ci", "revised"],
+        prompt: "You are a runner.",
+        checklist: ["Assertion 1: Passes all tests", "Assertion 2: Clean exit"],
+        sampleCommand: "npm test",
+        revisionOfId: "sub-rejected-123",
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(mocks.prismaUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "sub-rejected-123" },
+        data: expect.objectContaining({
+          status: "pending",
+          tags: ["vitest", "ci", "revised"],
+          checklist: ["Assertion 1: Passes all tests", "Assertion 2: Clean exit"],
+          rejectionReason: null,
+          reviewedById: null,
+        }),
+      })
+    );
   });
 });

@@ -750,6 +750,7 @@ Confirm passing test suite`}
                       setTitle(selectedSubmission.title);
                       setCategory(selectedSubmission.category);
                       setSummary(selectedSubmission.summary);
+                      setTags((selectedSubmission.tags || []).join(", "));
                       setPrompt(selectedSubmission.prompt || "");
                       setChecklist((selectedSubmission.checklist || []).join("\n"));
                       setSampleCommand(selectedSubmission.sampleCommand || "");
