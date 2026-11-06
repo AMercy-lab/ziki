@@ -4,6 +4,10 @@ import { BASE_PATH } from "./lib/base-path";
 const nextConfig: NextConfig = {
   // #585: the production image ships only the traced standalone server.
   output: "standalone",
+  // CI type-checks every commit (`tsc --noEmit`) before it can deploy, so the
+  // image build and the end-to-end job set SKIP_BUILD_TYPECHECK=1 to skip
+  // next build's second, identical check. Every other build still runs it.
+  typescript: { ignoreBuildErrors: process.env.SKIP_BUILD_TYPECHECK === "1" },
   ...(BASE_PATH ? { basePath: BASE_PATH } : {}),
   images: {
     remotePatterns: [
@@ -70,6 +74,12 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     const list = [
+      // Earn's connect page moved to /earn/agent; keep old links and bookmarks working.
+      {
+        source: "/earn/connect",
+        destination: "/earn/agent",
+        permanent: true,
+      },
       {
         source: "/bugs",
         destination: "/issues",

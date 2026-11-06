@@ -12,7 +12,7 @@ import {
   type LeaderboardEntry,
 } from "@/lib/points/leaderboard";
 import { getPlatformRewardConfig } from "@/lib/points/platform-rewards";
-import { formatPointsAsDollars as money, pointsNumber } from "@/lib/points/rules";
+import { formatZ as money, pointsNumber } from "@/lib/points/rules";
 import { Avatar } from "@/components/avatar";
 import {
   StatusPage,
@@ -23,12 +23,13 @@ import { databaseErrorReason } from "@/lib/db-error";
 import { workflowFor } from "@/lib/workflow";
 import { DEFAULT_PROJECT_WORKFLOW } from "@/lib/workflow-config";
 import { projectContextFor } from "@/lib/project-context";
-import { teamAgentsForMembers, teamAssignedWorkForMembers, teamMetricSince, type TeamAgent, type TeamAgentWork } from "@/lib/team-directory";
+import { teamAgentsForMembers, teamAssignedWorkForMembers, type TeamAgent, type TeamAgentWork } from "@/lib/team-directory";
 import { MemberAssignedWork } from "@/components/member-assigned-work";
 import { isTenantAdminRole } from "@/lib/agents/membership";
 import { settableLevels } from "@/lib/agents/levels";
 import { TeamAgentTable } from "./team-agent-table";
 import { RankingRow } from "./ranking-row";
+import { WeeklyPaceBar } from "@/components/weekly-pace-bar";
 
 type SortKey = "points" | "solved";
 
@@ -66,6 +67,12 @@ export function rankingHref(opts: {
   return `/workers?${params.toString()}`;
 }
 
+/** Monday 00:00 UTC of the current week: where "this week" starts. */
+function startOfWeekUtc(now = new Date()): Date {
+  const day = (now.getUTCDay() + 6) % 7; // Monday is 0
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day));
+}
+
 function progressPct(points: number, target: number): number {
   const goal = target > 0 ? target : 1;
   return Math.min(100, Math.max(0, Math.round((points / goal) * 100)));
@@ -96,7 +103,7 @@ type RankedMember = {
   rank: number | null;
   points: number;
   solvedTasks: number;
-  /** Points in the last 30 days. */
+  /** $ earned this week (since Monday, UTC). */
   recentPoints: number;
   role: "Owner" | "Admin" | "Member";
   claims: number;
@@ -159,6 +166,7 @@ export default async function RankingPanel({
   let assignedMap: Map<string, TeamAgentWork[]>;
   let recentPoints;
   let activeClaims;
+  let myInMotion = 0;
   let maxActiveClaims: number;
   let activeProjectId: string | null;
   try {
@@ -170,7 +178,8 @@ export default async function RankingPanel({
       select: { role: true, user: { select: { id: true, name: true, image: true } } },
     });
     const memberIds = members.map(({ user: member }) => member.id);
-    const since = teamMetricSince();
+    // The leaderboard shows $ earned this week (since Monday, UTC) beside all time.
+    const since = startOfWeekUtc();
     [standing, myTotals, ranked, targetPoints, agentsMap, recentPoints, activeClaims] = await Promise.all([
       tenantRankFor(prisma, tenantId, user.id),
       pointTotals(prisma, tenantId, user.id),
@@ -193,6 +202,17 @@ export default async function RankingPanel({
         _count: { _all: true },
       }),
     ]);
+    // Rewards on the viewer's own active claims: what is "in motion" this week.
+    const myClaims = await prisma.issueClaim.findMany({
+      where: {
+        beneficiaryUserId: user.id,
+        status: "active",
+        releasedAt: null,
+        bug: { tenantId },
+      },
+      select: { bug: { select: { reward: true } } },
+    });
+    myInMotion = myClaims.reduce((sum, claim) => sum + pointsNumber(claim.bug.reward), 0);
     // #447: assigned issues no agent has claimed, shown once per member.
     assignedMap = await teamAssignedWorkForMembers(prisma, tenantId, agentsMap);
     maxActiveClaims = activeProjectId
@@ -283,7 +303,7 @@ export default async function RankingPanel({
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <p className="max-w-xl text-sm leading-relaxed text-zk-muted">
-          Earnings for solving, reporting and reviewing issues. The goal is {money(targetPoints)}.
+          $ earned for solving, reporting and reviewing issues, this week and all time. The goal is {money(targetPoints)}.
         </p>
         <Link
           href="/points/disputes"
@@ -348,9 +368,12 @@ export default async function RankingPanel({
                       <span className="text-[13px] text-zk-muted">{entry.solvedTasks} solved</span>
                     </div>
                   </div>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-[32px] font-extrabold leading-none text-zk-text motion-safe:transition-colors group-hover:text-zk-accent">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[32px] font-extrabold leading-none text-zk-text motion-safe:transition-colors group-hover:text-zk-accent" title="Earned all time">
                       {money(entry.points)}
+                    </span>
+                    <span className="text-[13px] font-semibold text-zk-muted">
+                      {money(recentById.get(entry.userId) ?? 0)} this week · all time {money(entry.points)}
                     </span>
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -407,6 +430,7 @@ export default async function RankingPanel({
                 <div className="h-full rounded-full bg-electric-blue" style={{ width: `${myPct}%` }} />
               </div>
             </div>
+            <WeeklyPaceBar earned={recentById.get(user.id) ?? 0} inMotion={myInMotion} target={targetPoints} />
             <span className="relative text-[13px] text-[#C9D6EF]">{standingDetail}</span>
           </div>
         </div>

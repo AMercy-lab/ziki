@@ -3,7 +3,7 @@ import { award, type PointAward } from "./award";
 import { getProjectRewardConfig } from "./platform-rewards";
 import {
   calculateReporterPoints,
-  calculateSolverPoints,
+  solverReward,
   type ProjectRewardConfig,
 } from "./project-rewards";
 import { pointSourceKey } from "./rules";
@@ -36,9 +36,21 @@ export type HistoricalBug = {
   createdAt?: Date;
   isConfirmed?: boolean;
   projectId?: string | null;
+  /** #rewards: what solving it pays. */
+  reward?: number | { toNumber(): number } | null;
+  /** #live-payout: a resolution still waiting for its deployment reports pays nothing yet. */
+  heldPayout?: unknown;
+  payoutReleasedAt?: Date | null;
 };
 
-const FINISHED: ReadonlySet<Status> = new Set<Status>(["resolved", "closed"]);
+/** Solver points are earned on `resolved` only — the same eligibility the
+ * live award path (app/actions/issues.ts) and the bulk edit path
+ * (lib/points/bulk-award.ts) use. A `closed` issue may still be a duplicate,
+ * cancellation or won't-fix outcome, which must never pay a solver (#656);
+ * a genuinely completed closed ticket can be credited through a missing-award
+ * dispute, which is the audited path for that case.
+ */
+const SOLVER_ELIGIBLE: ReadonlySet<Status> = new Set<Status>(["resolved"]);
 
 export function isModernBug(bug: HistoricalBug, cutoffDate?: Date): boolean {
   if (bug.createdByAgentId) return true;
@@ -46,8 +58,10 @@ export function isModernBug(bug: HistoricalBug, cutoffDate?: Date): boolean {
   return false;
 }
 
-/** The awards a ticket earns: solver for its assignee once finished, reporter unless it's a duplicate.
- * For modern/agent-platform issues (#715), reporter points require independent confirmation.
+/** The awards a ticket earns: solver for its assignee once resolved (never for
+ * a duplicate, and not from a mere `closed` status), reporter unless it's a
+ * duplicate. For modern/agent-platform issues (#715), reporter points require
+ * independent confirmation.
  */
 export function backfillEntries(
   bug: HistoricalBug,
@@ -57,13 +71,14 @@ export function backfillEntries(
   if (bug.isDeleted) return [];
   const rewardConfig = options?.rewardConfig;
   const entries: PointAward[] = [];
-  if (FINISHED.has(bug.status) && bug.assigneeId) {
+  const payoutHeld = Array.isArray(bug.heldPayout) && bug.heldPayout.length > 0 && !bug.payoutReleasedAt;
+  if (SOLVER_ELIGIBLE.has(bug.status) && bug.assigneeId && !bug.duplicateOfId && !payoutHeld) {
     entries.push({
       tenantId: bug.tenantId,
       userId: bug.assigneeId,
       bugId: bug.id,
       role: "solver",
-      points: calculateSolverPoints(rewardConfig),
+      points: solverReward(bug.reward),
       sourceKey: pointSourceKey("solver", bug.id, bug.assigneeId),
     });
   }
@@ -140,6 +155,9 @@ export async function backfillPoints(db: Db, options: BackfillOptions = {}): Pro
         createdByAgentId: true,
         createdAt: true,
         projectId: true,
+        reward: true,
+        heldPayout: true,
+        payoutReleasedAt: true,
       },
     });
     if (bugs.length === 0) break;

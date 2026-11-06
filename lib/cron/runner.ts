@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { sweepExpiredOffers } from "@/lib/agent-api/offer";
+import { sweepStakes } from "@/lib/agent-api/stakes";
 import { sweepJobReviewOffers } from "@/lib/jobs/review";
 import { sweepStaleClaims } from "@/lib/agent-api/availability";
 import { dispatchDueDeliveries } from "@/lib/webhooks/deliver";
@@ -8,6 +9,7 @@ import { pruneAgentRows, type AgentRetentionCounts } from "@/lib/agent-retention
 import { sweepOrphanedAttachments } from "@/lib/attachment-retention";
 import { sweepOrphanedIssues } from "@/lib/orphaned-issues";
 import { sweepUndraftedIdeas } from "@/lib/cron/draft-structuring";
+import { refreshMergeQueue } from "@/lib/github/sync";
 
 export const FAILURE_ALERT_THRESHOLD = 3;
 const consecutiveFailures = new Map<string, number>();
@@ -43,6 +45,7 @@ export type PlatformSweepsResult = {
   timestamp: string;
   sweeps: {
     offers: { status: "ok" | "error"; expired?: number; error?: string };
+    stakes: { status: "ok" | "error"; settled?: number; error?: string };
     jobReviewOffers: { status: "ok" | "error"; expired?: number; offered?: number; error?: string };
     claims: { status: "ok" | "error"; released?: number; error?: string };
     orphanedIssues: { status: "ok" | "error"; reopened?: number; error?: string };
@@ -54,6 +57,7 @@ export type PlatformSweepsResult = {
       failed?: number;
       error?: string;
     };
+    githubStatus: { status: "ok" | "error"; checked?: number; moved?: number; failed?: number; error?: string };
     deliveries: { status: "ok" | "error"; processed?: number; error?: string };
     retention: {
       status: "ok" | "error";
@@ -88,10 +92,12 @@ export async function runPlatformSweeps(): Promise<PlatformSweepsResult | { skip
       timestamp,
       sweeps: {
         offers: { status: "ok" },
+        stakes: { status: "ok" },
         jobReviewOffers: { status: "ok" },
         claims: { status: "ok" },
         orphanedIssues: { status: "ok" },
         draftStructuring: { status: "ok" },
+        githubStatus: { status: "ok" },
         deliveries: { status: "ok" },
         retention: { status: "ok" },
       },
@@ -105,6 +111,16 @@ export async function runPlatformSweeps(): Promise<PlatformSweepsResult | { skip
     } catch (err) {
       recordSweepFailure("offers", err);
       result.sweeps.offers = { status: "error", error: err instanceof Error ? err.message : String(err) };
+    }
+
+    // 1a. Stakes (#stakes): drops, 10-minute wins and decided contests.
+    try {
+      const res = await sweepStakes();
+      recordSweepSuccess("stakes");
+      result.sweeps.stakes = { status: "ok", settled: res.settled };
+    } catch (err) {
+      recordSweepFailure("stakes", err);
+      result.sweeps.stakes = { status: "error", error: err instanceof Error ? err.message : String(err) };
     }
 
     // 1b. Job Review Offers
@@ -157,6 +173,16 @@ export async function runPlatformSweeps(): Promise<PlatformSweepsResult | { skip
         status: "error",
         error: err instanceof Error ? err.message : String(err),
       };
+    }
+
+    // 3. GitHub status (#github-status): re-read the pull requests waiting to merge.
+    try {
+      const res = await refreshMergeQueue();
+      recordSweepSuccess("githubStatus");
+      result.sweeps.githubStatus = { status: "ok", ...res };
+    } catch (err) {
+      recordSweepFailure("githubStatus", err);
+      result.sweeps.githubStatus = { status: "error", error: err instanceof Error ? err.message : String(err) };
     }
 
     // 4. Webhook Deliveries

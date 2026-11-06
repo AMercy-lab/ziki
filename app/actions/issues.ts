@@ -9,7 +9,6 @@ import {
   areaChangedSummary,
   assigneeChangedSummary,
   boostedSummary,
-  categoryChangedSummary,
   commentedSummary,
   commentPreview,
   deletedSummary,
@@ -32,6 +31,7 @@ import {
   normalizeMentions,
 } from "@/lib/mentions";
 import { resolveTenantMentions, tenantMemberWhere } from "@/lib/tenant-mentions";
+import { structureIdea } from "@/lib/idea-structuring";
 import {
   commentSchema,
   createBugSchema,
@@ -81,7 +81,8 @@ import {
   NO_TENANT_MESSAGE,
 } from "@/lib/tenant-context";
 import { currentTenantAccess } from "@/lib/tenant-access";
-import { award, awardSolver } from "@/lib/points/award";
+import { award, solverAwardFor } from "@/lib/points/award";
+import { holdPayout } from "@/lib/points/payout";
 import { isConfirmed } from "@/lib/agent-api/confirmations";
 import { correct } from "@/lib/points/correct";
 import { VOTE_POINTS, importanceSourceKey, pointSourceKey } from "@/lib/points/rules";
@@ -103,7 +104,7 @@ import {
   mentionedAgents,
   type MentionedAgent,
 } from "@/lib/agent-mentions";
-import { ideaPath } from "@/lib/project-paths";
+import { ideaPath, refOf } from "@/lib/project-paths";
 import { ENTRY_SUBSTATUS, moveTo } from "@/lib/issue-substatus";
 
 export type ActionResult = {
@@ -221,7 +222,6 @@ export async function createBugAction(
     description: formData.get("description"),
     typeId: formData.get("typeId") || "",
     assigneeId: "",
-    categoryId: formData.get("categoryId") || "",
     areaId: formData.get("areaId") || "",
     proofLinks: formData.get("proofLinks") || "",
   });
@@ -240,7 +240,7 @@ export async function createBugAction(
   // #project-urls: the project the form was opened in, and only if it is in this workspace.
   const requestedProjectId = typeof formData.get("projectId") === "string" ? String(formData.get("projectId")) : "";
   const targetProject = tenantId && requestedProjectId
-    ? await prisma.project.findFirst({ where: { id: requestedProjectId, tenantId, archivedAt: null }, select: { id: true, slug: true } })
+    ? await prisma.project.findFirst({ where: { id: requestedProjectId, tenantId, archivedAt: null }, select: { id: true, slug: true, tenant: { select: { slug: true } } } })
     : null;
   if (!tenantId || !targetProject) {
     return { error: NO_TENANT_MESSAGE };
@@ -258,25 +258,15 @@ export async function createBugAction(
     }
   }
 
-  const categoryId =
-    parsed.data.categoryId && parsed.data.categoryId.length > 0
-      ? parsed.data.categoryId
-      : null;
   const areaId = parsed.data.areaId && parsed.data.areaId.length > 0
     ? parsed.data.areaId
     : null;
+  // #idea-intake: Claude writes what they typed up as a clear idea (title and the standard
+  // headings) before it is saved. Without the key, or if that fails, it is saved as typed.
+  const structured = await structureIdea({ title: parsed.data.title, description: parsed.data.description });
+  const ideaTitle = structured?.title ?? parsed.data.title;
   // #502: mentions resolve only to members of the idea's tenant.
-  const description = await resolveTenantMentions(prisma, tenantId, parsed.data.description);
-
-  if (categoryId) {
-    const category = await prisma.category.findFirst({
-      where: { id: categoryId, tenantId, isActive: true },
-      select: { id: true },
-    });
-    if (!category) {
-      return fieldError("categoryId", "Platform not found or inactive");
-    }
-  }
+  const description = await resolveTenantMentions(prisma, tenantId, structured?.description ?? parsed.data.description);
 
   if (areaId) {
     const area = await prisma.projectArea.findFirst({
@@ -295,11 +285,10 @@ export async function createBugAction(
           projectId,
           beneficiaryUserId: userId,
           reporterId: userId,
-          title: parsed.data.title,
+          title: ideaTitle,
           description,
           typeId,
           proofLinks: parsed.data.proofLinks,
-          categoryId,
           areaId,
         },
         select: { id: true, number: true },
@@ -339,8 +328,8 @@ export async function createBugAction(
     throw error;
   }
 
-  revalidatePath("/[project]", "layout");
-  redirect(ideaPath(targetProject.slug, idea.number));
+  revalidatePath("/[org]/[project]", "layout");
+  redirect(ideaPath(refOf(targetProject), idea.number));
 }
 
 /** Updates status (assignee/admin) and type/assignee (admin) and logs activity. */
@@ -358,7 +347,6 @@ export async function updateBugAction(
     where: { id: bugId, ...bugInTenant(tenantId) },
     include: {
       assignee: { select: { id: true, name: true } },
-      category: { select: { id: true, name: true } },
       area: { select: { id: true, name: true } },
       type: { select: { id: true, name: true } },
       milestone: { select: { id: true, title: true } },
@@ -424,7 +412,6 @@ export async function updateBugAction(
     }
   }
 
-  const categoryRaw = formData.get("categoryId");
   const areaRaw = formData.get("areaId");
   const typeRaw = formData.get("typeId");
   const parsed = updateBugSchema.safeParse({
@@ -435,11 +422,6 @@ export async function updateBugAction(
         : typeRaw || undefined
       : undefined,
     assigneeId: targetAssigneeId,
-    categoryId: admin
-      ? categoryRaw === "" || categoryRaw === "none"
-        ? null
-        : categoryRaw || undefined
-      : undefined,
     areaId: admin
       ? areaRaw === "" || areaRaw === "none"
         ? null
@@ -488,7 +470,6 @@ export async function updateBugAction(
     substatus?: Substatus;
     typeId?: string | null;
     assigneeId?: string | null;
-    categoryId?: string | null;
     areaId?: string | null;
     milestoneId?: string | null;
     isBoosted?: boolean;
@@ -499,10 +480,6 @@ export async function updateBugAction(
   if (admin) {
     if (parsed.data.typeId !== undefined) {
       data.typeId = parsed.data.typeId === "" ? null : parsed.data.typeId;
-    }
-    if (parsed.data.categoryId !== undefined) {
-      data.categoryId =
-        parsed.data.categoryId === "" ? null : parsed.data.categoryId;
     }
     if (parsed.data.areaId !== undefined) {
       data.areaId = parsed.data.areaId === "" ? null : parsed.data.areaId;
@@ -597,40 +574,6 @@ export async function updateBugAction(
         to: toName,
       },
     });
-  }
-
-  if (
-    data.categoryId !== undefined &&
-    data.categoryId !== existing.categoryId
-  ) {
-    let toName: string | null = null;
-    if (data.categoryId) {
-      const cat = await prisma.category.findFirst({
-        where: { id: data.categoryId, tenantId: existing.tenantId },
-        select: { id: true, name: true },
-      });
-      if (!cat) {
-        return { error: "Platform not found" };
-      }
-      toName = cat.name;
-    }
-    pending.push({
-      type: "category_changed",
-      summary: categoryChangedSummary(existing.category?.name ?? null, toName),
-      metadata: {
-        field: "category",
-        from: existing.category?.name ?? null,
-        to: toName,
-      },
-    });
-  } else if (data.categoryId) {
-    const cat = await prisma.category.findFirst({
-      where: { id: data.categoryId, tenantId: existing.tenantId },
-      select: { id: true },
-    });
-    if (!cat) {
-      return { error: "Platform not found" };
-    }
   }
 
   if (data.areaId !== undefined) {
@@ -793,15 +736,15 @@ export async function updateBugAction(
           }
         }
       }
-      // #428: resolving an issue earns its assignee solver points, once.
+      // #428, #rewards: resolving an issue earns its assignee the issue's reward, once,
+      // held until enough people report the work deployed (#live-payout).
       if (data.status === "resolved" && existing.status !== "resolved") {
-        await awardSolver(tx, {
+        const solver = await solverAwardFor(tx, {
           id: bugId,
           tenantId: existing.tenantId,
-          projectId: existing.projectId,
-          pullRequestUrl: existing.pullRequestUrl,
           assigneeId: data.assigneeId !== undefined ? data.assigneeId : existing.assigneeId,
         });
+        if (solver) await holdPayout(tx, bugId, [solver]);
       }
       if (pending.length > 0) {
         await tx.bugActivity.createMany({
@@ -848,7 +791,7 @@ export async function updateBugAction(
   }
   if (events.length > 0) notifyLater(...events);
 
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -937,7 +880,7 @@ export async function reopenAgentResolvedAction(bugId: string): Promise<ActionRe
   });
   if (!reopened) return { error: "The issue's status changed meanwhile. Refresh and try again." };
 
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -1136,7 +1079,7 @@ export async function editBugContentAction(
     });
   }
 
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -1261,7 +1204,7 @@ export async function editProofLinksAction(
     }
   });
 
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -1416,7 +1359,7 @@ export async function addCommentAction(
   });
   notifyLater(...events);
 
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -1530,7 +1473,7 @@ export async function toggleVoteAction(
     };
   });
 
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -1603,7 +1546,7 @@ export async function deleteBugAction(bugId: string): Promise<ActionResult> {
     return { error: TICKET_DELETION_ERRORS.failed };
   }
 
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -1682,7 +1625,7 @@ export async function restoreBugAction(bugId: string): Promise<ActionResult> {
     return { error: TICKET_DELETION_ERRORS.failedRestore };
   }
 
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -1753,7 +1696,7 @@ export async function toggleBoostBugAction(
     return { error: TICKET_BOOST_ERRORS.failed };
   }
 
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   revalidateIssue();
   revalidatePath("/bugs");
   revalidatePath(`/bugs/${bugId}`);
@@ -1875,7 +1818,7 @@ export async function selfAssignBugAction(
   });
 
   revalidateIssue();
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   revalidatePath(`/bugs/${bugId}`);
   revalidatePath("/bugs");
   return { ok: true };

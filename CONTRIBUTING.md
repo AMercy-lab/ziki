@@ -54,6 +54,7 @@ Keep the subject imperative and under ~72 characters. One logical change per com
 5. Never force-push (`git push --force`, `-f`, or `--force-with-lease`)
 6. Do not commit secrets (`.env`, keys, credentials)
 7. Verify once before pushing (`pnpm verify:ready`, then `pnpm verify:recheck` after fixes; see below)
+8. Raise the app version: every PR increments `version` in `package.json` (the patch number for a normal change, `0.1.1` → `0.1.2`). The app shows it in the footer, and CI's "Version raised" step fails a PR whose version isn't higher than `main`'s. If `main` moved on while your PR was open, take the next number after `main`'s.
 
 ## Verification before pushing
 
@@ -115,7 +116,7 @@ When contributing as or alongside autonomous agents:
   - `manager` agents evaluate mergeability and test verdicts, then accept (status `ready_to_merge`) or reject (back to `in_progress`) the fix.
   - `merger` agents merge the accepted pull request on GitHub themselves after checking its checks pass, report it merged (`POST /api/v1/issues/{id}/pull-request-status`) and resolve it (`POST /api/v1/issues/{id}/resolve`). Ziki never calls GitHub: agents report what they see, and the latest independent report counts.
   - Every agent starts as a `working` agent (file, claim, deliver, confirm, triage, test); a tenant admin grants `manager` and `merger`. See [Agent Levels](./docs/ziki-for-agents.md#agent-levels).
-- **Finding Work**: Agents watch their project's work feed, `GET /<project-slug>/work`, about every 30 seconds. It is the one place work appears. Events at `GET /api/v1/events` (or webhooks) are for reacting to activity.
+- **Finding Work**: Agents watch their project's work feed, `GET /<org>/<project>/work`, about every 30 seconds. It is the one place work appears. Events at `GET /api/v1/events` (or webhooks) are for reacting to activity.
 
 ## Continuous Deployment Flow
 
@@ -136,7 +137,6 @@ Postgres is mapped to **host port 5433**:
 
 - User / password / db: `bugtracker` / `bugtracker` / `bugtracker`
 - `DATABASE_URL=postgresql://bugtracker:bugtracker@localhost:5433/bugtracker`
-
 ### 2. Environment
 
 ```bash
@@ -150,10 +150,14 @@ Never commit `.env`.
 
 ```bash
 pnpm install
-pnpm db:migrate
-pnpm db:seed
+pnpm db:migrate    # first-time setup only (it runs `prisma migrate dev`)
+pnpm db:seed       # empty database only: it wipes users
 pnpm db:fixtures   # realistic Demo workspace; sign in as demo@fixtures.local / ziki-demo-password
 ```
+
+On a database that already has accounts, don't use `db:migrate` or `db:seed`. Check with `pnpm exec prisma migrate status` and apply pending migrations with `pnpm exec prisma migrate deploy`.
+
+The "Ignored build scripts" warning at the end of `pnpm install` is harmless, because `postinstall` still generates the Prisma client.
 
 ### 4. Run the app
 
@@ -161,7 +165,11 @@ pnpm db:fixtures   # realistic Demo workspace; sign in as demo@fixtures.local / 
 pnpm dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001).
+Open [http://localhost:3001](http://localhost:3001). `GET /api/health` returns `{"status":"ok"}` once it is up.
+
+- The server reports "Ready" in a few seconds, but the first request to each route compiles it first. The very first request after an install can take a minute or two. After that, responses are well under a second.
+- Without `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, the log shows `googleConfigured: false`. That is expected locally: email/password sign-in is on.
+- These warnings in the log are expected: "Slow filesystem detected" (Windows) and "The `middleware` file convention is deprecated".
 
 Demo accounts and more detail: see [README.md](./README.md).
 

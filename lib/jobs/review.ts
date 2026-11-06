@@ -35,7 +35,8 @@ export type JobForReview = {
   id: string;
   tenantId: string;
   projectId: string;
-  pointsPerAccepted: number;
+  /** $ per accepted row; the database's Decimal or a number. */
+  pointsPerAccepted: number | { toNumber(): number };
 };
 
 export type SubmissionForReview = {
@@ -379,6 +380,17 @@ export async function reviewJobSubmission(
   const parsed = jobReviewSchema.parse(input);
 
   const result = await prisma.$transaction(async (tx) => {
+    // Serialize verdicts for this row. Under READ COMMITTED a second reviewer
+    // must wait for the first transaction to commit before counting accepts;
+    // otherwise both transactions can miss each other's uncommitted review and
+    // leave a fully reviewed submission pending forever.
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "JobSubmission" WHERE "id" = ${submissionId} FOR UPDATE
+    `;
+    if (!locked.length) {
+      throw new IssueApiError(404, "Submission not found.");
+    }
+
     const submission = await tx.jobSubmission.findUnique({
       where: { id: submissionId },
       include: { job: { select: { id: true, tenantId: true, projectId: true, pointsPerAccepted: true } } },
@@ -451,10 +463,10 @@ export async function reviewJobSubmission(
           userId: submission.beneficiaryUserId,
           bugId: null,
           role: "submission",
-          points: submission.job.pointsPerAccepted,
+          points: Number(submission.job.pointsPerAccepted),
           sourceKey: jobSubmissionSourceKey(submission.job.id, submission.id),
         });
-        if (written) pointsAwarded = submission.job.pointsPerAccepted;
+        if (written) pointsAwarded = Number(submission.job.pointsPerAccepted);
       }
     }
 

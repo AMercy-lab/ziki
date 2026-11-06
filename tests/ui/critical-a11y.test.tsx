@@ -2,13 +2,20 @@
 "use client";
 
 import axe from "axe-core";
-import { cleanup, render } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { labelInNameMismatches } from "@/lib/a11y/label-in-name";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { EntryReplyForm } from "@/components/entry-reply-form";
 import { CreateBugForm } from "@/components/create-issue-form";
 import { UserSearch } from "@/components/user-search";
 import { VoteButton } from "@/components/vote-button";
+import { WebhookManagement } from "@/components/webhook-management";
+import { createWebhookAction, listWebhooksAction } from "@/app/actions/webhooks";
+import { OnScreenGuide } from "@/components/support-guide/on-screen-guide";
+import { getPageGuidance, searchSupportAnswers } from "@/components/support-guide/support-guide-data";
+import { projectRef } from "@/lib/project-paths";
 
 vi.mock("@/app/actions/issues", () => ({
   addCommentAction: vi.fn(),
@@ -24,10 +31,18 @@ vi.mock("@/app/(app)/questions/actions", () => ({
   answerQuestionAction: vi.fn(),
 }));
 
+vi.mock("@/app/actions/webhooks", () => ({
+  createWebhookAction: vi.fn(),
+  deleteWebhookAction: vi.fn(),
+  listWebhooksAction: vi.fn(),
+  reEnableWebhookAction: vi.fn(),
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
   useParams: () => ({ project: "acme" }),
+  usePathname: () => "/",
 }));
 
 beforeAll(() => {
@@ -89,9 +104,8 @@ describe("component accessibility (axe)", () => {
 
   it("CreateBugForm has no violations", async () => {
     const { container } = render(
-      <CreateBugForm projectSlug="acme"
+      <CreateBugForm projectSlug={projectRef("zedu", "acme")}
         users={users}
-        categories={[{ id: "c1", name: "macOS" }]}
         types={[{ id: "t1", name: "Bug" }]}
         isAdmin
       />,
@@ -101,9 +115,8 @@ describe("component accessibility (axe)", () => {
 
   it("CreateBugForm quick report in the modal has no violations (#report-modal)", async () => {
     const { container } = render(
-      <CreateBugForm projectSlug="acme"
+      <CreateBugForm projectSlug={projectRef("zedu", "acme")}
         users={users}
-        categories={[{ id: "c1", name: "macOS" }]}
         types={[{ id: "t1", name: "Bug" }]}
         isAdmin={false}
         currentUserId="u1"
@@ -117,6 +130,138 @@ describe("component accessibility (axe)", () => {
   it("UserSearch has no violations", async () => {
     const { container } = render(<UserSearch />);
     await expectNoA11yViolations(container);
+  });
+
+  it("keeps the signing-secret dialog modal and restores focus when it closes", async () => {
+    const originalShowModal = Object.getOwnPropertyDescriptor(
+      HTMLDialogElement.prototype,
+      "showModal",
+    );
+    const originalClose = Object.getOwnPropertyDescriptor(
+      HTMLDialogElement.prototype,
+      "close",
+    );
+    let previousFocus: HTMLElement | null = null;
+    Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
+      configurable: true,
+      value(this: HTMLDialogElement) {
+        previousFocus = document.activeElement as HTMLElement | null;
+        this.setAttribute("open", "");
+        this.querySelector<HTMLElement>("button")?.focus();
+      },
+    });
+    Object.defineProperty(HTMLDialogElement.prototype, "close", {
+      configurable: true,
+      value(this: HTMLDialogElement) {
+        this.removeAttribute("open");
+        this.dispatchEvent(new Event("close"));
+        previousFocus?.focus();
+      },
+    });
+
+    try {
+      vi.mocked(listWebhooksAction).mockResolvedValue({
+        ok: true,
+        subscriptions: [],
+        agents: [{ id: "agent-1", name: "Test agent", avatar: null }],
+      });
+      vi.mocked(createWebhookAction).mockResolvedValue({
+        ok: true,
+        secret: "secret-for-test",
+        subscription: {
+          id: "webhook-1",
+          url: "https://example.test/hooks/ziki",
+          enabled: true,
+          failureCount: 0,
+          disabledAt: null,
+          createdAt: new Date(),
+          lastError: null,
+          lastErrorAt: null,
+          lastDeliveredAt: null,
+          agent: { id: "agent-1", name: "Test agent", avatar: null },
+        },
+      });
+
+      const user = userEvent.setup();
+      render(<WebhookManagement />);
+      await user.click(await screen.findByRole("radio", { name: "Test agent" }));
+      await user.type(
+        screen.getByRole("textbox", { name: "HTTPS endpoint URL" }),
+        "https://example.test/hooks/ziki",
+      );
+      await user.click(screen.getByRole("button", { name: "Add webhook" }));
+
+      const dialog = await screen.findByRole("dialog", {
+        name: "Copy your signing secret now",
+      });
+      expect(dialog).toHaveAttribute("open");
+      expect(dialog.contains(document.activeElement)).toBe(true);
+
+      fireEvent(dialog, new Event("cancel", { bubbles: true, cancelable: true }));
+      await waitFor(() => expect(dialog).not.toBeInTheDocument());
+      expect(document.activeElement).toBe(
+        screen.getByRole("textbox", { name: "HTTPS endpoint URL" }),
+      );
+    } finally {
+      if (originalShowModal) {
+        Object.defineProperty(HTMLDialogElement.prototype, "showModal", originalShowModal);
+      } else {
+        delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>).showModal;
+      }
+      if (originalClose) {
+        Object.defineProperty(HTMLDialogElement.prototype, "close", originalClose);
+      } else {
+        delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>).close;
+      }
+    }
+  });
+
+  describe("Customer Support Guide", () => {
+    it("resolves route context guidance for homepage, issues, ideas, and tickets", () => {
+      const home = getPageGuidance("/");
+      expect(home.contextKey).toBe("home");
+      expect(home.pageName).toContain("Homepage");
+
+      const issues = getPageGuidance("/acme/issues");
+      expect(issues.contextKey).toBe("issues");
+      expect(issues.pageName).toContain("Issues");
+
+      const ideas = getPageGuidance("/acme/ideas");
+      expect(ideas.contextKey).toBe("ideas");
+      expect(ideas.pageName).toContain("Ideas");
+
+      const ticket = getPageGuidance("/acme/123");
+      expect(ticket.contextKey).toBe("issue-detail");
+    });
+
+    it("answers user questions about agents, issues, your call, and feeling lost", () => {
+      expect(searchSupportAnswers("I feel lost where do I start?").text).toContain("Ziki is designed for humans");
+      expect(searchSupportAnswers("What are agents doing?").text).toContain("Autonomous agents in Ziki");
+      expect(searchSupportAnswers("What does Your Call mean?").text).toContain("Your Call");
+      expect(searchSupportAnswers("How do points and rewards work?").text).toContain("Rewards in Ziki");
+    });
+
+    it("returns direct page navigation shortcuts for page queries", () => {
+      const issuesNav = searchSupportAnswers("take me to issues", projectRef("demo", "demo"));
+      expect(issuesNav.actions).toBeDefined();
+      expect(issuesNav.actions?.[0].href).toBe("/demo/demo/issues/all");
+
+      const ideasNav = searchSupportAnswers("take me to ideas", projectRef("demo", "demo"));
+      expect(ideasNav.actions).toBeDefined();
+      expect(ideasNav.actions?.[0].href).toBe("/demo/demo/ideas");
+    });
+
+    it("renders the support guide with accessible ARIA label and toggle button", async () => {
+      render(<OnScreenGuide />);
+      const guide = screen.getByRole("complementary", { name: "Customer Support Guide" });
+      expect(guide).toBeInTheDocument();
+
+      const toggleBtn = screen.getByRole("button", { name: "Toggle Ziki Customer Support Guide" });
+      expect(toggleBtn).toBeInTheDocument();
+
+      fireEvent.click(toggleBtn);
+      expect(screen.getAllByText(/Ziki Support Guide/i).length).toBeGreaterThanOrEqual(1);
+    });
   });
 
 });
