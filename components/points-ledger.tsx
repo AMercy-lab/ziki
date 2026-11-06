@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useMemo } from "react";
 import { LocalTime } from "@/components/local-time";
 import type { PointEntriesPage } from "@/lib/points/entries";
-import { formatPoints } from "@/lib/points/rules";
+import { formatPoints, formatPointsAsDollars } from "@/lib/points/rules";
 import {
   type DetailedPointEntry,
   type PointLedgerSummary,
@@ -139,7 +139,7 @@ export function PointsLedger({
             Itemized Points Ledger
           </h2>
           <p className="mt-0.5 text-xs text-zk-text2">
-            Your workspace ledger showing verified task bounties, review rewards, and adjustments.
+            Your workspace ledger showing verified task bounties, review rewards, and adjustments (100 pts = $1.00).
           </p>
         </div>
         <Link
@@ -161,6 +161,9 @@ export function PointsLedger({
             +{formatPoints(summary.totalEarned)}{" "}
             <span className="text-xs font-normal text-zk-muted">pts</span>
           </p>
+          <span className="text-xs font-medium text-zk-text2 tabular-nums">
+            {formatPointsAsDollars(summary.totalEarned)}
+          </span>
         </div>
         <div className="rounded-xl border border-zk-border bg-zk-chip/40 p-3">
           <span className="text-2xs font-semibold uppercase tracking-wider text-zk-muted">
@@ -170,6 +173,9 @@ export function PointsLedger({
             {summary.totalDeductions > 0 ? `-${formatPoints(summary.totalDeductions)}` : "0"}{" "}
             <span className="text-xs font-normal text-zk-muted">pts</span>
           </p>
+          <span className="text-xs font-medium text-zk-text2 tabular-nums">
+            {summary.totalDeductions > 0 ? `-${formatPointsAsDollars(summary.totalDeductions)}` : "$0.00"}
+          </span>
         </div>
         <div className="col-span-2 rounded-xl border border-zk-border bg-zk-chip/40 p-3 sm:col-span-1">
           <span className="text-2xs font-semibold uppercase tracking-wider text-zk-muted">
@@ -179,6 +185,9 @@ export function PointsLedger({
             {formatPoints(summary.netPoints)}{" "}
             <span className="text-xs font-normal text-zk-muted">pts</span>
           </p>
+          <span className="text-xs font-medium text-zk-text2 tabular-nums">
+            {formatPointsAsDollars(summary.netPoints)}
+          </span>
         </div>
       </div>
 
@@ -332,7 +341,7 @@ export function PointsLedger({
                 {/* Right: Point Value & Dispute Action */}
                 <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
                   <div className="text-right">
-                    <span
+                    <div
                       className={`text-base font-bold tabular-nums ${
                         isNegative
                           ? "text-rose-600 dark:text-rose-400"
@@ -340,8 +349,11 @@ export function PointsLedger({
                       }`}
                     >
                       {isNegative ? formatPoints(entry.points) : `+${formatPoints(entry.points)}`}
-                    </span>
-                    <span className="ml-1 text-xs font-normal text-zk-muted">pts</span>
+                      <span className="ml-1 text-xs font-normal text-zk-muted">pts</span>
+                    </div>
+                    <div className="text-xs text-zk-muted tabular-nums">
+                      {formatPointsAsDollars(entry.points)}
+                    </div>
                   </div>
 
                   {canDispute && entry.issue && !isCorrected && !activeDispute ? (
