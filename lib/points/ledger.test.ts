@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "@prisma/client";
 import { getDetailedPointLedger, pointRoleDescription } from "./ledger";
 
 describe("lib/points/ledger", () => {
@@ -69,10 +70,13 @@ describe("lib/points/ledger", () => {
       },
     };
 
-    const res = await getDetailedPointLedger(mockDb as any, {
-      tenantId: "tenant-1",
-      userId: "user-1",
-    });
+    const res = await getDetailedPointLedger(
+      mockDb as unknown as PrismaClient,
+      {
+        tenantId: "tenant-1",
+        userId: "user-1",
+      },
+    );
 
     expect(res.entries).toHaveLength(2);
     expect(res.summary.totalEarned).toBe(40);
