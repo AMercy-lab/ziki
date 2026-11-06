@@ -6,7 +6,7 @@ import { reviewerConflict, ReviewerNotIndependentError } from "@/lib/agents/inde
 import { publish } from "@/lib/agent-api/events";
 import { notifyMergeFailed } from "@/lib/agent-notifications";
 import { issueIdFor } from "@/lib/issue-ref";
-import { pullRequestReportSchema } from "@/lib/validations/pull-request-report";
+import { pullRequestReportSchema, checkRunsSchema, pullRequestChecksSummary, type PullRequestCheck } from "@/lib/validations/pull-request-report";
 import type { GateReport } from "@/lib/agent-api/pr-gate";
 import { moveTo } from "@/lib/issue-substatus";
 import { statusChangedSummary } from "@/lib/activity-log";
@@ -38,6 +38,7 @@ export const reportSelect = {
   headSha: true,
   mergeCommitSha: true,
   checks: true,
+  checkRuns: true,
   mergeable: true,
   note: true,
   agentId: true,
@@ -81,8 +82,7 @@ export async function latestPullRequestReports(
 }
 
 /** A stored report as the gate reads it. */
-export function gateReport(report: StoredPullRequestReport | null | undefined): GateReport | null {
-  if (!report) return null;
+export function gateReport(report: StoredPullRequestReport | null | undefined): GateReport | null {  if (!report) return null;
   return {
     pullRequestUrl: report.pullRequestUrl,
     state: report.state,
@@ -92,6 +92,17 @@ export function gateReport(report: StoredPullRequestReport | null | undefined): 
     checks: report.checks,
     mergeable: report.mergeable,
   };
+}
+
+/**
+ * The checks stored on a report, or null when it carries only the summary.
+ * Anything unrecognisable reads as no detail rather than as a pass (#pr-checks):
+ * the card then falls back to `checks`, which is what the gate already trusts.
+ */
+export function storedCheckRuns(value: unknown): PullRequestCheck[] | null {
+  if (!Array.isArray(value)) return null;
+  const parsed = checkRunsSchema.safeParse(value);
+  return parsed.success && parsed.data.length ? parsed.data : null;
 }
 
 /** A report as the API shows it: what was seen, who saw it and how long ago. */
@@ -104,6 +115,8 @@ export type PullRequestStateView = {
   headSha: string | null;
   mergeCommitSha: string | null;
   checks: string | null;
+  /** Each check by name, when the reporter sent them (#pr-checks). */
+  checkRuns: PullRequestCheck[] | null;
   mergeable: boolean | null;
   note: string;
   reportedAt: Date;
@@ -123,6 +136,7 @@ export function pullRequestStateView(report: StoredPullRequestReport | null | un
     headSha: report.headSha,
     mergeCommitSha: report.mergeCommitSha,
     checks: report.checks,
+    checkRuns: storedCheckRuns(report.checkRuns),
     mergeable: report.mergeable,
     note: report.note,
     reportedAt: report.createdAt,
@@ -200,6 +214,18 @@ export async function reportPullRequestStatus(
   }
   const body = parsed.data;
 
+  // #pr-checks: the per-check detail decides the summary. Sent together, they
+  // must agree, so a report can never say "passing" next to a failed check.
+  const reportedChecks = body.checkRuns ? pullRequestChecksSummary(body.checkRuns) : body.checks;
+  if (body.checkRuns && body.checks && body.checks !== reportedChecks) {
+    return fail(
+      400,
+      "checks_mismatch",
+      `checks "${body.checks}" does not match checkRuns, which amount to "${reportedChecks}". Send one, or both in agreement.`,
+      "checks",
+    );
+  }
+
   const bugId = await issueIdFor(prisma, issueRef, scope.tenantId);
   if (!bugId) return fail(404, "not_found", "No such issue in this project.");
   const bug = await prisma.bug.findFirst({
@@ -252,7 +278,8 @@ export async function reportPullRequestStatus(
         inDefaultBranch: body.inDefaultBranch ?? null,
         headSha: body.headSha ?? null,
         mergeCommitSha: body.mergeCommitSha ?? null,
-        checks: body.checks ?? null,
+        checks: reportedChecks ?? null,
+        checkRuns: body.checkRuns ? (body.checkRuns as unknown as Prisma.InputJsonValue) : undefined,
         mergeable: body.mergeable ?? null,
         note: body.note,
         agentId: agent.agentId,
@@ -264,7 +291,7 @@ export async function reportPullRequestStatus(
       await tx.bug.updateMany({ where: { id: bug.id, pullRequestUrl }, data: { pullRequestHeadSha: body.headSha } });
     }
     // In Merge, the latest report decides Ready to merge or Error (#substatus).
-    const mergeStep = bug.status === "merge" ? mergeSubstatusFor(body) : null;
+    const mergeStep = bug.status === "merge" ? mergeSubstatusFor({ ...body, checks: reportedChecks }) : null;
     if (mergeStep && mergeStep !== bug.substatus) {
       const moved = await tx.bug.updateMany({ where: { id: bug.id, status: "merge", pullRequestUrl }, data: moveTo(mergeStep) });
       if (moved.count) {
@@ -289,7 +316,7 @@ export async function reportPullRequestStatus(
       inDefaultBranch: body.inDefaultBranch ?? null,
       headSha: body.headSha ?? null,
       mergeCommitSha: body.mergeCommitSha ?? null,
-      checks: body.checks ?? null,
+      checks: reportedChecks ?? null,
       mergeable: body.mergeable ?? null,
       note: body.note,
       ...(mergeStep && mergeStep !== bug.substatus ? { substatus: { from: bug.substatus, to: mergeStep } } : {}),

@@ -16,6 +16,73 @@ const branch = z.string().trim().min(1).max(255);
 export const PULL_REQUEST_STATES = ["open", "closed", "merged", "not_found"] as const;
 export const PULL_REQUEST_CHECKS = ["passing", "failing", "pending", "none"] as const;
 
+/**
+ * The state of one check on the pull request's head commit (#pr-checks). Every
+ * conclusion GitHub reports has a home here, plus `unavailable` for a check the
+ * agent could not read (a private repository it has no access to, a check that
+ * was never run): unavailable is never shown as a pass.
+ */
+export const PULL_REQUEST_CHECK_STATUSES = [
+  "passed",
+  "failed",
+  "pending",
+  "cancelled",
+  "skipped",
+  "neutral",
+  "unavailable",
+] as const;
+
+export type PullRequestCheckStatus = (typeof PULL_REQUEST_CHECK_STATUSES)[number];
+export type PullRequestChecks = (typeof PULL_REQUEST_CHECKS)[number];
+
+/** One check on the head commit: its name, what it did, and where to look. */
+export type PullRequestCheck = {
+  name: string;
+  status: PullRequestCheckStatus;
+  /** The check run or workflow on GitHub. */
+  url?: string;
+  /** One line of failure context, when GitHub gives the agent any. */
+  summary?: string;
+};
+
+/** More than this is a list, not a status: the note carries the rest. */
+export const PULL_REQUEST_CHECK_RUNS_MAX = 100;
+
+/** An https:// link only: the card renders it as an anchor. */
+const checkUrl = z
+  .string()
+  .trim()
+  .max(2048)
+  .refine((value) => /^https:\/\/\S+$/i.test(value), "Send the check's https:// link.");
+
+const checkRunSchema = z
+  .object({
+    name: z.string().trim().min(1, "Name the check.").max(120),
+    status: z.enum(PULL_REQUEST_CHECK_STATUSES),
+    url: checkUrl.optional(),
+    summary: z.string().trim().max(280).optional(),
+  })
+  .strict();
+
+/** The checks on the head commit, in the order GitHub lists them. */
+export const checkRunsSchema = z
+  .array(checkRunSchema)
+  .max(PULL_REQUEST_CHECK_RUNS_MAX, `Send at most ${PULL_REQUEST_CHECK_RUNS_MAX} checks; put the rest in the note.`);
+
+/**
+ * What a set of checks amounts to in the words `checks` uses. A failed check is
+ * `failing`; so is a cancelled one, because it never proved the commit and will
+ * not finish without a re-run. Then anything still running is `pending`, no
+ * checks at all is `none`, and everything else `passing`. Skipped and neutral
+ * checks do not hold a merge up, so they leave the summary as they find it.
+ */
+export function pullRequestChecksSummary(checkRuns: readonly { status: PullRequestCheckStatus }[]): PullRequestChecks {
+  if (!checkRuns.length) return "none";
+  if (checkRuns.some((check) => check.status === "failed" || check.status === "cancelled")) return "failing";
+  if (checkRuns.some((check) => check.status === "pending")) return "pending";
+  return "passing";
+}
+
 export const pullRequestReportSchema = z
   .object({
     /** The pull request checked: must be the issue's linked one. */
@@ -32,6 +99,12 @@ export const pullRequestReportSchema = z
     mergeCommitSha: sha.optional(),
     /** Every check, status and deployment on the head commit: all passing, any failing, any still running, or none at all. */
     checks: z.enum(PULL_REQUEST_CHECKS).optional(),
+    /**
+     * The same checks one by one, by name (#pr-checks), so the issue can say
+     * which failed. Send this and `checks` may be left out: Ziki works the
+     * summary out from it. Send both and they must agree.
+     */
+    checkRuns: checkRunsSchema.optional(),
     /** False when GitHub says it conflicts with its base branch. */
     mergeable: z.boolean().optional(),
     /** What you saw, in a sentence or two. */

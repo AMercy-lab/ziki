@@ -1624,6 +1624,10 @@ model PullRequestReport {
   mergeCommitSha   String?
   /// "passing", "failing", "pending" or "none" (no checks run on it).
   checks           String?
+  /// Each check on the head commit as a list, by name: which failed, which are
+  /// still running (["name","status","url?","summary?"]). Null when the agent
+  /// sent only the summary in `checks`.
+  checkRuns        Json?
   /// False when GitHub says it conflicts with its base branch.
   mergeable        Boolean?
   /// What the agent saw, in its own words.
