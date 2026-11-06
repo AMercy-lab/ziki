@@ -29,14 +29,14 @@ export function HeartbeatReopenAlert({
 }) {
   const router = useRouter();
   const toast = useToast();
-  const [isWatching, setIsWatching] = useState(initiallyWatching);
+  const isWatching = initiallyWatching;
   const [now, setNow] = useState(0);
   const [pending, startTransition] = useTransition();
   const deadline = releaseAt ? new Date(releaseAt).getTime() : null;
   const expired = !paused && deadline !== null && now >= deadline;
 
   useEffect(() => {
-    setNow(Date.now());
+    const initialTick = window.setTimeout(() => setNow(Date.now()), 0);
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     let refreshInterval: number | undefined;
     let refreshTimeout: number | undefined;
@@ -53,23 +53,22 @@ export function HeartbeatReopenAlert({
       refreshInterval = window.setInterval(() => router.refresh(), 60_000);
     }
     return () => {
+      window.clearTimeout(initialTick);
       window.clearInterval(timer);
       if (refreshInterval !== undefined) window.clearInterval(refreshInterval);
       if (refreshTimeout !== undefined) window.clearTimeout(refreshTimeout);
     };
   }, [expired, router]);
 
-  useEffect(() => setIsWatching(initiallyWatching), [initiallyWatching]);
-
   const toggleWatching = () => {
-    const next = !isWatching;
+    const next = !initiallyWatching;
     startTransition(async () => {
       const result = await setWatchingAction(bugId, next);
       if (result.error) {
         toast(result.error, "error");
         return;
       }
-      setIsWatching(next);
+
       toast(next ? "You'll get an alert when bidding reopens." : "Reopen alerts are off.");
       router.refresh();
     });
