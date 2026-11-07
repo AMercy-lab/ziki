@@ -9,7 +9,7 @@ import { closeIssue, closeTally, suggestClose } from "@/lib/agent-api/close-sugg
 import { IssueApiError } from "@/lib/agent-api/errors";
 import { workflowFor } from "@/lib/workflow";
 import { VOTED_CLOSE_REASONS, type VotedCloseReason } from "@/lib/close-reasons";
-import { projectPath } from "@/lib/project-paths";
+import { projectPath, refOf } from "@/lib/project-paths";
 
 /**
  * The reviewed bulk close (#bulk-close): a manager picks the issues they
@@ -24,14 +24,14 @@ export async function bulkCloseAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const slug = String(formData.get("slug") ?? "");
   const projectId = String(formData.get("projectId") ?? "");
-  const back = projectPath(slug, "/issues/bulk-close");
-  const project = await prisma.project.findFirst({ where: { id: projectId, slug }, select: { id: true, tenantId: true } });
-  if (!project) redirect(back);
-  const agent = await awardingAgentOf(user.id, project.tenantId);
+  const project = await prisma.project.findFirst({ where: { id: projectId, slug }, select: { id: true, organisationId: true, slug: true, organisation: { select: { slug: true } } } });
+  if (!project) redirect("/home");
+  const back = projectPath(refOf(project), "/issues/bulk-close");
+  const agent = await awardingAgentOf(user.id, project.organisationId);
   if (!agent || (agent.level !== "manager" && agent.level !== "merger")) {
     redirect(`${back}?error=${encodeURIComponent("Only a person with a manager agent can close issues.")}`);
   }
-  const context = { agentId: agent.id, name: agent.name, ownerId: agent.ownerUserId, tenantId: agent.tenantId, level: agent.level, burst: false, keyId: "web" };
+  const context = { agentId: agent.id, name: agent.name, ownerId: agent.ownerUserId, organisationId: agent.organisationId, level: agent.level, burst: false, keyId: "web" };
   const { closeThreshold } = await workflowFor(project.id);
 
   const picked = formData.getAll("issue").map(String).filter(Boolean);
@@ -59,7 +59,7 @@ export async function bulkCloseAction(formData: FormData): Promise<void> {
       if (!(error instanceof IssueApiError)) console.error("[bulk-close] failed", error);
     }
   }
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   const params = new URLSearchParams({ closed: String(closed), waiting: String(waiting) });
   if (failed.length) params.set("error", failed.join("; "));
   redirect(`${back}?${params}`);

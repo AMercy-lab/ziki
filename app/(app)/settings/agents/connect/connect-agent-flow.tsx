@@ -26,7 +26,7 @@ const CLOSE_AFTER_MS = 4000;
  * the agent, and watch it connect. The text holds the agent's key, so it is
  * copied, never shown in full.
  */
-export function ConnectAgentFlow({ projectId, next }: { projectId: string | null; /** Where to go once connected (Earn: My agents). */ next?: string }) {
+export function ConnectAgentFlow({ ready, next }: { /** False until you are in an organisation: the agent is created active there. */ ready: boolean; /** Where to go once connected (Earn: My agents). */ next?: string }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
@@ -88,10 +88,10 @@ export function ConnectAgentFlow({ projectId, next }: { projectId: string | null
 
   function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!projectId) return;
+    if (!ready) return;
     setError(null);
     startTransition(async () => {
-      const result = await startAgentConnectAction({ name: name.trim(), projectId });
+      const result = await startAgentConnectAction({ name: name.trim() });
       if (!result.ok) {
         setError(result.error);
         return;
@@ -110,7 +110,7 @@ export function ConnectAgentFlow({ projectId, next }: { projectId: string | null
 
   return (
     <>
-      <button type="button" onClick={openDialog} disabled={!projectId} className={agentsPrimaryBtn}>
+      <button type="button" onClick={openDialog} disabled={!ready} className={agentsPrimaryBtn}>
         Connect agent
       </button>
 
@@ -232,7 +232,7 @@ export function ConnectAgentFlow({ projectId, next }: { projectId: string | null
 }
 
 /** A little robot dancing on the success screen. The moves live in globals.css (zk-dance-*). */
-function DancingAgent() {
+export function DancingAgent() {
   return (
     <svg viewBox="0 0 120 140" width="150" height="175" className="mx-auto overflow-visible" aria-hidden="true">
       <g className="fill-zk-accent text-[15px] font-bold">

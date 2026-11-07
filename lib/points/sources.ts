@@ -1,5 +1,6 @@
 import type { PrismaClient, PointRole } from "@prisma/client";
 import { pointsNumber } from "./rules";
+import { refOf, type ProjectRef } from "@/lib/project-paths";
 
 /**
  * Where a person's points came from (#points-sources), for spotting farming:
@@ -43,6 +44,7 @@ const ROLE_LABEL: Record<PointRole, string> = {
   signup: "Signup bonus",
   comment: "Comment upvoted by someone",
   vote: "Voted",
+  plan: "Plan approved",
 };
 /** Small, repeatable actions: the ones farming leans on. */
 const SMALL_KINDS = new Set(["idea", "comment-upvote", "importance", "bid-vote", "triager-clear", "duplicate-marker", "reviewer-confirm"]);
@@ -65,8 +67,8 @@ export type PointRecentRow = {
   points: number;
   corrected: boolean;
   agentName: string | null;
-  issue: { number: number; projectSlug: string | null } | null;
-  idea: { number: number; projectSlug: string | null } | null;
+  issue: { number: number; projectRef: ProjectRef | null } | null;
+  idea: { number: number; projectRef: ProjectRef | null } | null;
 };
 export type PointSources = {
   total: number;
@@ -79,16 +81,16 @@ export type PointSources = {
   recent: PointRecentRow[];
 };
 
-export async function pointSources(db: PrismaClient, scope: { tenantId: string; userId: string }, now = new Date()): Promise<PointSources> {
+export async function pointSources(db: PrismaClient, scope: { organisationId: string; userId: string }, now = new Date()): Promise<PointSources> {
   const rows = await db.pointEntry.findMany({
-    where: { tenantId: scope.tenantId, userId: scope.userId },
+    where: { organisationId: scope.organisationId, userId: scope.userId },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: ENTRY_LIMIT + 1,
     select: {
       id: true, role: true, points: true, sourceKey: true, correctedAt: true, createdAt: true,
       agent: { select: { id: true, name: true } },
-      bug: { select: { number: true, reporterId: true, project: { select: { slug: true } } } },
-      idea: { select: { number: true, reporterId: true, project: { select: { slug: true } } } },
+      bug: { select: { number: true, reporterId: true, project: { select: { slug: true, organisation: { select: { slug: true } } } } } },
+      idea: { select: { number: true, reporterId: true, project: { select: { slug: true, organisation: { select: { slug: true } } } } } },
     },
   });
   const truncated = rows.length > ENTRY_LIMIT;
@@ -183,8 +185,8 @@ export async function pointSources(db: PrismaClient, scope: { tenantId: string; 
     points: pointsNumber(entry.points),
     corrected: Boolean(entry.correctedAt),
     agentName: entry.agent?.name ?? null,
-    issue: entry.bug ? { number: entry.bug.number, projectSlug: entry.bug.project?.slug ?? null } : null,
-    idea: entry.idea ? { number: entry.idea.number, projectSlug: entry.idea.project?.slug ?? null } : null,
+    issue: entry.bug ? { number: entry.bug.number, projectRef: entry.bug.project ? refOf(entry.bug.project) : null } : null,
+    idea: entry.idea ? { number: entry.idea.number, projectRef: entry.idea.project ? refOf(entry.idea.project) : null } : null,
   }));
 
   return {

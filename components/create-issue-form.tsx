@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { unstable_rethrow } from "next/navigation";
-import { newIssuePath } from "@/lib/project-paths";
+import { newIssuePath, type ProjectRef } from "@/lib/project-paths";
 import { createBugAction, type ActionResult } from "@/app/actions/issues";
 import { submitFailureMessage } from "@/lib/submit-error";
 import { ErrorSummary, FieldError, useFieldErrors } from "@/components/ui/field-errors";
@@ -62,7 +62,7 @@ export function CreateIssueForm({
   currentUserId?: string;
   projectId?: string | null;
   /** The project the form was opened in, for the full report page link. */
-  projectSlug: string;
+  projectSlug: ProjectRef;
   /**
    * "page": the full report page (detailed by default, with a link to a
    * quick report). "modal": the quick report opened over the current page.
@@ -166,7 +166,7 @@ export function CreateIssueForm({
         );
         formData.set("attachmentIds", attachmentIds.join(","));
         formData.set("isReport", mode === "report" ? "true" : "false");
-        // The project the form was opened in (#project-urls); the action checks it is in the workspace.
+        // The project the form was opened in (#project-urls); the action checks it is in the organisation.
         if (projectId) formData.set("projectId", projectId);
         if (mode === "detailed") {
           formData.set("typeId", values.typeId);
@@ -354,7 +354,7 @@ export function CreateIssueForm({
                 name="proofLinks"
                 rows={3}
                 placeholder={
-                  "https://github.com/organization/repo/pull/123"
+                  "https://github.com/organisation/repo/pull/123"
                 }
                 value={values.proofLinks}
                 onChange={(event) => setValue("proofLinks", event.target.value)}
@@ -362,7 +362,7 @@ export function CreateIssueForm({
               />
               <FieldError formId={errs.formId} field="proofLinks" errors={errs.fieldErrors} />
               <p className="text-xs text-zk-muted">
-                Optional. One GitHub link per line (e.g. https://github.com/organization/repo/pull/123).
+                Optional. One GitHub link per line (e.g. https://github.com/organisation/repo/pull/123).
               </p>
             </div>
           ) : null}

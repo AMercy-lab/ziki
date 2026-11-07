@@ -1,3 +1,4 @@
+import { cache } from "react";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { auth } from "@/auth";
@@ -6,25 +7,29 @@ import { isLinkPreviewBot } from "@/lib/link-preview";
 import { isPublicAgentPath } from "@/lib/public-agent-paths";
 import { AppHeader } from "@/components/app-header";
 import { getUnreadCount } from "@/lib/lookups";
-import { REPORT_FORM_URL } from "@/lib/report-form";
 import { MAIN_CONTENT_ID, SkipLink } from "@/components/skip-link";
 import { PAGE_CONTAINER_CLASS } from "@/components/page-container";
 import { FocusMainOnNavigate } from "@/components/focus-main-on-navigate";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
-import { isOrganizationAdmin, type OrganizationRole } from "@/lib/organization-role";
-import type { WorkspaceChoice } from "@/components/workspace-switcher";
+import type { OrganisationOption, ExternalProjectChoice } from "@/components/organisation-switcher";
 import { prisma } from "@/lib/prisma";
-import { currentTenantIdFor } from "@/lib/tenant-context";
-import { firstProjectSlugFor } from "@/lib/project-route";
-import { tenantsForUser } from "@/lib/tenants";
+import { currentOrganisationIdFor } from "@/lib/organisation-context";
+import { firstProjectRefFor } from "@/lib/project-route";
+import { organisationsForUser } from "@/lib/organisations";
 import { countPendingEscalations } from "@/lib/agent-questions";
 import { loadOwnAgents } from "@/lib/dashboard-overview";
 import { AgentsDock, type DockAgent } from "@/components/agents-dock";
 import { appVersionLabel } from "@/lib/deployed-version";
 import { agentActivity, agentEarnings } from "@/lib/points/agent-earnings";
-import { sampleBalance } from "@/lib/earn/state";
-import { withdrawInfo } from "@/lib/earn/draft";
-import { isEarner } from "@/lib/earn/earner";
+import { headerEarnings } from "@/lib/earnings";
+
+async function getOrganisationProjects(organisationId: string) {
+  return prisma.project.findMany({
+    where: { organisationId, archivedAt: null },
+    select: { id: true, name: true, slug: true, organisationId: true },
+    orderBy: { name: "asc" },
+  });
+}
 
 export default async function AppLayout({
   children,
@@ -53,7 +58,9 @@ export default async function AppLayout({
 
   // #agent-profile: a guest on a public agent page (a profile, the directory)
   // gets a plain shell with a way to sign in, not the sign-in redirect.
-  if (!session?.user && isPublicAgentPath((await headers()).get("x-ziki-path") ?? "")) {
+  const reqPath = (await headers()).get("x-ziki-path") ?? "";
+  const isPublicSkillsPath = reqPath === "/skills" || reqPath.startsWith("/skills/");
+  if (!session?.user && (isPublicAgentPath(reqPath) || reqPath === "/discover" || isPublicSkillsPath)) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <header className="border-b border-zk-border bg-zk-surface">
@@ -74,25 +81,82 @@ export default async function AppLayout({
   }
 
   const user = await requireUser();
-  // The header lists this person's workspaces. Pages still resolve the active
-  // project inside the current workspace, so a foreign project id is ignored.
-  let workspaces: WorkspaceChoice[] = [];
-  let activeTenantId: string | null = null;
-  let tenantId: string | null = null;
-  let membershipRole: OrganizationRole | null = null;
+  const requestPath = (await headers()).get("x-ziki-path") ?? "";
+  // The header lists this person's organisations. Pages still resolve the active
+  // project inside the current organisation, so a foreign project id is ignored.
+  let organisationOptions: OrganisationOption[] = [];
+  let externalProjects: ExternalProjectChoice[] = [];
+  let activeOrganisationId: string | null = null;
+  let organisationId: string | null = null;
   try {
-    tenantId = await currentTenantIdFor(user.id);
-    activeTenantId = tenantId;
-    const memberships = await tenantsForUser(prisma, user.id, user.role);
-    membershipRole = memberships.find((tenant) => tenant.id === tenantId)?.role ?? null;
-    workspaces = memberships
-      .filter((tenant) => tenant.archivedAt === null)
-      .map((tenant) => ({ id: tenant.id, name: tenant.name, slug: tenant.slug }));
+    organisationId = await currentOrganisationIdFor(user.id);
+    activeOrganisationId = organisationId;
+    const memberships = await organisationsForUser(prisma, user.id, user.role);
+    const activeOrganisations = memberships.filter((organisation) => organisation.archivedAt === null);
+
+    const pathSegments = requestPath.split("/").filter(Boolean);
+    const routeOrg = pathSegments[0] ? decodeURIComponent(pathSegments[0]) : null;
+    const matchedOrg = routeOrg ? activeOrganisations.find((t) => t.slug === routeOrg) : null;
+    if (matchedOrg) {
+      organisationId = matchedOrg.id;
+      activeOrganisationId = matchedOrg.id;
+    }
+
+    const [orgProjects, userProjectMemberships] = await Promise.all([
+      organisationId ? getOrganisationProjects(organisationId) : Promise.resolve([]),
+      prisma.projectMembership.findMany({
+        where: {
+          userId: user.id,
+          project: {
+            archivedAt: null,
+            organisation: { archivedAt: null },
+          },
+        },
+        select: {
+          project: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              organisationId: true,
+              organisation: { select: { id: true, name: true, slug: true } },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const projectsByOrg = new Map<string, Array<{ id: string; name: string; slug: string }>>();
+    const orgProjectIds = new Set<string>();
+    for (const p of orgProjects) {
+      orgProjectIds.add(p.id);
+      const list = projectsByOrg.get(p.organisationId) ?? [];
+      list.push({ id: p.id, name: p.name, slug: p.slug });
+      projectsByOrg.set(p.organisationId, list);
+    }
+
+    organisationOptions = activeOrganisations.map((organisation) => ({
+      id: organisation.id,
+      name: organisation.name,
+      slug: organisation.slug,
+      projects: projectsByOrg.get(organisation.id) ?? [],
+    }));
+
+    externalProjects = userProjectMemberships
+      .filter((m) => !orgProjectIds.has(m.project.id))
+      .map((m) => ({
+        id: m.project.id,
+        name: m.project.name,
+        slug: m.project.slug,
+        organisationId: m.project.organisationId,
+        organisationName: m.project.organisation.name,
+        organisationSlug: m.project.organisation.slug,
+      }));
   } catch (error) {
-    console.error("[layout] workspace context failed", error);
+    console.error("[layout] organisation context failed", error);
   }
   // For links on pages whose URL names no project yet (#project-urls).
-  const defaultProjectSlug = await firstProjectSlugFor(user.id).catch(() => null);
+  const defaultProjectSlug = await firstProjectRefFor(user.id).catch(() => null);
   // A missing Notification table must not take down every signed-in page.
   let unreadCount = 0;
   try {
@@ -105,21 +169,29 @@ export default async function AppLayout({
 
   let pendingEscalationsCount = 0;
   let dockAgents: DockAgent[] = [];
-  if (tenantId) {
+  // Members of this organisation, for the Leaderboard link: nobody ranks against no one. Null when it couldn't be read.
+  let memberCount: number | null = null;
+  const dockOrganisationId = organisationId;
+  if (organisationId) {
     try {
-      pendingEscalationsCount = await countPendingEscalations(user.id, tenantId);
+      pendingEscalationsCount = await countPendingEscalations(user.id, organisationId);
     } catch (error) {
       console.error("[layout] pending escalations count failed", error);
     }
     try {
-      const agents = await loadOwnAgents({ userId: user.id, tenantId });
+      memberCount = await prisma.membership.count({ where: { organisationId } });
+    } catch (error) {
+      console.error("[layout] member count failed", error);
+    }
+    try {
+      const agents = dockOrganisationId ? await loadOwnAgents({ userId: user.id, organisationId: dockOrganisationId }) : [];
       // #710: what each agent earned, from the point entries its work wrote.
       const ids = agents.map((agent) => agent.id);
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);
       const [earned, activity, pending] = await Promise.all([
-        agentEarnings(prisma, tenantId, ids),
-        agentActivity(prisma, tenantId, ids, startOfToday),
+        agentEarnings(prisma, dockOrganisationId ?? organisationId, ids),
+        agentActivity(prisma, dockOrganisationId ?? organisationId, ids, startOfToday),
         prisma.agentRequest.groupBy({ by: ["agentId"], where: { agentId: { in: ids }, doneAt: null }, _count: { _all: true } }),
       ]);
       const pendingBy = new Map(pending.map((row) => [row.agentId, row._count._all]));
@@ -129,11 +201,16 @@ export default async function AppLayout({
     }
   }
 
-  // Earn (#earn-drafts): an earner's money for the header.
-  const earner = await isEarner(user.id).catch(() => false);
-  const earnSample = earner ? await sampleBalance() : null;
-  // The earner's agent bar shows what she has earned, the same amount as the header ($5 from signing up).
-  if (earnSample) dockAgents = dockAgents.map((agent) => ({ ...agent, earnedPoints: earnSample.earned }));
+  // Earnings (#earnings): what this person has earned in the workspace they're in, shown with Withdraw on every page
+  // to anyone who works on projects (not to people who only post them). The workspace is the one in the address
+  // (one they belong to, or one they joined a project of), else their active one. A failed read hides it.
+  const routeSlug = requestPath.split("/").filter(Boolean)[0] ?? null;
+  const earningsOrganisationId =
+    (routeSlug ? externalProjects.find((project) => project.organisationSlug === routeSlug)?.organisationId : null) ?? organisationId;
+  const earned = await headerEarnings(prisma, user.id, earningsOrganisationId).catch((error) => {
+    console.error("[layout] earnings total failed", error);
+    return null;
+  });
 
   // #287: one primary-key read; a failure leaves shortcuts on, the default.
   let shortcutsEnabled = true;
@@ -161,13 +238,13 @@ export default async function AppLayout({
           unreadCount={unreadCount}
           pendingEscalationsCount={pendingEscalationsCount}
           userId={user.id}
-          workspaces={workspaces}
-          activeTenantId={activeTenantId}
+          organisationOptions={organisationOptions}
+          externalProjects={externalProjects}
+          activeOrganisationId={activeOrganisationId}
           defaultProjectSlug={defaultProjectSlug}
-          reportFormUrl={REPORT_FORM_URL}
-          organizationAdmin={tenantId !== null && isOrganizationAdmin(membershipRole, user.role)}
-          earned={earnSample ? earnSample.earned : null}
-          withdraw={earnSample ? withdrawInfo(earnSample.stage) : null}
+          earned={earned}
+          earningsOrganisationId={earningsOrganisationId}
+          version={appVersionLabel()}
         />
         <main
           id={MAIN_CONTENT_ID}
@@ -180,8 +257,8 @@ export default async function AppLayout({
           {children}
         </main>
       </div>
-      {/* The agents dock keeps the page's foot clear of its floor line itself, as tall as what stands on it. */}
-      <AgentsDock agents={dockAgents} defaultProjectSlug={defaultProjectSlug} version={appVersionLabel()} earn={earnSample !== null} />
+      {/* The agents dock keeps the page's foot clear of its floor line itself, as tall as what stands on it, and draws nothing (no spacer either) where it doesn't help. */}
+      <AgentsDock agents={dockAgents} defaultProjectSlug={defaultProjectSlug} memberCount={memberCount} />
       <FocusMainOnNavigate />
       <KeyboardShortcuts
         enabled={shortcutsEnabled}

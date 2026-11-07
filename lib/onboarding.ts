@@ -1,77 +1,12 @@
-import type { PrismaClient } from "@prisma/client";
-import { newIssuePath, orgPath } from "@/lib/project-paths";
-
 /**
- * The "getting started" checklist a new workspace's owner sees on the issues
- * page (#641) until every step is done or they dismiss it.
+ * Per-organisation dismissals kept in a cookie on this device, such as the
+ * next-step card's (lib/organisation-next-step.ts).
  */
 
-export const GETTING_STARTED_COOKIE = "ziki_getting_started_dismissed";
-/** Dismissals are remembered per workspace, on this device, for a year. */
-export const GETTING_STARTED_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
-/** Most workspace ids the cookie keeps, so it can't grow without bound. */
+/** Most organisation ids the cookie keeps, so it can't grow without bound. */
 const MAX_DISMISSED = 50;
 
-export type GettingStartedStepId = "workspace" | "project" | "issue" | "invite";
-
-export type GettingStartedStep = {
-  id: GettingStartedStepId;
-  label: string;
-  hint: string;
-  href: string;
-  done: boolean;
-};
-
-type Db = Pick<PrismaClient, "project" | "bug" | "membership" | "tenantInvite">;
-
-/** The steps for one workspace, from four cheap counts. */
-export async function gettingStartedFor(
-  db: Db,
-  tenantId: string,
-  /** The project the checklist is shown in, for its links (#project-urls). */
-  slug: string,
-  { now = new Date() }: { now?: Date } = {},
-): Promise<{ steps: GettingStartedStep[]; complete: boolean }> {
-  const [projects, issues, members, pendingInvites] = await Promise.all([
-    db.project.count({ where: { tenantId } }),
-    db.bug.count({ where: { tenantId, isDeleted: false } }),
-    db.membership.count({ where: { tenantId } }),
-    db.tenantInvite.count({ where: { tenantId, acceptedAt: null, expiresAt: { gt: now } } }),
-  ]);
-  const steps: GettingStartedStep[] = [
-    {
-      id: "workspace",
-      label: "Create your workspace",
-      hint: "Your team's own space for projects, issues and people.",
-      href: "/tenants",
-      done: true,
-    },
-    {
-      id: "project",
-      label: "Set up a project",
-      hint: "One product you track, such as a web app.",
-      href: orgPath(slug, "projects"),
-      done: projects > 0,
-    },
-    {
-      id: "issue",
-      label: "Report the first issue",
-      hint: "Say what you expected, what happened instead, and how to make it happen again.",
-      href: newIssuePath(slug),
-      done: issues > 0,
-    },
-    {
-      id: "invite",
-      label: "Invite a teammate",
-      hint: "Send an email invite or share an invite link from the organization's Invites tab.",
-      href: orgPath(slug, "invites"),
-      done: members > 1 || pendingInvites > 0,
-    },
-  ];
-  return { steps, complete: steps.every((step) => step.done) };
-}
-
-/** Workspace ids whose checklist was dismissed on this device. */
+/** Organisation ids dismissed on this device. */
 export function parseDismissed(value: string | null | undefined): string[] {
   if (!value) return [];
   return value
@@ -81,9 +16,9 @@ export function parseDismissed(value: string | null | undefined): string[] {
     .slice(-MAX_DISMISSED);
 }
 
-/** The cookie value after dismissing `tenantId`, newest last, capped. */
-export function withDismissed(value: string | null | undefined, tenantId: string): string {
-  const ids = parseDismissed(value).filter((id) => id !== tenantId);
-  ids.push(tenantId);
+/** The cookie value after dismissing `organisationId`, newest last, capped. */
+export function withDismissed(value: string | null | undefined, organisationId: string): string {
+  const ids = parseDismissed(value).filter((id) => id !== organisationId);
+  ids.push(organisationId);
   return ids.slice(-MAX_DISMISSED).join(",");
 }
