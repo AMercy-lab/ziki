@@ -7,9 +7,9 @@ import { withdrawDetailsAction, type WithdrawDetails } from "@/app/(app)/earning
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 const PRIMARY =
-  "inline-flex min-h-11 items-center justify-center rounded-full bg-electric-blue-strong px-5 text-sm font-bold text-white shadow-[0_8px_20px_rgba(46,111,239,0.30)] transition hover:bg-[#2552af] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue focus-visible:ring-offset-2";
+  "inline-flex min-h-11 items-center justify-center rounded-full bg-electric-blue-strong px-5 text-sm font-bold whitespace-nowrap text-white max-sm:px-2 max-sm:text-[13px] shadow-[0_8px_20px_rgba(46,111,239,0.30)] transition hover:bg-[#2552af] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue focus-visible:ring-offset-2";
 const SECONDARY =
-  "inline-flex min-h-11 items-center justify-center rounded-full border border-zk-border bg-zk-surface px-5 text-sm font-bold text-zk-text transition hover:bg-zk-chip focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue focus-visible:ring-offset-2";
+  "inline-flex min-h-11 items-center justify-center rounded-full border border-zk-border bg-zk-surface px-5 text-sm font-bold whitespace-nowrap text-zk-text max-sm:px-2 max-sm:text-[13px] transition hover:bg-zk-chip focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-blue focus-visible:ring-offset-2";
 
 /**
  * The withdraw bar, as Earn always drew it: what you've earned (green), what Ziki is still checking (yellow
@@ -144,7 +144,8 @@ export function WithdrawWindow({ earned, organisationId, className, children }: 
             <WithdrawBar earned={available} checking={checking} />
           </div>
 
-          <div className="mt-6 flex flex-wrap justify-end gap-2">
+          {/* Side by side on every screen: two equal columns on phones, right-aligned from sm up. */}
+          <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:justify-end">
             <Link href={details?.workspaceSlug ? `/earnings?in=${encodeURIComponent(details.workspaceSlug)}` : "/earnings"} onClick={() => setOpen(false)} className={SECONDARY}>See my earnings</Link>
             {ready ? (
               <Link href="/settings?section=finance" onClick={() => setOpen(false)} className={PRIMARY}>Add your wallet</Link>
