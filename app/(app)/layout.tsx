@@ -63,6 +63,10 @@ export default async function AppLayout({
     ? await prisma.project.findFirst({
         where: {
           slug: overviewSegments.projectSlug,
+          // Only a public project gets the guest shell. A private one sends a
+          // guest to sign in, the same as an address that names no project, so
+          // the shell doesn't tell outsiders which private projects exist.
+          visibility: "public",
           archivedAt: null,
           organisation: { slug: overviewSegments.orgSlug, archivedAt: null },
         },

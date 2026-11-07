@@ -3,7 +3,7 @@ import { Avatar } from "@/components/avatar";
 import { RichText } from "@/components/rich-text";
 import { ProjectOverviewJoinButton } from "@/components/project-overview-join-button";
 import { Badge } from "@/components/ui/badge";
-import { ideasPath, issuesPath, orgHomePath, projectRef } from "@/lib/project-paths";
+import { issuesPath, marketingPath, orgHomePath, projectRef } from "@/lib/project-paths";
 import { safeHref } from "@/lib/rich-text";
 import type { ProjectOverviewData } from "@/lib/project-overview";
 
@@ -68,9 +68,12 @@ function PersonRow({
 export function ProjectOverviewView({
   data,
   currentUserId,
+  workHref,
 }: {
   data: ProjectOverviewData;
   currentUserId: string | null;
+  /** Where a member starts work: the project's Marketing tab or its Ideas. */
+  workHref: string | null;
 }) {
   const { project } = data;
   const ref = projectRef(project.organisation.slug, project.slug);
@@ -174,13 +177,13 @@ export function ProjectOverviewView({
             )}
           </section>
 
-          {data.isMember ? (
+          {data.isMember && workHref ? (
             <section aria-label="Project actions" className="flex flex-wrap gap-3 border-t border-zk-border pt-5">
               <Link
-                href={ideasPath(ref)}
+                href={workHref}
                 className="inline-flex min-h-10 items-center rounded-xl bg-zk-accent px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
               >
-                Browse Ideas →
+                {workHref === marketingPath(ref) ? "Open Marketing →" : "Browse Ideas →"}
               </Link>
               <Link
                 href={issuesPath(ref, "open")}

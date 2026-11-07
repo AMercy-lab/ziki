@@ -3,6 +3,9 @@ import { ProjectOverviewView } from "@/components/project-overview";
 import { optionalUser } from "@/lib/auth-helpers";
 import { requireProject } from "@/lib/project-route";
 import { loadProjectOverview } from "@/lib/project-overview";
+import { projectHomePath } from "@/lib/marketing/project-home";
+import { projectRef } from "@/lib/project-paths";
+import { prisma } from "@/lib/prisma";
 
 type Props = { params: Promise<{ org: string; project: string }> };
 
@@ -19,5 +22,11 @@ export default async function ProjectOverviewPage({ params }: Props) {
   const data = await loadProjectOverview(org, slug, user);
   if (!data) notFound();
 
-  return <ProjectOverviewView data={data} currentUserId={user?.id ?? null} />;
+  // A member's way into the work is where the project used to open: its
+  // Marketing tab when it is all marketing, else its Ideas (#marketing-home).
+  const workHref = data.isMember
+    ? await projectHomePath(prisma, data.project.id, projectRef(data.project.organisation.slug, data.project.slug))
+    : null;
+
+  return <ProjectOverviewView data={data} currentUserId={user?.id ?? null} workHref={workHref} />;
 }
