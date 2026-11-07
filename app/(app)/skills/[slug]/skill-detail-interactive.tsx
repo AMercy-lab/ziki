@@ -39,15 +39,35 @@ type StoreState = {
   toastMessage: string | null;
 };
 
+type StoreSnapshot = StoreState & {
+  setSelectedAgent: (agent: string) => void;
+};
+
 let currentState: StoreState = { selectedAgent: "all", toastMessage: null };
 const listeners = new Set<() => void>();
 
-export function getSnapshot(): StoreState {
-  return currentState;
+function notify() {
+  listeners.forEach((listener) => listener());
 }
 
-export function getServerSnapshot(): StoreState {
-  return { selectedAgent: "all", toastMessage: null };
+export function setSelectedAgent(agent: string) {
+  currentState = { ...currentState, selectedAgent: agent };
+  notify();
+}
+
+export function getSnapshot(): StoreSnapshot {
+  return {
+    ...currentState,
+    setSelectedAgent,
+  };
+}
+
+export function getServerSnapshot(): StoreSnapshot {
+  return {
+    selectedAgent: "all",
+    toastMessage: null,
+    setSelectedAgent: () => undefined,
+  };
 }
 
 export function subscribe(callback: () => void): () => void {
@@ -57,7 +77,7 @@ export function subscribe(callback: () => void): () => void {
 
 function setState(next: Partial<StoreState>) {
   currentState = { ...currentState, ...next };
-  listeners.forEach((listener) => listener());
+  notify();
 }
 
 /* ------------------------------------------------------------------ */
@@ -203,14 +223,12 @@ export function SkillDetailInteractive({
 
   // Reset selectedAgent to default when the skill/agent list changes
   useEffect(() => {
-    const newDefault =
-      agents.length > 0 ? agents[0].name : "all";
+    const newDefault = agents.length > 0 ? agents[0].name : "all";
     if (selectedAgent !== newDefault) {
       setSelectedAgent(newDefault);
     }
   }, [agents, selectedAgent, setSelectedAgent]);
 
-  // Read toast from shared store directly (no local state duplication)
   const toastMessage = currentState.toastMessage;
 
   const targeted = selectedAgent !== "all";
