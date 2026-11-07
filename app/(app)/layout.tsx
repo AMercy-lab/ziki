@@ -243,6 +243,7 @@ export default async function AppLayout({
           activeOrganisationId={activeOrganisationId}
           defaultProjectSlug={defaultProjectSlug}
           earned={earned}
+          earningsOrganisationId={earningsOrganisationId}
           version={appVersionLabel()}
         />
         <main

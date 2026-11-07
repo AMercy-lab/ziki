@@ -68,11 +68,11 @@ function WithdrawBar({ earned: raw, checking: rawChecking }: { earned: number; c
 
 /**
  * Withdraw (#earnings, Mark's review): always a window in the middle of the page you are on, never a trip to another
- * page, the way Earn showed it. It shows the threshold and your balance against it on the withdraw bar, with a link
- * to Your earnings. Payouts aren't built yet: at $30 or more it says the money is ready and that taking it out is
+ * page, the way Earn showed it. It shows the threshold and what you earned in the workspace you're in against it on
+ * the withdraw bar (not your total across workspaces), with a link to Your earnings for that workspace. Payouts aren't built yet: at $30 or more it says the money is ready and that taking it out is
  * coming.
  */
-export function WithdrawWindow({ earned, className, children }: { earned: number; className: string; children: React.ReactNode }) {
+export function WithdrawWindow({ earned, organisationId, className, children }: { earned: number; organisationId: string | null; className: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [details, setDetails] = useState<WithdrawDetails | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -85,7 +85,7 @@ export function WithdrawWindow({ earned, className, children }: { earned: number
 
   function show() {
     setOpen(true);
-    withdrawDetailsAction().then(setDetails, () => undefined);
+    withdrawDetailsAction(organisationId).then(setDetails, () => undefined);
   }
   function close() {
     setOpen(false);
@@ -132,7 +132,7 @@ export function WithdrawWindow({ earned, className, children }: { earned: number
             </button>
           </div>
           <p className="mt-1 text-sm text-zk-text2">
-            {ready ? "Your money is ready. We’re still working out how payouts will work, and we’ll tell you as soon as you can take it out." : `You have ${money(available)} in total, across all your workspaces. ${money(left)} to go.`}
+            {ready ? `Your money${details?.workspace ? ` in ${details.workspace}` : ""} is ready. We’re still working out how payouts will work, and we’ll tell you as soon as you can take it out.` : `You have ${money(available)}${details?.workspace ? ` in ${details.workspace}` : ""}. ${money(left)} to go.`}
           </p>
 
           <p className="mt-5 flex flex-wrap items-baseline gap-x-2">
@@ -144,7 +144,7 @@ export function WithdrawWindow({ earned, className, children }: { earned: number
           </div>
 
           <div className="mt-6 flex flex-wrap justify-end gap-2">
-            <Link href="/earnings" onClick={() => setOpen(false)} className={SECONDARY}>See my earnings</Link>
+            <Link href={details?.workspaceSlug ? `/earnings?in=${encodeURIComponent(details.workspaceSlug)}` : "/earnings"} onClick={() => setOpen(false)} className={SECONDARY}>See my earnings</Link>
             {ready ? (
               <Link href="/settings?section=finance" onClick={() => setOpen(false)} className={PRIMARY}>Add your wallet</Link>
             ) : (

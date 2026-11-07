@@ -291,12 +291,15 @@ export function AppHeader({
   reportFormUrl,
   defaultProjectSlug = null,
   earned = null,
+  earningsOrganisationId = null,
   version,
 }: {
   /** The running version (package version), shown with Cookie settings at the foot of the account menu. */
   version?: string;
-  /** Earnings (#earnings): everything the person has earned, shown with Withdraw on every page; null when unknown. */
+  /** Earnings (#earnings): what the person earned in the workspace they're in, shown with Withdraw on every page; null when unknown. */
   earned?: number | null;
+  /** The workspace the $ and Withdraw are for (#earnings): the one the person is in. */
+  earningsOrganisationId?: string | null;
   /** The first project in the current organisation, for pages whose URL names none yet. */
   defaultProjectSlug?: ProjectRef | null;
   userName?: string | null;
@@ -368,7 +371,7 @@ export function AppHeader({
                 {formatZ(earned)}
                 <span className="sr-only"> earned: Your earnings</span>
               </Link>
-              <WithdrawWindow earned={earned} className={`rounded-full bg-electric-blue-strong px-3 py-1.5 text-xs font-bold text-white hover:bg-[#2552af] max-sm:hidden ${linkFocus}`}>
+              <WithdrawWindow earned={earned} organisationId={earningsOrganisationId} className={`rounded-full bg-electric-blue-strong px-3 py-1.5 text-xs font-bold text-white hover:bg-[#2552af] max-sm:hidden ${linkFocus}`}>
                 Withdraw
               </WithdrawWindow>
             </div>
