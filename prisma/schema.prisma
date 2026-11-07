@@ -265,6 +265,7 @@ enum GoalAllocationTarget {
 }
 
 model User {
+  featurePlans              FeaturePlan[]
   savedIssueViews           SavedIssueView[]
   id                        String                  @id @default(cuid())
   name                      String
@@ -389,6 +390,7 @@ model IssueType {
 }
 
 model Bug {
+  featurePlanItems          FeaturePlanItem[]
   pullRequestLinkRepairs    PullRequestLinkRepair[]
   id                        String                  @id @default(cuid())
   /// Human-readable reference (#1, #2, ...), counted per organisation (#517). The
@@ -810,6 +812,7 @@ model Organisation {
 /// A project inside an organisation (organisation), e.g. Zedu Web or Zedu Desktop.
 /// Organisations hold projects and nothing in between (#no-platforms).
 model Project {
+  featurePlans          FeaturePlan[]
   savedIssueViews        SavedIssueView[]
   agentNotes            AgentNote[]
   id                    String                @id @default(cuid())
@@ -860,8 +863,32 @@ model Project {
   noteComments          ProjectNoteComment[]
   memberships           ProjectMembership[]
   joinRequests          ProjectJoinRequest[]
+  repositories          ProjectRepository[]
 
   @@unique([organisationId, slug])
+}
+
+/// More GitHub repositories for a project (#2), e.g. its API next to its web app.
+/// `Project.repoUrl` stays the main repository; these are the others. A pull
+/// request in any of them can be linked, delivered, accepted and resolved.
+model ProjectRepository {
+  id                   String   @id @default(cuid())
+  projectId            String
+  /// `https://github.com/owner/repo`, lower-cased so a repository is listed once.
+  url                  String
+  /// Short name shown to people and agents, e.g. "API" or "Mobile".
+  label                String?
+  /// The branch fixes go into, when it isn't the repository's default. Shown to
+  /// people and agents; Ziki does not read GitHub to enforce it (#pr-reports).
+  branch               String?
+  /// GitHub App installation for this repository when it differs from the
+  /// project's (another organization). Never a token.
+  githubInstallationId String?
+  createdAt            DateTime @default(now())
+  project              Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, url])
+  @@index([projectId])
 }
 
 /// The per-project workflow dials (#595). One row per project; a missing row
@@ -1606,6 +1633,7 @@ enum IdeaStatus {
 /// manager agent converts it, which creates an issue. Ideas are numbered
 /// apart from issues, per organisation.
 model Idea {
+  featurePlanItems   FeaturePlanItem[]
   id                 String           @id @default(cuid())
   /// Idea #1, #2, ... per organisation. The trigger `Idea_assign_organisation_number`
   /// replaces the sequence value with `Organisation.nextIdeaNumber`.
@@ -1678,6 +1706,43 @@ model Idea {
   @@index([projectId, track, status])
   @@index([reporterId])
   @@index([createdByAgentId])
+}
+
+/// A member's feature request and reviewed breakdown. Drafts remain private to their creator.
+model FeaturePlan {
+  id          String   @id @default(cuid())
+  projectId   String
+  creatorId   String
+  title       String
+  request     String
+  draft       Json
+  version     Int      @default(1)
+  /// The plan becomes read-only and visible to project members on first publication.
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator     User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  items       FeaturePlanItem[]
+
+  @@index([projectId, createdAt])
+  @@index([creatorId])
+}
+
+/// A durable publication receipt: retries cannot create the same plan item twice.
+model FeaturePlanItem {
+  id       String @id @default(cuid())
+  planId   String
+  position Int
+  ideaId   String?
+  bugId    String?
+  plan     FeaturePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  idea     Idea? @relation(fields: [ideaId], references: [id], onDelete: SetNull)
+  bug      Bug? @relation(fields: [bugId], references: [id], onDelete: SetNull)
+
+  @@unique([planId, position])
+  @@index([ideaId])
+  @@index([bugId])
 }
 
 model IdeaVerdict {
