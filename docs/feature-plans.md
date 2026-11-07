@@ -4,6 +4,12 @@
 
 For example, an owner asks for appointment booking. Their plan describes the customer outcome, links an existing availability issue, proposes a booking idea for the first version, and keeps optional rescheduling for later. Each item has its own acceptance criteria. The whole plan retains an end-to-end success criterion: a customer can book an available appointment and receive confirmation.
 
+## How this fits the existing tools
+
+- A project brief describes the product and its current focus. A feature plan uses that context to break down one requested capability.
+- Idea structuring clarifies one idea. A feature plan proposes several work items, reuses related work, and separates the first version from optional improvements before publication.
+- Plan review is an awarded agent's implementation plan for an existing complex issue. A feature plan is the owner's product scope before those ideas become issues. It does not replace plan review or introduce issue dependency rules.
+
 ## Using it
 
 1. Open a project's **Ideas → Feature plans → Plan a feature** (`/<org>/<project>/features`). Project members can create plans.
