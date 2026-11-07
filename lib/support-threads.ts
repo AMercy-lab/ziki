@@ -6,9 +6,7 @@ import { expireUnreadCounts } from "@/lib/cache-tags";
 import {
   ASKABLE_STATUSES,
   ELIGIBLE_AGENT_LEVELS,
-  type createSupportThreadSchema,
 } from "@/lib/validations/support-thread";
-import { z } from "zod";
 
 export type SupportThreadResult<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -444,9 +442,11 @@ export async function releaseSupportThread(
   }
 
   const now = new Date();
-  await prisma.$transaction(async (tx) => {
-    await tx.supportThread.update({
-      where: { id: thread.id },
+  const released = await prisma.$transaction(async (tx) => {
+    // Only while it is still taken by this agent: a thread resolved meanwhile
+    // (by hand, or because the fix went live) must not reopen.
+    const moved = await tx.supportThread.updateMany({
+      where: { id: thread.id, status: "taken", assigneeAgentId: thread.assigneeAgent!.id },
       data: {
         status: "open",
         assigneeAgentId: null,
@@ -454,6 +454,7 @@ export async function releaseSupportThread(
         lastMessageAt: now,
       },
     });
+    if (moved.count !== 1) return false;
 
     const eligibleAgents = await tx.agent.findMany({
       where: {
@@ -488,7 +489,9 @@ export async function releaseSupportThread(
         })),
       });
     }
+    return true;
   });
+  if (!released) return { ok: false, error: "This request changed meanwhile. Reload to see where it is." };
 
   return { ok: true };
 }

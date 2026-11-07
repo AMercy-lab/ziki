@@ -623,11 +623,12 @@ describe("Support Threads Domain Logic", () => {
         bug: { number: 42, title: "Fix" },
       });
       db.agent.findMany.mockResolvedValue([{ id: "agent-other-mgr" }]);
+      db.supportThread.updateMany.mockResolvedValue({ count: 1 });
 
       const res = await releaseSupportThread(bob, organisationId, "thread-1");
       expect(res).toEqual({ ok: true });
-      expect(db.supportThread.update).toHaveBeenCalledWith({
-        where: { id: "thread-1" },
+      expect(db.supportThread.updateMany).toHaveBeenCalledWith({
+        where: { id: "thread-1", status: "taken", assigneeAgentId: "agent-mgr" },
         data: expect.objectContaining({
           status: "open",
           assigneeAgentId: null,
@@ -643,6 +644,24 @@ describe("Support Threads Domain Logic", () => {
           }),
         ],
       });
+    });
+
+    it("does not reopen a thread that was resolved after it was read, and tells no agent", async () => {
+      db.supportThread.findFirst.mockResolvedValue({
+        id: "thread-1",
+        organisationId,
+        bugId: issueId,
+        requesterUserId: "user-alice",
+        status: "taken",
+        assigneeAgent: { id: "agent-mgr", name: "Agent Manager", ownerUserId: bob.id },
+        requester: { id: "user-alice", name: "Alice" },
+        bug: { number: 42, title: "Fix" },
+      });
+      db.supportThread.updateMany.mockResolvedValue({ count: 0 });
+
+      const res = await releaseSupportThread(bob, organisationId, "thread-1");
+      expect(res).toEqual({ ok: false, error: expect.any(String) });
+      expect(db.agentInboxItem.createMany).not.toHaveBeenCalled();
     });
   });
 

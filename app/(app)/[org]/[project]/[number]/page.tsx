@@ -820,7 +820,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   // Anyone may confirm their own issue (#confirmation-weights): it counts 1.
   const confirmationBlock: ConfirmationBlock = null;
   const activeSupportThread =
-    !bug.isDeleted && (ASKABLE_STATUSES as readonly string[]).includes(bug.status)
+    isOrgMember && !bug.isDeleted && (ASKABLE_STATUSES as readonly string[]).includes(bug.status)
       ? await prisma.supportThread.findFirst({
           where: {
             bugId: bug.id,
@@ -2261,7 +2261,8 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                 {bug.closeEvidence}
               </p>
             ) : null}
-            {!bug.isDeleted && (ASKABLE_STATUSES as readonly string[]).includes(bug.status) ? (
+            {/* createSupportThreadAction accepts organisation members only, so nobody else is offered the button. */}
+            {isOrgMember && !bug.isDeleted && (ASKABLE_STATUSES as readonly string[]).includes(bug.status) ? (
               activeSupportThread ? (
                 <Link
                   href={`/inbox?tab=requests&thread=${activeSupportThread.id}`}

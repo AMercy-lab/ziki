@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
 import { currentOrganisationIdFor } from "@/lib/organisation-context";
@@ -61,14 +60,9 @@ export async function RequestsView({ thread: selectedId }: { thread?: string }) 
     return b.lastMessageAt.getTime() - a.lastMessageAt.getTime();
   });
 
-  let current = threads[0];
-  if (selectedId) {
-    const found = threads.find((t) => t.id === selectedId);
-    if (!found) {
-      notFound();
-    }
-    current = found;
-  }
+  // A link to a thread that isn't listed here (older than the 50 shown, in another
+  // organisation, or no longer visible) opens the newest one instead of a 404.
+  const current = (selectedId ? threads.find((t) => t.id === selectedId) : undefined) ?? threads[0];
 
   const messages = await prisma.threadMessage.findMany({
     where: { threadId: current.id },
@@ -81,7 +75,6 @@ export async function RequestsView({ thread: selectedId }: { thread?: string }) 
 
   const isRequester = current.requesterUserId === user.id;
   const isAssigneeOwner = current.assigneeAgent?.ownerUserId === user.id;
-  const canTake = !isRequester && current.status === "open" && eligibleAgents.length > 0;
 
   return (
     <div className="grid gap-5 md:grid-cols-[14rem_minmax(0,1fr)]">

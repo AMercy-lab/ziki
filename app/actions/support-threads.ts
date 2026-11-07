@@ -22,7 +22,6 @@ import {
   replySupportThread,
   releaseSupportThread,
   resolveSupportThread,
-  type SupportThreadResult,
 } from "@/lib/support-threads";
 
 export type ActionResult<T = object> = ({ ok: true } & T) | { ok: false; error: string };
