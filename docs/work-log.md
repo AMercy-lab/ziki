@@ -30,3 +30,8 @@
 - CI stopped at Version raised after main reached 0.1.61. Merged main at bf94f78, kept a single plan approval label to resolve the ledger conflict, and bumped to 0.1.62.
 - Preserved upstream activity visibility rules and its planning nudge guard. Removed the obsolete zikiTasks guard from saved views after the type check detected the upstream route change.
 - Version gate, full type check, focused lint and 21 affected tests passed locally. GitHub CI will rerun on the updated PR.
+
+## 2026-11-07 — Refresh PR #500 after upstream version change
+
+- Merged main at c0f848d and resolved the package.json conflict by preserving upstream settings and bumping 0.1.63 to 0.1.64.
+- Version gate, Prisma generation, full type check, focused lint and 21 affected tests passed. GitHub checks will rerun on the existing PR.
