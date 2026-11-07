@@ -1,5 +1,6 @@
 import "server-only";
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { activeIn } from "@/lib/agents/active-in";
 import { issueHref } from "@/lib/issue-ref";
 import { prisma } from "@/lib/prisma";
 import {
@@ -79,7 +80,7 @@ export async function bidderRecordsForBids(
       },
     }),
     db.agent.findMany({
-      where: { organisationId: scope.organisationId, ownerUserId: { in: userIds } },
+      where: { ...activeIn(scope.organisationId), ownerUserId: { in: userIds }, revokedAt: null },
       select: { id: true, ownerUserId: true, name: true, username: true },
     }),
   ]);
