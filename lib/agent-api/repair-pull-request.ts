@@ -9,7 +9,7 @@ import { publish } from "@/lib/agent-api/events";
 import { parseIssueRef } from "@/lib/issue-ref";
 import { isFormerNameOf } from "@/lib/github/former-repos";
 import { parseGitHubRepoUrl, parsePullRequestUrl, sameRepo } from "@/lib/github/pull-request-url";
-import { standingAcceptance } from "@/lib/accepted-fix";
+import { acceptedFixGate, releaseAcceptedFix } from "@/lib/accepted-fix";
 import { latestPullRequestReport } from "@/lib/agent-api/pull-request-report";
 
 /**
@@ -174,10 +174,17 @@ export async function repairPullRequestLink(
   // repository (or this one, spelled differently).
   const samePullRequest = Boolean(old && old.number === target.number && (sameRepo(old, repo) || isFormerNameOf(old, repo)));
 
+  // #replacement-pr: an accepted fix is bound to its pull request, unless that
+  // one was closed without merging: then a replacement may be linked, and it is
+  // reviewed afresh.
+  let replacing: { acceptanceId: string } | null = null;
   if (!samePullRequest && prisma.agentAuditEvent) {
-    const accepted = await standingAcceptance(prisma, bug.id);
-    if (accepted) {
-      return fail(409, "status_changed", "This issue's accepted fix is bound to a different pull request — link the accepted one again.");
+    const gate = await acceptedFixGate(bug.id, previous);
+    if (gate.acceptance) {
+      if (!gate.replaceable) {
+        return fail(409, "status_changed", "This issue's accepted fix is bound to a different pull request — link the accepted one again. (A replacement is accepted only when the accepted pull request is reported closed without merging.)");
+      }
+      replacing = { acceptanceId: gate.acceptance.id };
     }
   }
 
@@ -226,11 +233,14 @@ export async function repairPullRequestLink(
         })
       ).count;
     }
+    if (replacing) {
+      await releaseAcceptedFix(tx, { bugId: bug.id, acceptanceId: replacing.acceptanceId, previous, next, actorUserId: agent.ownerId });
+    }
     await audit(
       agent,
       "issue.pull_request_repaired",
       `bug:${bug.id}`,
-      { from: previous, to: next, samePullRequest, headSha, moved: counts },
+      { from: previous, to: next, samePullRequest, headSha, moved: counts, ...(replacing ? { replacesPullRequestUrl: previous } : {}) },
       { bugId: bug.id, db: tx },
     );
     await publish(tx, {
@@ -245,6 +255,7 @@ export async function repairPullRequestLink(
         values: { pullRequestUrl: next },
         previousPullRequestUrl: previous,
         samePullRequest,
+        ...(replacing ? { replacesPullRequestUrl: previous, restartedReview: true } : {}),
         source: "agent",
         agentId: agent.agentId,
       },
