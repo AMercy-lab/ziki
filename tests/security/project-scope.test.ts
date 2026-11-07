@@ -93,7 +93,6 @@ import { projectRef } from "@/lib/project-paths";
 import { canManageProject } from "@/lib/project-permissions";
 import { joinOpenProjectAction } from "@/app/actions/project-join-requests";
 import { requireUser } from "@/lib/auth-helpers";
-import { getSkills } from "@/app/(app)/skills/skills-data";
 import { reviewSkillSubmissionAction } from "@/app/actions/skill-submissions";
 import IssueHistoryPage from "@/app/(app)/[org]/[project]/[number]/history/page";
 import ProjectIssueLayout from "@/app/(app)/[org]/[project]/[number]/layout";
@@ -454,7 +453,7 @@ describe("skills library public scope and review authorization", () => {
 
     const { skills, error } = await getSkills();
     expect(error).toBeUndefined();
-    expect(skills).toHaveLength(1);
+    expect(skills).toHaveLength(1 + CORE_SKILL_TEMPLATES.length);
     expect(skills[0].title).toBe("Vitest Deterministic Suite Runner");
     expect(skillSubmissionFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -484,37 +483,5 @@ describe("skills library public scope and review authorization", () => {
         rejectionReason: null,
       }),
     });
-  });
-});
-
-describe("skills library scope (#skills)", () => {
-  beforeEach(() => {
-    findMany.mockReset();
-  });
-
-  it("only lists approved skills, filtering out pending or rejected submissions", async () => {
-    findMany.mockResolvedValue([
-      {
-        id: "sub-vitest",
-        slug: "vitest-deterministic-suite-runner",
-        title: "Vitest Deterministic Suite Runner",
-        category: "testing",
-        categoryLabel: "Testing & QA",
-        summary: "Deterministic test suite runner with mutation testing.",
-        tags: ["vitest", "testing", "deterministic"],
-        prompt: "Run vitest deterministically.",
-        checklist: ["Run `npx vitest run --coverage`", "Verify mutants are caught"],
-        sampleCommand: "npx vitest run",
-        documentationUrl: null,
-        createdAt: new Date("2026-11-07T00:00:00.000Z"),
-        submittedBy: { name: "Vitest Team" },
-        status: "approved",
-      },
-    ]);
-
-    const { skills, error } = await getSkills();
-    expect(error).toBeUndefined();
-    expect(skills).toHaveLength(1 + CORE_SKILL_TEMPLATES.length);
-    expect(skills[0].title).toBe("Vitest Deterministic Suite Runner");
   });
 });
