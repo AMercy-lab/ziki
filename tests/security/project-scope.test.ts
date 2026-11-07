@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("typesense", () => ({ default: class {} }));
 
 const findFirst = vi.hoisted(() => vi.fn());
+const findMany = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/prisma", () => ({ prisma: { project: { findFirst }, skillSubmission: { findMany } } }));
 const publishedTasks = vi.hoisted(() => vi.fn());
 const taskCounts = vi.hoisted(() => vi.fn());
 const proposalCount = vi.hoisted(() => vi.fn());
@@ -86,11 +88,11 @@ import { readRejectedIdeas } from "@/app/(app)/[org]/[project]/marketing/ideas/r
 import { parseTaskView } from "@/components/marketing/tasks/model";
 import { marketingTabHref } from "@/lib/header-nav";
 import { issueProject } from "@/lib/agent-api/issues";
+import { getSkills, CORE_SKILL_TEMPLATES } from "@/app/(app)/skills/skills-data";
 import { projectRef } from "@/lib/project-paths";
 import { canManageProject } from "@/lib/project-permissions";
 import { joinOpenProjectAction } from "@/app/actions/project-join-requests";
 import { requireUser } from "@/lib/auth-helpers";
-import { getSkills } from "@/app/(app)/skills/skills-data";
 import { reviewSkillSubmissionAction } from "@/app/actions/skill-submissions";
 import IssueHistoryPage from "@/app/(app)/[org]/[project]/[number]/history/page";
 import ProjectIssueLayout from "@/app/(app)/[org]/[project]/[number]/layout";
@@ -451,7 +453,7 @@ describe("skills library public scope and review authorization", () => {
 
     const { skills, error } = await getSkills();
     expect(error).toBeUndefined();
-    expect(skills).toHaveLength(1);
+    expect(skills).toHaveLength(1 + CORE_SKILL_TEMPLATES.length);
     expect(skills[0].title).toBe("Vitest Deterministic Suite Runner");
     expect(skillSubmissionFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
