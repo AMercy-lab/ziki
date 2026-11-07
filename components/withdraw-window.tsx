@@ -25,7 +25,7 @@ function WithdrawBar({ earned: raw, checking: rawChecking }: { earned: number; c
   const pct = (value: number) => `${(value / total) * 100}%`;
   const parts = [
     { key: "earned", value: earned, shown: Math.max(0, raw), bar: "bg-zk-ok-fg", dot: "bg-zk-ok-fg", text: "font-bold text-zk-text", label: "earned" },
-    { key: "checking", value: checking, shown: rawChecking, bar: "bg-[repeating-linear-gradient(45deg,#f2c14e_0,#f2c14e_6px,#f7d98a_6px,#f7d98a_12px)]", dot: "bg-[#f2c14e]", text: "font-bold text-zk-warn-fg", label: "Ziki is checking" },
+    { key: "checking", value: checking, shown: rawChecking, bar: "bg-[repeating-linear-gradient(45deg,#f2c14e_0,#f2c14e_6px,#f7d98a_6px,#f7d98a_12px)]", dot: "bg-[#f2c14e]", text: "font-bold text-zk-warn-fg", label: "being checked" },
     { key: "togo", value: toGo, shown: toGo, bar: "bg-zk-accent/35", dot: "bg-zk-accent/40", text: "font-bold text-zk-accent", label: "to go" },
   ];
 
@@ -54,7 +54,8 @@ function WithdrawBar({ earned: raw, checking: rawChecking }: { earned: number; c
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zk-text2">
         {parts.map((part) =>
-          part.key === "earned" || part.shown > 0 ? (
+          // Earned always shows; "being checked" and "to go" only while the bar isn't full yet.
+          part.key === "earned" || (!ready && part.shown > 0) ? (
             <span key={part.key} className="inline-flex items-center gap-1.5">
               <span aria-hidden="true" className={`h-2 w-2 rounded-full ${part.dot}`} />
               <span className={part.text}>{money(part.shown)}</span> {part.label}
@@ -132,7 +133,7 @@ export function WithdrawWindow({ earned, organisationId, className, children }: 
             </button>
           </div>
           <p className="mt-1 text-sm text-zk-text2">
-            {ready ? `Your money${details?.workspace ? ` in ${details.workspace}` : ""} is ready. We’re still working out how payouts will work, and we’ll tell you as soon as you can take it out.` : `You have ${money(available)}${details?.workspace ? ` in ${details.workspace}` : ""}. ${money(left)} to go.`}
+            {ready ? "Your money is ready. We’re still working out how payouts will work, and we’ll tell you as soon as you can take it out." : `You have ${money(available)}. ${money(left)} to go.`}
           </p>
 
           <p className="mt-5 flex flex-wrap items-baseline gap-x-2">

@@ -371,7 +371,7 @@ export function AppHeader({
                 {formatZ(earned)}
                 <span className="sr-only"> earned: Your earnings</span>
               </Link>
-              <WithdrawWindow earned={earned} organisationId={earningsOrganisationId} className={`rounded-full bg-electric-blue-strong px-3 py-1.5 text-xs font-bold text-white hover:bg-[#2552af] max-sm:hidden ${linkFocus}`}>
+              <WithdrawWindow earned={earned} organisationId={earningsOrganisationId} className={`rounded-full bg-electric-blue-strong px-3 py-1.5 text-xs font-bold text-white hover:bg-[#2552af] max-sm:px-2.5 max-sm:py-1 ${linkFocus}`}>
                 Withdraw
               </WithdrawWindow>
             </div>

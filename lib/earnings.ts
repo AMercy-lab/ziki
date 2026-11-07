@@ -165,10 +165,9 @@ export async function taskScopeFor(db: Db, userId: string, selected: string | nu
 }
 
 export async function earningsSummary(db: Db, userId: string, scope: TaskScope | null = null) {
-  // Everything on the page is for the selected workspace; the total across all of them is given beside it.
+  // Everything on the page is for the selected workspace only (Chloe's call: no total across workspaces).
   const inOrg = scope?.organisationId ?? null;
   const here = inOrg ? { organisationId: inOrg } : {};
-  const allTotal = inOrg ? totalEarned(db, userId) : null;
   const weekStart = startOfWeek();
   const [total, checking, week, goalRow, byRole, solvedCount, latest, projectMemberships] = await Promise.all([
     totalEarned(db, userId, inOrg),
@@ -219,7 +218,6 @@ export async function earningsSummary(db: Db, userId: string, scope: TaskScope |
       });
 
   return {
-    allWorkspaces: allTotal ? await allTotal : null,
     joinedProjects: projectIds.length,
     total,
     checking,
