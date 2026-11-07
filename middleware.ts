@@ -47,8 +47,6 @@ export function isPublicPath(
     // The public comparison directory and every comparison page (#compare).
     pathWithoutBase === "/compare" ||
     pathWithoutBase.startsWith("/compare/") ||
-    pathWithoutBase === "/skills" ||
-    pathWithoutBase.startsWith("/skills/") ||
     // Old business links from earners' emails (#earn-outreach): opened by people who aren't signed in.
     /^\/r\/[a-z0-9]{4,16}$/.test(pathWithoutBase) ||
     isAuthPage ||
