@@ -16,6 +16,19 @@ export function getCategoryLabel(category: string): string {
   return CATEGORY_LABELS[category as SkillCategory] || "General";
 }
 
+/**
+ * The skills database is unreachable or erroring, as opposed to a slug that
+ * genuinely does not exist. Callers show an "unavailable" banner for this and
+ * keep `notFound()` for the missing-skill case (GAP 3).
+ */
+export class SkillUnavailableError extends Error {
+  constructor(cause?: unknown) {
+    super("The skills library is temporarily unavailable.");
+    this.name = "SkillUnavailableError";
+    this.cause = cause;
+  }
+}
+
 export interface SkillItem {
   id: string;
   slug: string;
@@ -389,6 +402,9 @@ export async function getSkillBySlug(slug: string): Promise<SkillItem | undefine
     return mapSubmissionToSkill(sub);
   } catch (error) {
     console.error("[skills] failed to load skill by slug", error);
-    return undefined;
+    // A broken database is not a missing skill: the page shows a banner instead
+    // of a misleading 404 (GAP 3).
+    throw new SkillUnavailableError(error);
   }
 }
+
