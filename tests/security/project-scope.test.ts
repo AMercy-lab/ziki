@@ -23,6 +23,8 @@ const projectJoinRequestUpdateMany = vi.hoisted(() => vi.fn());
 const bugCount = vi.hoisted(() => vi.fn());
 const bugFindFirst = vi.hoisted(() => vi.fn());
 const membershipUpsert = vi.hoisted(() => vi.fn());
+const txMembershipFindUnique = vi.hoisted(() => vi.fn());
+const awardSignupBonus = vi.hoisted(() => vi.fn());
 const ideaFindFirst = vi.hoisted(() => vi.fn());
 const notificationCreateMany = vi.hoisted(() => vi.fn().mockResolvedValue({ count: 1 }));
 const membershipFindMany = vi.hoisted(() => vi.fn());
@@ -45,10 +47,11 @@ vi.mock("@/lib/prisma", () => ({
     notification: { createMany: notificationCreateMany },
     skillSubmission: { findMany: skillSubmissionFindMany, findUnique: skillSubmissionFindUnique, update: skillSubmissionUpdate },
     $transaction: async (run: (tx: unknown) => Promise<unknown>) =>
-      run({ projectMembership: { upsert: projectMembershipUpsert }, membership: { upsert: membershipUpsert }, projectJoinRequest: { updateMany: projectJoinRequestUpdateMany } }),
+      run({ projectMembership: { upsert: projectMembershipUpsert }, membership: { upsert: membershipUpsert, findUnique: txMembershipFindUnique }, projectJoinRequest: { updateMany: projectJoinRequestUpdateMany } }),
   },
 }));
 vi.mock("@/components/marketing/tasks/tasks-board", () => ({ TasksBoard: () => null }));
+vi.mock("@/lib/points/signup-bonus", () => ({ awardSignupBonus }));
 vi.mock("@/lib/organisation-next-step-load", () => ({ loadOrganisationNextStep: vi.fn(async () => null) }));
 vi.mock("@/lib/workflow", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/workflow")>()),
@@ -398,6 +401,19 @@ describe("joinOpenProjectAction (#earnings)", () => {
     bugFindFirst.mockResolvedValue(null);
     ideaFindFirst.mockImplementation(async ({ where }: { where: { track: string } }) => (where.track === "marketing" ? { id: "i" } : null));
     expect(await joinOpenProjectAction("p-1")).toEqual({ ok: true, href: "/ziki/ziki-marketing/marketing" });
+  });
+
+  it("pays the signup bonus when joining makes you a member of its organisation, and not when you already were", async () => {
+    findFirst.mockResolvedValue(open);
+    bugCount.mockResolvedValue(1);
+    txMembershipFindUnique.mockResolvedValue(null);
+    await joinOpenProjectAction("p-1");
+    expect(awardSignupBonus).toHaveBeenCalledWith(expect.anything(), "user-1", "t-1");
+
+    awardSignupBonus.mockClear();
+    txMembershipFindUnique.mockResolvedValue({ id: "m-1" });
+    await joinOpenProjectAction("p-1");
+    expect(awardSignupBonus).not.toHaveBeenCalled();
   });
 
   it("refuses a project that isn't open, or isn't public, and adds nobody", async () => {
