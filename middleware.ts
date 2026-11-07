@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import authConfig from "@/auth.config";
 import { isLinkPreviewBot } from "@/lib/link-preview";
 import { BASE_PATH, toAppPath } from "@/lib/base-path";
-import { isProjectIssuePath, isReservedProjectSlug } from "@/lib/project-slug";
+import { isProjectIssuePath, isReservedProjectSlug, projectOverviewSegments } from "@/lib/project-slug";
 import { isProjectFirstPath } from "@/lib/project-paths";
 import { isPublicAgentPath } from "@/lib/public-agent-paths";
 import { safeCallbackUrl } from "@/lib/safe-callback-url";
@@ -39,13 +39,13 @@ export function isPublicPath(
     pathWithoutBase === "/how-it-works" ||
     pathWithoutBase === "/for-agents" ||
     pathWithoutBase === "/developers" ||
+    // Public skills library (guest-accessible per optionalUser()).
+    pathWithoutBase === "/skills" ||
+    pathWithoutBase.startsWith("/skills/") ||
     // The public comparison directory and every comparison page (#compare).
     pathWithoutBase === "/compare" ||
     pathWithoutBase.startsWith("/compare/") ||
-    pathWithoutBase === "/earn" ||
-    pathWithoutBase === "/skills" ||
-    pathWithoutBase.startsWith("/skills/") ||
-    // A business's own link from an earner's email (#earn-outreach): opened by people who aren't signed in.
+    // Old business links from earners' emails (#earn-outreach): opened by people who aren't signed in.
     /^\/r\/[a-z0-9]{4,16}$/.test(pathWithoutBase) ||
     isAuthPage ||
     isPasswordResetPage ||
@@ -72,6 +72,7 @@ export function isPublicPath(
     // session; each route rejects a request without one.
     pathWithoutBase.startsWith("/api/v1/") ||
     pathWithoutBase.startsWith("/_next") ||
+    projectOverviewSegments(pathWithoutBase) !== null ||
     pathWithoutBase === "/favicon.ico"
   );
 }
