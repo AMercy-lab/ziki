@@ -406,6 +406,9 @@ export function AppHeader({
                 <MenuLink href="/docs" active={isNavItemActive(pathname, "/docs")}>
                   Documentation
                 </MenuLink>
+                <MenuLink href="/skills" active={isNavItemActive(pathname, "/skills")}>
+                  Skills library
+                </MenuLink>
                 {reportFormUrl ? (
                   <MenuLink href={reportFormUrl}>Report issue</MenuLink>
                 ) : null}

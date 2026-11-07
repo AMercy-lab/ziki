@@ -56,7 +56,7 @@ function resolveIcon(title: string, category: string): SkillItem["icon"] {
 
 function mapSubmissionToSkill(sub: {
   id: string;
-  slug: string;
+  slug?: string;
   title: string;
   category: string;
   categoryLabel?: string;
@@ -379,10 +379,7 @@ export async function getSkillBySlug(slug: string): Promise<SkillItem | undefine
   // 2. Query database for approved community submissions
   try {
     const sub = await prisma.skillSubmission.findFirst({
-      where: {
-        OR: [{ slug: normalized }, { id: slug }],
-        status: "approved",
-      },
+      where: { id: slug, status: "approved" },
       include: {
         submittedBy: { select: { name: true } },
       },

@@ -30,7 +30,7 @@ const CATEGORY_OPTIONS: { id: SkillCategory; label: string }[] = [
   { id: "marketing", label: "SEO & Marketing" },
 ];
 
-export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
+export function EarnSkillsPortal({}: EarnSkillsPortalProps) {
   const [activeTab, setActiveTab] = useState<"submit" | "submissions">("submit");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -94,8 +94,6 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
     },
   ]);
 
-  const activeCategoryConfig = CATEGORY_OPTIONS.find((c) => c.id === category) || CATEGORY_OPTIONS[0];
-
   function showToast(msg: string) {
     setToastMessage(msg);
     setTimeout(() => {
@@ -119,13 +117,12 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
         body: JSON.stringify({
           title: title.trim(),
           category,
-          categoryLabel: activeCategoryConfig.label,
+          categoryLabel: CATEGORY_OPTIONS.find((c) => c.id === category)?.label || category,
           summary: summary.trim(),
           tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
           prompt: prompt.trim(),
           sampleCommand: sampleCommand.trim() || undefined,
           documentationUrl: docUrl.trim() || undefined,
-          bounty: activeCategoryConfig.defaultBounty,
         }),
       });
       if (!res.ok) throw new Error("Failed to submit skill.");
@@ -166,9 +163,6 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
       setIsSubmitting(false);
     }
   }
-
-  const approvedCount = submissions.filter((s) => s.status === "approved").length;
-  const inReviewCount = submissions.filter((s) => s.status === "pending").length;
 
   return (
     <div className="mx-auto w-full max-w-[1040px] space-y-8 pb-12">
@@ -265,10 +259,11 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
               {/* Title & Category Grid */}
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-zk-text2">
+                  <label htmlFor="skill-title" className="block text-sm font-semibold text-zk-text2">
                     Skill Title <span className="text-red-500">*</span>
                   </label>
                   <input
+                    id="skill-title"
                     type="text"
                     required
                     placeholder="e.g. Next.js App Router Auditor"
@@ -279,10 +274,11 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-zk-text2">
+                  <label htmlFor="skill-category" className="block text-sm font-semibold text-zk-text2">
                     Category <span className="text-red-500">*</span>
                   </label>
                   <select
+                    id="skill-category"
                     value={category}
                     onChange={(e) => setCategory(e.target.value as SkillCategory)}
                     className="w-full min-h-[44px] rounded-xl border border-zk-border bg-zk-surface px-3.5 py-2.5 text-sm font-semibold text-zk-text focus-visible:outline-2 focus-visible:outline-zk-accent focus-visible:outline-offset-2 transition-all"
@@ -298,10 +294,11 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
 
               {/* Short Summary */}
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-zk-text2">
+                <label htmlFor="skill-summary" className="block text-sm font-semibold text-zk-text2">
                   Short Summary <span className="text-red-500">*</span>
                 </label>
                 <textarea
+                  id="skill-summary"
                   required
                   rows={2}
                   placeholder="One or two sentences explaining what capabilities this skill gives an AI agent..."
@@ -313,10 +310,11 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
 
               {/* Tags */}
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-zk-text2">
+                <label htmlFor="skill-tags" className="block text-sm font-semibold text-zk-text2">
                   Tags <span className="text-zk-muted font-normal">(comma-separated)</span>
                 </label>
                 <input
+                  id="skill-tags"
                   type="text"
                   placeholder="e.g. nextjs, app-router, server-components, audit"
                   value={tags}
@@ -328,12 +326,13 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
               {/* Agent System Instructions (Prompt) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="block text-sm font-semibold text-zk-text2">
+                  <label htmlFor="skill-prompt" className="block text-sm font-semibold text-zk-text2">
                     Agent System Instructions (Prompt) <span className="text-red-500">*</span>
                   </label>
                   <span className="text-xs text-zk-muted">Injected into agent context</span>
                 </div>
                 <textarea
+                  id="skill-prompt"
                   required
                   rows={5}
                   placeholder={`You have the Next.js App Router Auditor skill equipped.
@@ -348,10 +347,11 @@ export function EarnSkillsPortal({ user }: EarnSkillsPortalProps) {
 
               {/* Verification Assertions */}
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-zk-text2">
+                <label htmlFor="skill-checklist" className="block text-sm font-semibold text-zk-text2">
                   Verification Assertions <span className="text-zk-muted font-normal">(one per line)</span>
                 </label>
                 <textarea
+                  id="skill-checklist"
                   rows={3}
                   placeholder={`Run tsc --noEmit with 0 errors
 Verify layout constraints and zero overflow warnings
@@ -365,8 +365,9 @@ Confirm passing test suite`}
               {/* Sample Command & Documentation URL */}
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-zk-text2">Sample Execution Command</label>
+                  <label htmlFor="skill-sample-command" className="block text-sm font-semibold text-zk-text2">Sample Execution Command</label>
                   <input
+                    id="skill-sample-command"
                     type="text"
                     placeholder="e.g. npx tsc --noEmit"
                     value={sampleCommand}
@@ -376,8 +377,9 @@ Confirm passing test suite`}
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-zk-text2">Documentation / Source URL</label>
+                  <label htmlFor="skill-doc-url" className="block text-sm font-semibold text-zk-text2">Documentation / Source URL</label>
                   <input
+                    id="skill-doc-url"
                     type="url"
                     placeholder="https://..."
                     value={docUrl}
