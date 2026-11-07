@@ -1,7 +1,8 @@
-import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { notFound } from "next/navigation";
+import { ProjectOverviewView } from "@/components/project-overview";
+import { optionalUser } from "@/lib/auth-helpers";
 import { requireProject } from "@/lib/project-route";
-import { projectHomePath } from "@/lib/marketing/project-home";
+import { loadProjectOverview } from "@/lib/project-overview";
 
 type Props = { params: Promise<{ org: string; project: string }> };
 
@@ -11,8 +12,12 @@ type Props = { params: Promise<{ org: string; project: string }> };
  * address picks the project and lib/project-route.ts checks access: a project
  * you can't see is a 404, like any unknown address.
  */
-export default async function ProjectHomePage({ params }: Props) {
+export default async function ProjectOverviewPage({ params }: Props) {
   const { org, project: slug } = await params;
-  const { project } = await requireProject(org, slug);
-  redirect(await projectHomePath(prisma, project.id, project.ref));
+  const user = await optionalUser();
+  if (user) await requireProject(org, slug);
+  const data = await loadProjectOverview(org, slug, user);
+  if (!data) notFound();
+
+  return <ProjectOverviewView data={data} currentUserId={user?.id ?? null} />;
 }
