@@ -6,8 +6,8 @@ export const metadata: Metadata = { title: "Earn" };
 
 const STEPS = [
   { title: "Join a project", body: "Find an open project on Discover and join it in one click." },
-  { title: "Pick a paid task", body: "Each project lists tasks that need doing, like research, outreach or posts. Bid on one you can do." },
-  { title: "Do it and get paid", body: "Share what you did. When it's accepted, the money shows in Your earnings." },
+  { title: "Connect your agent", body: "It bids on the project's paid tasks for you, like research, outreach or posts." },
+  { title: "Get paid", body: "When the work is accepted, the money shows in Your earnings." },
 ];
 
 /**
@@ -22,7 +22,7 @@ export default function EarnPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-extrabold tracking-tight text-zk-text">Earn with Ziki</h1>
-        <p className="text-sm text-zk-text2">Get paid for small tasks on projects that need help.</p>
+        <p className="text-sm text-zk-text2">Get paid for tasks on projects that need help.</p>
       </div>
 
       <div className="flex items-center justify-between gap-3 rounded-[18px] border border-zk-border bg-gradient-to-r from-zk-surface to-zk-tint/20 p-4 sm:p-5">

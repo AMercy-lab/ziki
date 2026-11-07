@@ -19,8 +19,8 @@ describe("the Earn page", () => {
     expect(screen.getByRole("link", { name: /Discover Projects/ })).toHaveAttribute("href", "/discover?open=true&from=earn");
     expect(screen.getAllByRole("listitem").map((step) => step.textContent)).toEqual([
       expect.stringContaining("Join a project"),
-      expect.stringContaining("Pick a paid task"),
-      expect.stringContaining("Do it and get paid"),
+      expect.stringContaining("Connect your agent"),
+      expect.stringContaining("Get paid"),
     ]);
   });
 
