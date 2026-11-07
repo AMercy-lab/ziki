@@ -1,3 +1,5 @@
+import { AskAboutFix } from "@/components/ask-about-fix";
+import { ASKABLE_STATUSES } from "@/lib/validations/support-thread";
 import { MergerTransparencyCard } from "@/components/merger-transparency-card";
 import { requireProject } from "@/lib/project-route";
 import Link from "next/link";
@@ -828,6 +830,17 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
   const confirming = !bug.isDeleted && takesConfirmations(bug.substatus, confirmationsData?.confirmed ?? pastConfirmation);
   // Anyone may confirm their own issue (#confirmation-weights): it counts 1.
   const confirmationBlock: ConfirmationBlock = null;
+  const activeSupportThread =
+    isOrgMember && !bug.isDeleted && (ASKABLE_STATUSES as readonly string[]).includes(bug.status)
+      ? await prisma.supportThread.findFirst({
+          where: {
+            bugId: bug.id,
+            requesterUserId: user.id,
+            status: { in: ["open", "taken"] },
+          },
+          select: { id: true },
+        })
+      : null;
   // #close-reasons: the issue's owner may withdraw it while it is not closed or live.
   const canWithdraw = !bug.isDeleted && bug.status !== "closed" && bug.status !== "resolved" && ownsIssue(bug, user.id);
   const isAssignee = !!userId && bug.assigneeId === userId;
@@ -2258,6 +2271,20 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
               <p data-testid="close-evidence" className="m-0 break-words text-xs leading-[1.5] text-zk-muted">
                 {bug.closeEvidence}
               </p>
+            ) : null}
+            {/* createSupportThreadAction accepts organisation members only, so nobody else is offered the button. */}
+            {isOrgMember && !bug.isDeleted && (ASKABLE_STATUSES as readonly string[]).includes(bug.status) ? (
+              activeSupportThread ? (
+                <Link
+                  href={`/inbox?tab=requests&thread=${activeSupportThread.id}`}
+                  className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-zk-border bg-zk-chip/40 px-3 text-xs font-semibold text-zk-text hover:bg-zk-chip"
+                >
+                  <span aria-hidden="true">💬</span>
+                  <span>View your request</span>
+                </Link>
+              ) : (
+                <AskAboutFix issueId={bug.id} issueNumber={bug.number} issueTitle={bug.title} />
+              )
             ) : null}
             {/* The reporter or the person it is for cancels their own issue (#close-reasons). */}
             {canWithdraw ? (
