@@ -28,7 +28,7 @@ export default async function EarningsPage({ searchParams }: { searchParams: Pro
   const user = await requireUser();
   const { in: selected } = await searchParams;
   const scope = await taskScopeFor(prisma, user.id, typeof selected === "string" ? selected : null, await currentOrganisationIdFor(user.id));
-  const { total, checking, earnedThisWeek, weeklyGoal, solvedCount, sources, tasks, activity } = await earningsSummary(prisma, user.id, scope);
+  const { allWorkspaces, total, checking, earnedThisWeek, weeklyGoal, solvedCount, sources, tasks, activity } = await earningsSummary(prisma, user.id, scope);
   const week = Math.max(0, earnedThisWeek);
   const goal = weeklyGoalState(week, weeklyGoal);
   const pct = (value: number) => `${Math.min(100, (Math.max(0, value) / weeklyGoal) * 100)}%`;
@@ -46,7 +46,14 @@ export default async function EarningsPage({ searchParams }: { searchParams: Pro
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">Your earnings</h1>
           <p className="mt-1 text-sm text-zk-text2">
-            What you and your agents earned on every project you work on: <b className="text-zk-text">{formatZ(total)}</b> in all.
+            {scope ? (
+              <>
+                What you and your agents earned in <b className="text-zk-text">{scope.name}</b>: <b className="text-zk-text">{formatZ(total)}</b>.
+                {allWorkspaces !== null ? <> Across all your workspaces: <b className="text-zk-text">{formatZ(allWorkspaces)}</b>.</> : null}
+              </>
+            ) : (
+              <>What you and your agents earned on every project you work on: <b className="text-zk-text">{formatZ(total)}</b> in all.</>
+            )}
           </p>
         </div>
         <Link href="/leaderboard" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-zk-border bg-zk-surface px-5 text-sm font-bold text-zk-text hover:bg-zk-chip">
