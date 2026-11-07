@@ -109,7 +109,7 @@ export function SkillsDirectory({ skills, loadError }: SkillsDirectoryProps) {
             </p>
           </div>
           <Link
-            href="/earn/skills"
+            href="/skills/contribute"
             className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:brightness-110 transition shrink-0"
           >
             <span>+ Submit a Skill</span>
