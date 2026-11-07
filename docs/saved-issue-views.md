@@ -12,7 +12,7 @@ Previously a recurring queue had to be reconstructed or bookmarked in the browse
 
 The [query helper](../lib/saved-issue-views.ts) stores only supported filter keys. Links use the existing project-route helpers. Pagination and unknown parameters are omitted. Saving also captures the effective sort order when it came from the user's sort cookie.
 
-The additive [migration](../prisma/migrations/20270109000003_saved_issue_views/migration.sql) creates SavedIssueView. User and project foreign keys cascade deletion. Apply pending migrations with `pnpm exec prisma migrate deploy` before serving the new code.
+The additive [migration](../prisma/migrations/20270114000002_saved_issue_views/migration.sql) creates SavedIssueView. User and project foreign keys cascade deletion. Apply pending migrations with `pnpm exec prisma migrate deploy` before serving the new code.
 
 ## Verification
 

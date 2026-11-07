@@ -163,8 +163,7 @@ export async function loadActivity(
     }),
   );
 
-  const claims: ActivityClaim[] = claimRows.flatMap((claim) => {
-    if (claim.status === "planning") return [];
+  const claims: ActivityClaim[] = claimRows.map((claim) => {
     const workflow = workflows.get(claim.bug.projectId)!;
     return {
       id: claim.id,
