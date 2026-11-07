@@ -37,6 +37,9 @@ export function isPublicPath(
     pathWithoutBase === "/how-it-works" ||
     pathWithoutBase === "/for-agents" ||
     pathWithoutBase === "/developers" ||
+    // Public skills library (guest-accessible per optionalUser()).
+    pathWithoutBase === "/skills" ||
+    pathWithoutBase.startsWith("/skills/") ||
     isAuthPage ||
     isPasswordResetPage ||
     isPublicAgentPath(pathWithoutBase) ||

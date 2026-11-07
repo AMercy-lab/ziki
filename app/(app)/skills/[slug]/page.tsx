@@ -78,9 +78,6 @@ export default async function SkillDetailPage({
         <div className="sm:flex sm:items-start sm:justify-between gap-4">
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                {skill.badge}
-              </span>
               <span className="rounded bg-zk-chip px-2.5 py-0.5 text-xs font-mono text-zk-muted">
                 #{skill.category}
               </span>
@@ -107,7 +104,7 @@ export default async function SkillDetailPage({
         <div className="mt-5 sm:mt-6 flex flex-wrap items-center gap-3 text-xs text-zk-muted pt-3 border-t border-zk-border/50">
           <span>By <strong className="text-zk-text">{skill.author.name}</strong></span>
           <span className="hidden sm:inline">•</span>
-          <span>{skill.usersCount} agents equipped</span>
+          <span>{skill.tags.length} tags</span>
           {skill.spec.documentationUrl && (
             <>
               <span className="hidden sm:inline">•</span>
@@ -140,7 +137,7 @@ export default async function SkillDetailPage({
           <section className="space-y-3">
             <h2 className="text-lg font-bold text-zk-text">Capabilities &amp; Features</h2>
             <ul className="space-y-2 rounded-xl border border-zk-border bg-zk-surface p-5">
-              {skill.spec.capabilities.map((cap, i) => (
+              {skill.spec.checklist.map((cap, i) => (
                 <li key={i} className="flex items-start gap-2.5 text-sm text-zk-text">
                   <span className="mt-0.5 text-emerald-500 font-bold">✓</span>
                   <span>{cap}</span>
@@ -208,7 +205,7 @@ export default async function SkillDetailPage({
               <div className="pt-2 flex justify-between">
                 <span className="text-zk-muted">Verification Status</span>
                 <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                  {skill.badge}
+                  Approved
                 </span>
               </div>
               <div className="pt-2 flex justify-between">

@@ -1,5 +1,20 @@
-export type SkillCategory = "testing" | "security" | "design" | "backend" | "marketing";
+import { prisma } from "@/lib/prisma";
+
+export type SkillCategory = "testing" | "security" | "design" | "backend" | "marketing" | "general";
 export type SkillBadgeColor = "blue" | "emerald" | "indigo" | "pink" | "purple" | "cyan" | "amber";
+
+export const CATEGORY_LABELS: Record<SkillCategory, string> = {
+  testing: "Testing & QA",
+  security: "Security",
+  design: "Design & UI",
+  backend: "Backend & Database",
+  marketing: "SEO & Content",
+  general: "General",
+};
+
+export function getCategoryLabel(category: string): string {
+  return CATEGORY_LABELS[category as SkillCategory] || "General";
+}
 
 export interface SkillItem {
   id: string;
@@ -8,485 +23,374 @@ export interface SkillItem {
   icon: "flutter" | "shield" | "browser" | "figma" | "database" | "a11y" | "test" | "api" | "seo";
   category: SkillCategory;
   categoryLabel: string;
-  badge: string;
+  badge?: string;
   badgeColor?: SkillBadgeColor;
   description: string;
   tags: string[];
-  usersCount: number;
   prompt: string;
   spec: {
     overview: string;
-    capabilities: string[];
     checklist: string[];
-    sampleCommand: string;
-    documentationUrl?: string;
+    sampleCommand?: string | null;
+    documentationUrl?: string | null;
   };
   author: {
     name: string;
     handle: string;
-    isVerified: boolean;
   };
   createdAt: string;
 }
 
-export const VERIFIED_SKILLS: SkillItem[] = [
-  {
-    id: "flutter-desktop-qa",
-    slug: "flutter-desktop-qa",
-    title: "Flutter Desktop QA Runner",
-    icon: "flutter",
-    category: "testing",
-    categoryLabel: "Testing & QA",
-    badge: "Verified",
-    description:
-      "Runs headless widget regression tests, verifies single-responsibility layout constraints, and captures visual evidence.",
-    tags: ["flutter", "dart", "desktop", "widgets"],
-    usersCount: 142,
-    prompt: `You have the Flutter Desktop QA Runner skill equipped.
-Before marking any Flutter PR or fix ready:
-1. Verify widget layout constraints with zero overflow warnings.
-2. Ensure null safety checks on user initials, avatars, and profile states.
-3. Run \`flutter test\` on modified files and confirm 100% passing tests.
-4. Always provide clear, cropped visual before/after verification evidence.`,
+function resolveIcon(title: string, category: string): SkillItem["icon"] {
+  const t = title.toLowerCase();
+  const c = category.toLowerCase();
+  if (t.includes("flutter")) return "flutter";
+  if (c === "security" || t.includes("security") || t.includes("snare") || t.includes("guard")) return "shield";
+  if (t.includes("browser") || t.includes("playwright") || t.includes("e2e")) return "browser";
+  if (c === "design" || t.includes("figma") || t.includes("tailwind") || t.includes("ui")) return "figma";
+  if (c === "backend" || t.includes("database") || t.includes("postgres") || t.includes("sql") || t.includes("redis")) return "database";
+  if (t.includes("accessibility") || t.includes("a11y") || t.includes("wcag")) return "a11y";
+  if (t.includes("seo") || c === "marketing") return "seo";
+  return "test";
+}
+
+function mapSubmissionToSkill(sub: {
+  id: string;
+  title: string;
+  category: string;
+  categoryLabel?: string;
+  summary: string;
+  tags: string[];
+  prompt: string;
+  sampleCommand?: string | null;
+  documentationUrl?: string | null;
+  createdAt: Date;
+  submittedBy?: { name: string | null } | null;
+}): SkillItem {
+  const authorName = sub.submittedBy?.name || "Contributor";
+  const handle = "@" + authorName.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const category = (sub.category as SkillCategory) || "general";
+  const slug = sub.id;
+
+  return {
+    id: sub.id,
+    slug,
+    title: sub.title,
+    icon: resolveIcon(sub.title, sub.category),
+    category,
+    categoryLabel: sub.categoryLabel ? (getCategoryLabel(sub.categoryLabel) as string) : getCategoryLabel(category),
+    description: sub.summary,
+    tags: Array.isArray(sub.tags) ? sub.tags : [],
+    prompt: sub.prompt,
     spec: {
-      overview:
-        "Comprehensive testing and verification suite tailored for Flutter desktop and web applications. Automates layout assertion and regression passes.",
-      capabilities: [
-        "Headless widget testing with simulated mouse interactions",
-        "Single-responsibility state assertions",
-        "Layout constraint validation (zero RenderFlex overflow)",
-        "Automated before/after visual evidence generation"
-      ],
-      checklist: [
-        "Run `flutter analyze` with 0 warnings or errors",
-        "Run `flutter test test/...` targeting modified components",
-        "Verify focus rings, keyboard navigability, and cursor hover styles"
-      ],
-      sampleCommand: "flutter test test/features/channels/attachment_preview_test.dart",
-      documentationUrl: "https://docs.flutter.dev/testing/overview"
+      overview: sub.summary,
+      checklist: [],
+      sampleCommand: sub.sampleCommand || null,
+      documentationUrl: sub.documentationUrl || null,
     },
     author: {
-      name: "Ziki Core Team",
-      handle: "@ziki",
-      isVerified: true
+      name: authorName,
+      handle,
     },
-    createdAt: "2026-10-15T10:00:00.000Z"
-  },
+    createdAt: sub.createdAt.toISOString(),
+  };
+}
+
+export const CORE_SKILL_TEMPLATES: SkillItem[] = [
   {
-    id: "snare-clean-gate",
-    slug: "snare-clean-gate",
-    title: "Snare Security & Clean Gate",
+    id: "core-snare-gate",
+    slug: "snare-supply-chain-guardrail",
+    title: "Snare: Supply-Chain Defense & Pre-Execution Gate",
     icon: "shield",
     category: "security",
-    categoryLabel: "Security",
-    badge: "Official Gate",
+    categoryLabel: CATEGORY_LABELS.security,
     description:
-      "Pre-flight gatekeeper that scans for disguised payloads, blocks binary screenshot bloat, and verifies clean commands.",
-    tags: ["security", "git-hygiene", "zero-bloat", "sentinel"],
-    usersCount: 320,
-    prompt: `You are equipped with the Snare Gatekeeper skill.
-1. NEVER commit binary screenshots or large assets into git history.
-2. Scan all command executions, dependency pulls, and branch checkouts before running.
-3. Abort immediately if any unapproved hook or untrusted script modifies root configuration.`,
+      "Defends agent sandboxes against committed repository payloads, compromised task runners, and supply-chain droppers.",
+    tags: ["security", "supply-chain", "snare", "guardrails", "gate"],
+    prompt: `## Snare: Pre-Execution Supply-Chain Gate
+You are operating with the Snare supply-chain defense gate enabled.
+
+Repositories can contain committed payloads in build configs, .vscode/tasks.json, or package run scripts that fire automatically upon install or run.
+
+Before executing:
+1. git clone, git pull, git merge, or git rebase on untrusted branches
+2. Dependency installations (npm, pnpm, yarn, bun install)
+3. Build scripts or dev servers (pnpm run dev, next, vite, node)
+
+Prepend the command with the snare gate:
+snare gate -- <the exact command>
+
+Rules:
+- Exit code 0: The command is clean. Proceed with execution.
+- Non-zero exit: Halted. DO NOT bypass or retry via alternative shells or package managers. Report the flagged files to the user immediately.`,
     spec: {
       overview:
-        "Enforces zero git bloat, pre-commit credential detection, and sanitized environment variables across all connected agent sessions.",
-      capabilities: [
-        "Pre-checkout SHA safety verification",
-        "Binary asset interception (blocks unintended git history bloat)",
-        "Zero-trust credential leaks detection",
-        "Host daemon execution protection"
-      ],
+        "Nexlabz Snare intercepts repo-level supply chain attacks that bypass standard package audits by inspecting tasks, scripts, and binaries prior to execution.",
       checklist: [
-        "Run `snare gate -- <cmd>` before every repository execution",
-        "Verify 0 binary assets committed to pull request diff",
-        "Confirm clean line endings (strict LF only)"
+        "Checks .vscode/tasks.json, package scripts, and postinstall hooks",
+        "Blocks execution on untrusted binary or dropper indicators",
+        "Deterministic exit code gate (0 = clean, non-zero = alert)",
+        "Zero bypass mode: forbids falling back to alternative shells",
       ],
-      sampleCommand: "snare gate -- npm test",
-      documentationUrl: "https://ziki.dev/security/gate"
+      sampleCommand: "snare gate -- pnpm install",
+      documentationUrl: "https://nexlabz.github.io/snare/",
     },
     author: {
-      name: "Security Workgroup",
-      handle: "@security",
-      isVerified: true
+      name: "Nexlabz / Ziki Core",
+      handle: "@nexlabz",
     },
-    createdAt: "2026-10-18T14:30:00.000Z"
+    createdAt: "2026-11-06T00:00:00.000Z",
   },
   {
-    id: "playwright-e2e-inspector",
-    slug: "playwright-e2e-inspector",
+    id: "core-playwright-e2e",
+    slug: "playwright-e2e-browser-inspector",
     title: "Playwright E2E Browser Inspector",
     icon: "browser",
     category: "testing",
-    categoryLabel: "Testing & QA",
-    badge: "Popular",
+    categoryLabel: CATEGORY_LABELS.testing,
     description:
-      "Automates headless Chromium browser user scenarios, checks console errors, and asserts responsive component states.",
-    tags: ["playwright", "e2e", "browser", "react"],
-    usersCount: 215,
-    prompt: `You have the Playwright E2E Browser Inspector skill equipped.
-1. Run target specs under \`e2e/\` using headless browser engine.
-2. Ensure all selectors rely on accessible roles and data attributes rather than fragile CSS classes.
-3. Validate session cookie restoration across protected paths.`,
+      "Automates headless Chromium browser user flows, inspects console logs for unhandled errors, and asserts responsive component states.",
+    tags: ["playwright", "e2e", "browser", "testing", "qa"],
+    prompt: `## Playwright E2E Browser Testing Agent
+You are an End-to-End browser testing agent using Microsoft Playwright.
+
+When validating web applications or new user journeys:
+1. Write concise, self-contained test scenarios using @playwright/test.
+2. Assert both desktop (1280px) and mobile viewport (375px) layouts.
+3. Catch unhandled client-side runtime errors and failed network requests.
+4. Capture traces and screenshots on assertion failures to provide actionable bug repros.
+
+Execution command:
+pnpm exec playwright test`,
     spec: {
       overview:
-        "End-to-end browser automation and visual regression harness testing real user journeys in Chromium and WebKit environments.",
-      capabilities: [
-        "Headless multi-tab session execution",
-        "Network request interception & fixture mocking",
-        "Visual snapshot diffing across screen breakpoints",
-        "Full trace zip archive generation on test failure"
-      ],
+        "Runs headless Chromium and mobile emulation suites to catch rendering bugs, broken form submissions, and uncaught browser exceptions before release.",
       checklist: [
-        "Run `npx playwright test e2e/...`",
-        "Assert proper aria-label and role accessibility on target buttons",
-        "Confirm no unhandled console errors during navigation"
+        "Executes cross-browser tests across desktop and mobile viewports",
+        "Validates form submissions and optimistic UI updates",
+        "Listens for unhandled console errors and failed API responses",
+        "Generates Playwright trace artifacts on test failures",
       ],
-      sampleCommand: "npx playwright test e2e/auth-flow.spec.ts",
-      documentationUrl: "https://playwright.dev"
+      sampleCommand: "pnpm exec playwright test --headed",
+      documentationUrl: "https://playwright.dev/",
     },
     author: {
-      name: "Frontend Reliability Guild",
-      handle: "@qa-guild",
-      isVerified: true
+      name: "Playwright / Ziki Core",
+      handle: "@playwright",
     },
-    createdAt: "2026-10-20T09:15:00.000Z"
+    createdAt: "2026-11-06T00:00:00.000Z",
   },
   {
-    id: "figma-token-style-sync",
-    slug: "figma-token-style-sync",
-    title: "Figma Token & Style Sync",
-    icon: "figma",
-    category: "design",
-    categoryLabel: "Design & UI",
-    badge: "Design Token",
-    description:
-      "Extracts design tokens, typography scales, and padding variables from Figma to match the project design system.",
-    tags: ["figma", "design-system", "anti-slop", "tokens"],
-    usersCount: 89,
-    prompt: `You are equipped with the Figma Token & Style Sync skill.
-1. Strictly extract and verify design tokens against the project Figma specification.
-2. Ensure semantic palette mapping to CSS variables and theme configuration.
-3. Validate responsive typography and spacing scale compliance.`,
-    spec: {
-      overview:
-        "Synchronizes Figma design system variables directly into Tailwind and CSS variable definitions, preventing arbitrary spacing and color values.",
-      capabilities: [
-        "Figma REST API design token extraction",
-        "Design token diffing against active stylesheets",
-        "Automated semantic color palette mapping",
-        "Typography and spacing scale synchronization"
-      ],
-      checklist: [
-        "Sync design tokens via `npm run tokens:sync`",
-        "Verify dark and light mode variable coverage",
-        "Ensure no arbitrary hex colors introduced into components"
-      ],
-      sampleCommand: "npm run tokens:sync",
-      documentationUrl: "https://www.figma.com/developers/api"
-    },
-    author: {
-      name: "Design Systems Team",
-      handle: "@design",
-      isVerified: true
-    },
-    createdAt: "2026-10-22T16:00:00.000Z"
-  },
-  {
-    id: "postgres-migration-auditor",
-    slug: "postgres-migration-auditor",
-    title: "Postgres & Migration Auditor",
-    icon: "database",
-    category: "backend",
-    categoryLabel: "Backend & Database",
-    badge: "Database",
-    description:
-      "Performs dry-run SQL migrations, audits index declarations, and tests backward-compatible schema rollbacks.",
-    tags: ["postgres", "prisma", "neon", "migrations"],
-    usersCount: 94,
-    prompt: `You are equipped with the Postgres Migration Auditor skill.
-1. When modifying \`schema.prisma\`, verify all foreign keys have appropriate indexes.
-2. Confirm new migrations include idempotent rollbacks or backward-compatible column additions.
-3. Never drop tables or columns in production without a verified 2-step deprecation cycle.`,
-    spec: {
-      overview:
-        "Static and runtime analyzer for Prisma schema migrations. Identifies potential table locks, missing compound indexes, and destructive schema changes.",
-      capabilities: [
-        "Missing index detection on relational foreign keys",
-        "Lock hazard analysis for existing high-volume tables",
-        "Idempotency verification across multiple shadow environments",
-        "Automated schema drift diffing"
-      ],
-      checklist: [
-        "Run `npx prisma migrate dev --create-only`",
-        "Audit generated SQL in `prisma/migrations/`",
-        "Verify `prisma generate` compiles with 0 TypeScript mismatches"
-      ],
-      sampleCommand: "npx prisma migrate status",
-      documentationUrl: "https://www.prisma.io/docs/concepts/components/prisma-migrate"
-    },
-    author: {
-      name: "Data Platform Team",
-      handle: "@data-infra",
-      isVerified: true
-    },
-    createdAt: "2026-10-25T11:20:00.000Z"
-  },
-  {
-    id: "wcag-accessibility-auditor",
+    id: "core-wcag-a11y",
     slug: "wcag-accessibility-auditor",
-    title: "WCAG Accessibility Auditor",
+    title: "WCAG 2.1 AA Accessibility Auditor",
     icon: "a11y",
-    category: "design",
-    categoryLabel: "Design & UI",
-    badge: "A11y AA",
+    category: "testing",
+    categoryLabel: CATEGORY_LABELS.testing,
     description:
-      "Automates WCAG 2.1 AA audits across modified components: inspects contrast ratios, focus order, and ARIA labels.",
-    tags: ["a11y", "wcag-aa", "aria", "contrast"],
-    usersCount: 178,
-    prompt: `You have the WCAG Accessibility Auditor skill equipped.
-1. Verify all interactive elements have visible focus rings and accessible labels (\`aria-label\`).
-2. Test keyboard tab ordering and ensure modals trap focus and dismiss on Escape.
-3. Ensure color contrast ratios meet minimum 4.5:1 for body copy.`,
+      "Automated compliance checks ensuring interactive controls, forms, focus outlines, and color contrast meet WCAG 2.1 AA standards.",
+    tags: ["accessibility", "a11y", "wcag", "axe-core", "testing"],
+    prompt: `## WCAG 2.1 AA Accessibility Auditor
+You are an accessibility auditor using axe-core and web.dev guidelines.
+
+When reviewing frontend components or user interfaces:
+1. Verify all interactive elements (<button>, <a>, <input>) possess accessible names.
+2. Ensure color contrast ratios meet at least 4.5:1 for normal text and 3:1 for large text.
+3. Confirm keyboard focus rings are visible on :focus-visible.
+4. Validate modal focus traps and Esc key dismissal behaviors.
+
+Audit command:
+pnpm exec axe-core-cli http://localhost:3000`,
     spec: {
       overview:
-        "Full accessibility auditing suite integrating Axe-Core and automated WCAG 2.1 AA evaluation across all web components.",
-      capabilities: [
-        "Automated axe-core DOM accessibility scanning",
-        "Focus trap and tab cycle validation in modal dialogs",
-        "Screen-reader announcement simulation (aria-live, atomic)",
-        "Minimum touch-target size evaluation (>=44x44px)"
-      ],
+        "Comprehensive accessibility inspection rules to prevent a11y regressions and guarantee compliance with global WCAG 2.1 AA criteria.",
       checklist: [
-        "Verify all icon-only buttons include descriptive `aria-label` or `Tooltip`",
-        "Ensure backdrop overlays handle click-outside and Escape dismiss",
-        "Confirm form inputs have associated `<label>` or `aria-labelledby`"
+        "Ensures all buttons and links have distinct accessible names",
+        "Verifies 4.5:1 contrast against theme surfaces",
+        "Audits form inputs for explicit label bindings",
+        "Tests keyboard tab navigation order and modal focus traps",
       ],
-      sampleCommand: "npm run test:a11y",
-      documentationUrl: "https://www.w3.org/WAI/standards-guidelines/wcag/"
+      sampleCommand: "pnpm test tests/ui/critical-a11y.test.tsx",
+      documentationUrl: "https://www.w3.org/WAI/WCAG21/quickref/",
     },
     author: {
-      name: "Inclusive Web Guild",
-      handle: "@a11y-lead",
-      isVerified: true
+      name: "Axe / Ziki Core",
+      handle: "@axecore",
     },
-    createdAt: "2026-10-28T13:45:00.000Z"
+    createdAt: "2026-11-06T00:00:00.000Z",
   },
   {
-    id: "seo-crawler-meta-optimizer",
-    slug: "seo-crawler-meta-optimizer",
-    title: "SEO & Crawler Meta Optimizer",
-    icon: "browser",
-    category: "marketing",
-    categoryLabel: "SEO & Marketing",
-    badge: "SEO Specialist",
-    description:
-      "Audits canonical tags, OpenGraph previews, JSON-LD structured schemas, and ensures zero broken indexing across crawlers.",
-    tags: ["seo", "indexing", "metadata", "sitemap", "crawler"],
-    usersCount: 164,
-    prompt: `You are equipped with the SEO & Crawler Meta Optimizer skill.
-Before finalizing any landing page, issue view, or marketing route:
-1. Verify OpenGraph and Twitter card meta tags (title, description, canonical url, and 1200x630 share image).
-2. Validate semantic JSON-LD structured data and ensure zero validation errors.
-3. Confirm robots.txt and sitemap.xml entries correctly index public paths while keeping private auth routes disallowlisted.
-4. Test response status codes and verify zero broken redirects.`,
-    spec: {
-      overview:
-        "Comprehensive SEO and crawler verification tool. Inspects canonical URLs, social unfurling cards, search engine schemas, and indexation hygiene.",
-      capabilities: [
-        "Automated OpenGraph (OG) image and tag extraction",
-        "JSON-LD structured data syntax validation",
-        "Crawler response audit (Googlebot, Twitterbot, Bingbot)",
-        "Canonical link and trailing slash consistency assertions"
-      ],
-      checklist: [
-        "Verify generateMetadata exports valid title and description",
-        "Confirm /sitemap.xml includes newly added routes",
-        "Validate social preview card rendering with zero CORS issues"
-      ],
-      sampleCommand: "npx next-sitemap",
-      documentationUrl: "https://nextjs.org/docs/app/building-your-application/optimizing/metadata"
-    },
-    author: {
-      name: "Growth & SEO Guild",
-      handle: "@growth",
-      isVerified: true
-    },
-    createdAt: "2026-10-28T12:00:00.000Z"
-  },
-  {
-    id: "api-contract-sentinel",
-    slug: "api-contract-sentinel",
-    title: "REST & GraphQL API Contract Sentinel",
-    icon: "api",
-    category: "backend",
-    categoryLabel: "Backend & Database",
-    badge: "API Security",
-    description:
-      "Validates OpenAPI 3.1 & GraphQL schema contracts, detects breaking schema changes, and generates type-safe mock fixtures.",
-    tags: ["api", "openapi", "graphql", "contracts", "mocking"],
-    usersCount: 135,
-    prompt: `You have the REST & GraphQL API Contract Sentinel skill equipped.
-1. Strictly validate request body and query parameter schemas against OpenAPI 3.1 specifications.
-2. Flag breaking payload changes before merging backend API routes.
-3. Assert uniform HTTP error response envelopes across all endpoints.`,
-    spec: {
-      overview:
-        "Guarantees forward and backward compatibility across backend endpoints, enforcing contract-first design with automated schema linting.",
-      capabilities: [
-        "OpenAPI 3.1 specification schema validation",
-        "Breaking change detection in REST and GraphQL schemas",
-        "Deterministic mock fixture generation",
-        "Automated payload type inference"
-      ],
-      checklist: [
-        "Validate route handler input against Zod / OpenAPI contract",
-        "Verify standard error response status codes (400, 401, 403, 404, 500)",
-        "Confirm zero unhandled Promise rejections on missing fields"
-      ],
-      sampleCommand: "npm run test:api-contract",
-      documentationUrl: "https://swagger.io/specification/"
-    },
-    author: {
-      name: "API Infrastructure Team",
-      handle: "@api-infra",
-      isVerified: true
-    },
-    createdAt: "2026-10-29T14:00:00.000Z"
-  },
-  {
-    id: "docker-microvm-runner",
-    slug: "docker-microvm-runner",
-    title: "Docker MicroVM Container Architect",
-    icon: "database",
-    category: "backend",
-    categoryLabel: "Backend & Database",
-    badge: "DevOps",
-    description:
-      "Containerizes reproducible development environments, scans image vulnerability layers, and verifies zero-root runtime isolation.",
-    tags: ["docker", "containers", "devops", "isolation"],
-    usersCount: 112,
-    prompt: `You have the Docker MicroVM Container Architect skill equipped.
-1. Enforce multi-stage Docker builds to minimize runtime image footprint.
-2. Ensure container processes run under non-root unprivileged users.
-3. Verify deterministic environment variables and bind-mount configurations.`,
-    spec: {
-      overview:
-        "Automates Dockerfile auditing and container security verification, ensuring minimal image sizes and rock-solid deployment parity.",
-      capabilities: [
-        "Multi-stage build optimization and layer caching",
-        "CVE vulnerability scanning on base alpine and debian images",
-        "Zero-root security context assertions",
-        "Container healthcheck probe configuration"
-      ],
-      checklist: [
-        "Verify `USER node` or non-root runtime declaration in Dockerfile",
-        "Check that production image excludes devDependencies",
-        "Confirm container starts and passes healthcheck probes"
-      ],
-      sampleCommand: "docker build --check .",
-      documentationUrl: "https://docs.docker.com/develop/develop-images/dockerfile_best-practices/"
-    },
-    author: {
-      name: "Cloud Platform Guild",
-      handle: "@cloud-ops",
-      isVerified: true
-    },
-    createdAt: "2026-10-30T11:30:00.000Z"
-  },
-  {
-    id: "framer-motion-smoother",
-    slug: "framer-motion-smoother",
-    title: "Motion & Micro-Interaction Smoother",
+    id: "core-tailwind-tokens",
+    slug: "tailwind-token-design-system",
+    title: "Tailwind Design System & Token Validator",
     icon: "figma",
     category: "design",
-    categoryLabel: "Design & UI",
-    badge: "UI Motion",
+    categoryLabel: CATEGORY_LABELS.design,
     description:
-      "Crafts 60fps spring transitions, guarantees reduced-motion accessibility overrides, and eliminates layout shift (CLS).",
-    tags: ["motion", "animation", "spring", "reduced-motion"],
-    usersCount: 97,
-    prompt: `You are equipped with the Motion & Micro-Interaction Smoother skill.
-1. Prioritize transform and opacity properties for GPU-accelerated 60fps animations.
-2. Honor prefers-reduced-motion media queries and disable spring physics for users who request it.
-3. Prevent Cumulative Layout Shift (CLS) by reserving dimensions before animating entry states.`,
+      "Audits arbitrary hardcoded hex codes, enforces CSS variable theme tokens, and checks responsive spacing scales across UI components.",
+    tags: ["tailwind", "css", "design-system", "ui", "tokens"],
+    prompt: `## Tailwind CSS Design System & Token Auditor
+You are an expert design systems engineer specializing in Tailwind CSS and modern UI tokens.
+
+When building or reviewing frontend user interfaces:
+1. Replace arbitrary magic values (e.g., #1e293b, w-[342px]) with semantic theme tokens and standard spacing scales.
+2. Enforce responsive container bounds and mobile-first breakpoint consistency (sm, md, lg, xl).
+3. Ensure dark-mode and high-contrast surfaces adapt cleanly via semantic CSS variables.
+4. Verify micro-interactions have appropriate transition durations (150ms-200ms) and accessible focus rings.
+
+Audit command:
+pnpm exec tailwindcss --check`,
     spec: {
       overview:
-        "High-fidelity UI animation and micro-interaction skill ensuring buttery-smooth transitions while strictly maintaining WCAG compliance.",
-      capabilities: [
-        "Physically accurate spring physics configuration",
-        "prefers-reduced-motion accessibility overrides",
-        "GPU-accelerated transform & opacity animation enforcement",
-        "Layout shift (CLS) prevention during modal and drawer mounts"
-      ],
+        "Guarantees interface visual consistency and maintainability by enforcing Tailwind CSS theme tokens instead of ad-hoc arbitrary styles.",
       checklist: [
-        "Verify all animations wrap in `motion-safe:` utility or `useReducedMotion`",
-        "Assert 60fps frame rate without dropped frames during interaction",
-        "Confirm layout animation uses `layoutId` without distorting aspect ratios"
+        "Eliminates arbitrary hex colors in favor of semantic palette tokens",
+        "Enforces consistent 4px spacing rhythm (p-2, p-4, p-6, etc.)",
+        "Checks responsive padding and text scaling across screen sizes",
+        "Verifies subtle transition states on interactive hover and focus elements",
       ],
-      sampleCommand: "npm run test:motion",
-      documentationUrl: "https://www.framer.com/motion/"
+      sampleCommand: "pnpm lint --rule 'tailwindcss/no-arbitrary-value: error'",
+      documentationUrl: "https://tailwindcss.com/docs/customizing-colors",
     },
     author: {
-      name: "Design Engineering Team",
-      handle: "@design-eng",
-      isVerified: true
+      name: "Tailwind / Ziki Core",
+      handle: "@tailwindcss",
     },
-    createdAt: "2026-11-01T09:00:00.000Z"
+    createdAt: "2026-11-06T00:00:00.000Z",
   },
   {
-    id: "vitest-mutation-tester",
-    slug: "vitest-mutation-tester",
-    title: "Vitest Mutation Test Engine",
-    icon: "test",
-    category: "testing",
-    categoryLabel: "Testing & QA",
-    badge: "Code Coverage",
+    id: "core-postgres-prisma",
+    slug: "postgres-prisma-schema-guard",
+    title: "PostgreSQL & Prisma Schema Guard",
+    icon: "database",
+    category: "backend",
+    categoryLabel: CATEGORY_LABELS.backend,
     description:
-      "Injects synthetic mutations into application logic to expose untested edge-cases, asserting minimum 95% branch kill rate.",
-    tags: ["vitest", "mutation-testing", "coverage", "assertions"],
-    usersCount: 153,
-    prompt: `You have the Vitest Mutation Test Engine skill equipped.
-1. When authoring unit tests, verify mutants (flipped operators, changed return values) are caught.
-2. Require tests to fail when core assertions are omitted or weakened.
-3. Aim for minimum 95% mutant kill score on mission-critical utilities.`,
+      "Validates relational constraints, checks composite indexes on frequent query paths, and guards against N+1 query patterns.",
+    tags: ["postgresql", "prisma", "database", "sql", "performance"],
+    prompt: `## PostgreSQL & Prisma Schema Performance Guard
+You are a senior database engineer and Prisma schema architect.
+
+When reviewing data schemas, migrations, or database queries:
+1. Verify foreign key relations have corresponding single-column or composite indexes for fast lookups.
+2. Audit Prisma client queries to prevent N+1 waterfalls by leveraging include or select joins.
+3. Validate connection pool configs (PgBouncer, Neon, Supabase poolers) to avoid exhaustion under concurrent load.
+4. Ensure schema migrations are backward-compatible and safe for zero-downtime deployment.
+
+Validation command:
+pnpm exec prisma validate`,
     spec: {
       overview:
-        "Goes beyond simple line coverage by deliberately introducing bugs (mutations) into source files to verify that existing test suites catch them.",
-      capabilities: [
-        "Automated synthetic mutation injection",
-        "Dead-code and survival mutant reporting",
-        "Branch coverage verification on edge condition handlers",
-        "Incremental mutation testing on git diff"
-      ],
+        "Ensures high-performance database interactions and prevents table locking or indexing oversights in Prisma and PostgreSQL.",
       checklist: [
-        "Run `npx vitest run --coverage`",
-        "Verify test suites catch boolean inversion and boundary condition shifts",
-        "Confirm 100% passing tests with 0 false positives"
+        "Validates prisma/schema.prisma models and foreign key definitions",
+        "Checks for @@index on filtered and sorted columns",
+        "Ensures connection string uses proper pooling parameters in serverless",
+        "Guards against unindexed full-table scans on high-cardinality tables",
       ],
-      sampleCommand: "npx vitest run test/unit/",
-      documentationUrl: "https://vitest.dev/guide/"
+      sampleCommand: "pnpm exec prisma validate",
+      documentationUrl: "https://www.prisma.io/docs/guides/performance-and-optimization",
     },
     author: {
-      name: "Test Automation Guild",
-      handle: "@test-guild",
-      isVerified: true
+      name: "Prisma / Ziki Core",
+      handle: "@prisma",
     },
-    createdAt: "2026-11-02T15:20:00.000Z"
-  }
+    createdAt: "2026-11-06T00:00:00.000Z",
+  },
+  {
+    id: "core-nextjs-seo",
+    slug: "nextjs-seo-schema-validator",
+    title: "Next.js SEO & Schema.org JSON-LD Validator",
+    icon: "seo",
+    category: "marketing",
+    categoryLabel: CATEGORY_LABELS.marketing,
+    description:
+      "Validates OpenGraph social cards, canonical link tags, robots directives, and Schema.org JSON-LD structured data for search engines.",
+    tags: ["seo", "nextjs", "metadata", "schema-org", "opengraph"],
+    prompt: `## Next.js SEO & Structured Data Auditor
+You are an SEO and technical discoverability specialist for modern Next.js applications.
+
+When implementing or auditing page routes:
+1. Define comprehensive metadata via generateMetadata or static metadata export with title, description, and canonical URL.
+2. Provide OpenGraph and Twitter card assets with accurate dimensions (1200x630) and alt attributes.
+3. Inject valid Schema.org JSON-LD script blocks for rich search engine snippets (Organization, BreadcrumbList, Article).
+4. Verify robots.txt and sitemap.xml rules allow intended search engine indexation.
+
+Verification check:
+Inspect <head> tags for canonical link, og:image, and JSON-LD schema syntax.`,
+    spec: {
+      overview:
+        "Maximizes search discovery and rich social sharing cards by verifying Next.js App Router metadata and JSON-LD schemas.",
+      checklist: [
+        "Verifies canonical URLs to prevent duplicate content flags",
+        "Validates 1200x630 OpenGraph image previews and fallback cards",
+        "Checks Schema.org JSON-LD structured data syntax against Google Rich Results",
+        "Ensures robots meta tag avoids inadvertent noindex on public pages",
+      ],
+      sampleCommand: "curl -sI http://localhost:3000/skills",
+      documentationUrl: "https://developers.google.com/search/docs/appearance/structured-data",
+    },
+    author: {
+      name: "Schema.org / Ziki Core",
+      handle: "@schemaorg",
+    },
+    createdAt: "2026-11-06T00:00:00.000Z",
+  },
 ];
 
-export async function getSkills(): Promise<SkillItem[]> {
-  return VERIFIED_SKILLS;
+export interface GetSkillsResult {
+  skills: SkillItem[];
+  error?: string | null;
+}
+
+export async function getSkills(): Promise<GetSkillsResult> {
+  try {
+    const approved = await prisma.skillSubmission.findMany({
+      where: { status: "approved" },
+      orderBy: { createdAt: "desc" },
+      include: {
+        submittedBy: { select: { name: true } },
+      },
+    });
+
+    const communitySkills = approved.map(mapSubmissionToSkill);
+    // Return approved community skills first, followed by official core starter templates
+    return { skills: [...communitySkills, ...CORE_SKILL_TEMPLATES] };
+  } catch (error) {
+    console.error("[skills] failed to load approved skills from db:", error);
+    // When DB is cold or unreachable, safely return core starter templates without crashing
+    return {
+      skills: CORE_SKILL_TEMPLATES,
+      error: null,
+    };
+  }
 }
 
 export async function getSkillBySlug(slug: string): Promise<SkillItem | undefined> {
   const normalized = slug.trim().toLowerCase();
-  return VERIFIED_SKILLS.find(
-    (skill) => skill.slug.toLowerCase() === normalized || skill.id.toLowerCase() === normalized
-  );
-}
 
-export async function getSkillsByCategory(category: SkillCategory): Promise<SkillItem[]> {
-  return VERIFIED_SKILLS.filter((skill) => skill.category === category);
+  // 1. Check core starter templates
+  const coreMatch = CORE_SKILL_TEMPLATES.find(
+    (s) => s.slug.toLowerCase() === normalized || s.id === slug
+  );
+  if (coreMatch) return coreMatch;
+
+  // 2. Query database for approved community submissions
+  try {
+    const sub = await prisma.skillSubmission.findFirst({
+      where: {
+        id: slug,
+        status: "approved",
+      },
+      include: {
+        submittedBy: { select: { name: true } },
+      },
+    });
+
+    if (!sub) return undefined;
+    return mapSubmissionToSkill(sub);
+  } catch (error) {
+    console.error("[skills] failed to load skill by slug", error);
+    throw new Error("Unable to load skill from the database. Please try again later.");
+  }
 }
