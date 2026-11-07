@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth-helpers";
 import { canManageProject } from "@/lib/project-permissions";
 import { marketingPath, orgPath, projectPath, projectRef } from "@/lib/project-paths";
 import { projectHomePath } from "@/lib/marketing/project-home";
+import { awardSignupBonus } from "@/lib/points/signup-bonus";
 
 export type JoinRequestActionResult = {
   ok?: boolean;
@@ -202,12 +203,18 @@ export async function joinOpenProjectAction(projectId: string): Promise<JoinOpen
     });
     // Joining also makes you a member of the project's organisation (#earnings, Chloe's call), so connecting an
     // agent works as it does for anyone else there: the Create an agent card, Connect your agent, and its key.
-    // Someone already in it keeps their role.
+    // Someone already in it keeps their role. Becoming a member pays the signup bonus, as an invite does
+    // (lib/invites.ts): once per account, in the first organisation it joins, so a later one adds nothing.
+    const existing = await tx.membership.findUnique({
+      where: { organisationId_userId: { organisationId: project.organisationId, userId: user.id } },
+      select: { id: true },
+    });
     await tx.membership.upsert({
       where: { organisationId_userId: { organisationId: project.organisationId, userId: user.id } },
       create: { organisationId: project.organisationId, userId: user.id, role: "member" },
       update: {},
     });
+    if (!existing) await awardSignupBonus(tx, user.id, project.organisationId);
     await tx.projectJoinRequest.updateMany({
       where: { projectId: project.id, userId: user.id, status: "pending" },
       data: { status: "accepted", reviewedAt: new Date() },
