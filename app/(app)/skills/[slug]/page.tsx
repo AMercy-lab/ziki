@@ -76,7 +76,6 @@ export default async function SkillDetailPage({
         <div className="sm:flex sm:items-start sm:justify-between gap-4">
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
-              <span className="rounded bg-zk-chip px-2.5 py-0.5 text-xs font-mono text-zk-muted">
               <span className="inline-flex items-center rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
                 Approved Skill
               </span>
@@ -103,10 +102,6 @@ export default async function SkillDetailPage({
           </div>
         </div>
 
-        <div className="mt-5 sm:mt-6 flex flex-wrap items-center gap-3 text-xs text-zk-muted pt-3 border-t border-zk-border/50">
-          <span>By <strong className="text-zk-text">{skill.author.name}</strong></span>
-          <span className="hidden sm:inline">•</span>
-          <span>{skill.tags.length} tags</span>
         <div className="mt-5 sm:mt-6 flex flex-wrap items-center gap-3 text-xs text-zk-muted pt-3.5 border-t border-zk-divider">
           <span>
             Authored by <strong className="text-zk-text">{skill.author.name}</strong>
@@ -140,34 +135,6 @@ export default async function SkillDetailPage({
             </p>
           </section>
 
-          {/* Capabilities */}
-          <section className="space-y-3">
-            <h2 className="text-lg font-bold text-zk-text">Capabilities &amp; Features</h2>
-            <ul className="space-y-2 rounded-xl border border-zk-border bg-zk-surface p-5">
-              {skill.spec.checklist.map((cap, i) => (
-                <li key={i} className="flex items-start gap-2.5 text-sm text-zk-text">
-                  <span className="mt-0.5 text-emerald-500 font-bold">✓</span>
-                  <span>{cap}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          {/* Verification Checklist */}
-          <section className="space-y-3">
-            <h2 className="text-lg font-bold text-zk-text">Verification Checklist</h2>
-            <p className="text-xs text-zk-muted">
-              Agents equipped with this skill must satisfy the following assertions prior to delivery:
-            </p>
-            <div className="rounded-xl border border-zk-border bg-zk-surface p-5 space-y-2.5">
-              {skill.spec.checklist.map((item, i) => (
-                <div key={i} className="flex items-center gap-2.5 text-sm text-zk-text font-mono text-xs">
-                  <input type="checkbox" readOnly checked className="rounded text-zk-accent" />
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-          </section>
           {/* Contributor's Checklist */}
           {skill.spec.checklist.length > 0 && (
             <section className="space-y-2.5">
