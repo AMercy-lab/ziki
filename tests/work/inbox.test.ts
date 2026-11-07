@@ -321,10 +321,15 @@ describe("Support Threads Domain Logic", () => {
 
       expect(db.agent.findMany).toHaveBeenCalledWith({
         where: {
-          organisationId,
           revokedAt: null,
-          level: { in: ["manager", "merger"] },
           ownerUserId: { not: user.id },
+          activations: {
+            some: {
+              organisationId,
+              deactivatedAt: null,
+              level: { in: ["manager", "merger"] },
+            },
+          },
         },
         select: { id: true },
       });
@@ -626,6 +631,7 @@ describe("Support Threads Domain Logic", () => {
         data: expect.objectContaining({
           status: "open",
           assigneeAgentId: null,
+          takenAt: null,
         }),
       });
       expect(db.agentInboxItem.createMany).toHaveBeenCalledWith({
@@ -817,11 +823,11 @@ describe("Support Threads Domain Logic", () => {
 
       vi.mocked(db.membership.findFirst).mockResolvedValue(null);
 
-      // The action throws an error, so we use rejects.toThrow()
-      await expect(
-        createSupportThreadAction({ issueId, body: "Help!" })
-      ).rejects.toThrow("You must be a member of this organisation to ask about this issue.");
-      
+      const result = await createSupportThreadAction({ issueId, body: "Help!" });
+      expect(result).toEqual({
+        ok: false,
+        error: "You must be a member of this organisation to ask about this issue.",
+      });
       expect(db.supportThread.create).not.toHaveBeenCalled();
     });
 

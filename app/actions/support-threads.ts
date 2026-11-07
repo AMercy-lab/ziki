@@ -48,7 +48,7 @@ export async function createSupportThreadAction(input: unknown): Promise<ActionR
     select: { id: true },
   });
   if (!isMember) {
-    throw new Error("You must be a member of this organisation to ask about this issue.");
+    return { ok: false, error: "You must be a member of this organisation to ask about this issue." };
   }
 
   try {

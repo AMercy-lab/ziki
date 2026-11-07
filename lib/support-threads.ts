@@ -55,10 +55,15 @@ export async function notifySupportThread(
 export async function countUserEligibleAgents(userId: string, organisationId: string): Promise<number> {
   return prisma.agent.count({
     where: {
-      organisationId,
       ownerUserId: userId,
       revokedAt: null,
-      level: { in: [...ELIGIBLE_AGENT_LEVELS] },
+      activations: {
+        some: {
+          organisationId,
+          deactivatedAt: null,
+          level: { in: [...ELIGIBLE_AGENT_LEVELS] },
+        },
+      },
     },
   });
 }
@@ -69,12 +74,17 @@ export async function countUserEligibleAgents(userId: string, organisationId: st
 export async function getUserEligibleAgents(userId: string, organisationId: string) {
   return prisma.agent.findMany({
     where: {
-      organisationId,
       ownerUserId: userId,
       revokedAt: null,
-      level: { in: [...ELIGIBLE_AGENT_LEVELS] },
+      activations: {
+        some: {
+          organisationId,
+          deactivatedAt: null,
+          level: { in: [...ELIGIBLE_AGENT_LEVELS] },
+        },
+      },
     },
-    select: { id: true, name: true, username: true, level: true },
+    select: { id: true, name: true, username: true },
     orderBy: { createdAt: "asc" },
   });
 }
@@ -175,10 +185,15 @@ export async function createSupportThread(
 
     const eligibleAgents = await tx.agent.findMany({
       where: {
-        organisationId,
         revokedAt: null,
-        level: { in: [...ELIGIBLE_AGENT_LEVELS] },
         ownerUserId: { not: user.id },
+        activations: {
+          some: {
+            organisationId,
+            deactivatedAt: null,
+            level: { in: [...ELIGIBLE_AGENT_LEVELS] },
+          },
+        },
       },
       select: { id: true },
     });
@@ -298,10 +313,15 @@ export async function takeSupportThread(
   const agent = await prisma.agent.findFirst({
     where: {
       id: agentId,
-      organisationId,
       ownerUserId: user.id,
       revokedAt: null,
-      level: { in: [...ELIGIBLE_AGENT_LEVELS] },
+      activations: {
+        some: {
+          organisationId,
+          deactivatedAt: null,
+          level: { in: [...ELIGIBLE_AGENT_LEVELS] },
+        },
+      },
     },
     select: { id: true, name: true },
   });
@@ -430,16 +450,22 @@ export async function releaseSupportThread(
       data: {
         status: "open",
         assigneeAgentId: null,
+        takenAt: null,
         lastMessageAt: now,
       },
     });
 
     const eligibleAgents = await tx.agent.findMany({
       where: {
-        organisationId,
         revokedAt: null,
-        level: { in: [...ELIGIBLE_AGENT_LEVELS] },
         ownerUserId: { not: thread.requesterUserId },
+        activations: {
+          some: {
+            organisationId,
+            deactivatedAt: null,
+            level: { in: [...ELIGIBLE_AGENT_LEVELS] },
+          },
+        },
       },
       select: { id: true },
     });

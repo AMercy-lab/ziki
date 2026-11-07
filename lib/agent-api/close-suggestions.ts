@@ -427,7 +427,6 @@ export async function closeIssue(agent: AgentContext, projectId: string, issueRe
     const closed = await closeInTransaction(tx, agentActor(agent), projectId, bug, fresh, {
       reason, evidence: input.evidence, duplicateOfId, votes, threshold: closeThreshold,
     });
-    await closeSupportThreadsForIssue(tx, { bugId: bug.id, reason: "issue_closed" });
     return {
       issueId: bug.id,
       issueNumber: bug.number,
@@ -604,7 +603,6 @@ export async function withdrawIssue(withdrawer: IssueWithdrawer, projectId: stri
       throw new IssueApiError(409, message, { error: "already_closed", message });
     }
     const closed = await closeInTransaction(tx, withdrawer, projectId, bug, fresh, { reason: "withdrawn", evidence });
-    await closeSupportThreadsForIssue(tx, { bugId: bug.id, reason: "issue_closed" });
     return {
       issueId: bug.id,
       issueNumber: bug.number,
