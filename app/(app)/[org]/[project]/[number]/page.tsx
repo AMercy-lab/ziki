@@ -81,6 +81,8 @@ import {
 import { IssueConfirmationsPanel, type ConfirmationBlock, type ConfirmationsData } from "@/components/issue-confirmations";
 import { CONFIRMATION_SUMMARY_MAX_CHARS, listConfirmations, takesConfirmations } from "@/lib/agent-api/confirmations";
 import { DisputeAwardDialog, type DisputeRole } from "@/components/dispute-award-dialog";
+import { TakeItBackPanel } from "@/components/take-it-back";
+import { takeItBackViewFor } from "@/lib/take-it-back-server";
 import { AttachmentList, type AttachmentView } from "@/components/attachment-list";
 import { ChooseRedesignButton } from "@/components/choose-redesign-button";
 import { isOrganisationAdminRole } from "@/lib/agents/membership";
@@ -458,6 +460,10 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     ),
   ]) : [[], null] as const;
   const canChooseRedesign = isOrganisationAdminRole(membership?.role, user.role);
+  // "Take it back" (#851): only an owner or admin sees it, only on a merged issue.
+  const takeItBack = await loadOptional("take it back", null, () =>
+    takeItBackViewFor({ issue: bug, membershipRole: membership?.role, appRole: user.role }),
+  );
   // Once an issue is past Requires confirmation, the Conversation opens on who
   // has it (its claims), then every bid it took (#issue-bids).
   const pastConfirmation = bug.substatus !== "requires_confirmation";
@@ -1673,6 +1679,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                   </ConfirmSubmitButton>
                 </form>
               ) : null}
+              {takeItBack ? <TakeItBackPanel view={takeItBack} /> : null}
             </section>
 
             {rewardRow ? (
