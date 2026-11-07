@@ -641,14 +641,16 @@ describe("feature plans feed the existing idea lifecycle", () => {
     expect(featureWorkState({ idea: { isDeleted: true, status: "open", issue: null }, bug: null })).toMatchObject({ kind: "unavailable" });
   });
 
-  it("never trusts generated references and supports manual planning when AI is unavailable", async () => {
+  it("never trusts generated references and returns no proposal when AI is unavailable", async () => {
     vi.stubEnv("ZIKI_CLAUDE_API_KEY", "");
     const context = { project: project.name, goal: null, brief: null, notes: null, work: [] };
     expect(await generateFeatureDraft(request, context)).toBeNull();
     vi.stubEnv("ZIKI_CLAUDE_API_KEY", "test");
     const proposed = makeDraft(); proposed.tasks[0].existing = "issue:invented";
     claude.parse.mockResolvedValueOnce({ stop_reason: "end_turn", parsed_output: proposed });
-    const result = await generateFeatureDraft(request, context);
+    const constrained = { ...request, request: `${request.request}\n\nConstraints:\nNo payments in the first version.` };
+    const result = await generateFeatureDraft(constrained, context);
+    expect(JSON.parse(claude.parse.mock.calls.at(-1)![0].messages[0].content).request.request).toContain("No payments in the first version.");
     expect(result?.tasks[0].existing).toBeNull();
     claude.parse.mockRejectedValueOnce(new Error("offline"));
     expect(await generateFeatureDraft(request, context)).toBeNull();

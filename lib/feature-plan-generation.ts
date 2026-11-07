@@ -28,6 +28,7 @@ Use "first" for the smallest usable end-to-end version and "later" for optional 
 The overall definition of done must be achievable by the first version; Later work is optional, not a hidden prerequisite.
 Do not invent requirements, technologies, dependencies or promises. Omit optional work if none is justified.
 Define the overall user outcome and 1–4 observable end-to-end conditions for the whole feature.
+Respect the owner's explicit constraints; never move excluded work into the first version.
 Consider the project's brief, goal and official notes. The existing-work list is a bounded search, not the full codebase.
 Reuse relevant work using its EXACT supplied ref; otherwise existing must be null. Never invent a reference.
 An apparent duplicate is a suggestion for the owner to check, not evidence a capability already exists.
@@ -44,7 +45,7 @@ Write plainly. A new contributor should understand each item without reading the
     return { ...result.data, tasks: result.data.tasks.map((task) => ({ ...task, existing: task.existing && allowed.has(task.existing) ? task.existing : null })) };
   } catch {
     // Request text and model responses may contain private project data.
-    logger.warn("[feature-plans] Draft generation unavailable; manual planning remains available.");
+    logger.warn("[feature-plans] Draft generation unavailable; the request can be retried.");
     return null;
   }
 }

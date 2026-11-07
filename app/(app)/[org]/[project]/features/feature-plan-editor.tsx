@@ -11,7 +11,6 @@ const field = "mt-1 w-full rounded-lg border border-zk-border bg-zk-bg px-3 py-2
 const button = "rounded-lg border border-zk-border px-4 py-2 text-sm font-semibold text-zk-text hover:bg-zk-chip disabled:cursor-wait disabled:opacity-50";
 const primary = `${button} bg-zk-accent text-white hover:opacity-90`;
 const blankTask = () => ({ title: "", description: "", acceptanceCriteria: [""], scope: "first" as FeatureScope, existing: null as string | null });
-const emptyDraft = (): FeatureDraft => ({ outcome: "", definitionOfDone: [""], tasks: [blankTask()] });
 
 function Criteria({ label, value, disabled, onChange }: { label: string; value: string[]; disabled: boolean; onChange: (value: string[]) => void }) {
   return <fieldset className="space-y-2"><legend className="text-sm font-semibold">{label}</legend>
@@ -31,6 +30,7 @@ export function FeaturePlanEditor({ projectId, basePath, initial }: {
   const router = useRouter();
   const [id] = useState(() => initial?.id ?? crypto.randomUUID());
   const [request, setRequest] = useState<FeatureRequest>({ title: initial?.title ?? "", request: initial?.request ?? "" });
+  const [constraints, setConstraints] = useState("");
   const [draft, setDraft] = useState<FeatureDraft | null>(initial?.draft ?? null);
   const [work, setWork] = useState<FeatureWork[]>([]);
   const [search, setSearch] = useState("");
@@ -44,36 +44,66 @@ export function FeaturePlanEditor({ projectId, basePath, initial }: {
     });
   }
   async function propose() {
-    const result = await proposeFeaturePlanAction(projectId, request);
+    const input = {
+      title: request.request.trim().replace(/\s+/g, " ").slice(0, 120),
+      request: `${request.request.trim()}${constraints.trim() ? `\n\nConstraints:\n${constraints.trim()}` : ""}`,
+    };
+    const result = await proposeFeaturePlanAction(projectId, input);
     if (!result.ok) { setError(result.error); return; }
+    if (!result.value.draft) {
+      setError("AI planning is currently unavailable. Your idea and constraints are still here. Please try again later; no work has been created.");
+      return;
+    }
+    setRequest(input);
     setWork(result.value.work);
-    setDraft(result.value.draft ?? emptyDraft());
-    setMessage(result.value.draft
-      ? "Proposal ready. Check its assumptions, related work and scope before saving. Nothing has been published."
-      : "Automatic drafting is unavailable. You can write and publish the same plan manually below.");
+    setDraft(result.value.draft);
+    setMessage("AI proposal ready. Review the first version, later improvements and definition of done. Nothing has been published.");
   }
   const updateTask = (index: number, patch: Partial<FeatureDraft["tasks"][number]>) => {
     if (draft) setDraft({ ...draft, tasks: draft.tasks.map((task, i) => i === index ? { ...task, ...patch } : task) });
   };
-  return <form className="space-y-6" onSubmit={(event) => {
+  return <form noValidate className="space-y-6" onSubmit={(event) => {
     event.preventDefault();
     if (!draft) { run(propose); return; }
     run(async () => {
       const result = await saveFeaturePlanAction({ projectId, id, version: initial?.version ?? 1, creating: !initial, request, draft });
       if (!result.ok) { setError(result.error); return; }
-      router.push(`${basePath}/${result.value.id}`); router.refresh();
+      router.push(`${basePath}/${result.value.id}`);
     });
   }}>
-    <fieldset disabled={pending} className="space-y-4 rounded-2xl border border-zk-border bg-zk-surface p-5">
-      <legend className="px-1 font-semibold">1. Describe the feature</legend>
-      <label className="block text-sm font-semibold">Feature name<input className={field} value={request.title} required minLength={3} maxLength={120} placeholder="Appointment booking" onChange={(event) => setRequest({ ...request, title: event.target.value })} /></label>
-      <label className="block text-sm font-semibold">Who is it for, and what should they be able to do?<textarea className={field} rows={4} value={request.request} required minLength={20} maxLength={4000} placeholder="Customers should be able to book an available appointment and receive confirmation. Include constraints and what is outside this request." onChange={(event) => setRequest({ ...request, request: event.target.value })} /></label>
-      {!draft ? <div className="flex flex-wrap gap-2"><button className={primary} type="submit">{pending ? "Preparing proposal…" : "Suggest a plan"}</button><button className={button} type="button" onClick={() => setDraft(emptyDraft())}>Write a plan myself</button></div> : null}
-      {!draft ? <p className="text-sm text-zk-text2">Suggestions use the project brief, official notes and matching ideas/issues. Project text is sent to the same AI provider used for idea structuring. Review every suggestion.</p> : null}
-    </fieldset>
+    {!draft ? <section className="space-y-4 rounded-2xl border border-zk-border bg-zk-surface p-5" aria-labelledby="feature-request-heading">
+      <h2 id="feature-request-heading" className="font-semibold">What would you like to add?</h2>
+      <p className="text-sm text-zk-text2">AI can help turn your feature idea into actionable tasks. Just describe the idea and any constraints; we use your project context and related ideas and issues.</p>
+      <label className="block text-sm font-semibold">Your feature idea<textarea className={field} rows={5} value={request.request} disabled={pending} required minLength={20} maxLength={3000} placeholder="Let customers book an available appointment and receive confirmation." onChange={(event) => setRequest({ ...request, request: event.target.value })} /></label>
+      <label className="block text-sm font-semibold">Constraints (optional)<textarea className={field} rows={2} value={constraints} disabled={pending} maxLength={900} placeholder="For example: use our existing calendar; email only for the first version; no payments yet." onChange={(event) => setConstraints(event.target.value)} /></label>
+      <button className={primary} disabled={pending} type="submit">{pending ? "AI is preparing your plan…" : "Generate plan with AI"}</button>
+      <p className="text-sm text-zk-text2">Your request and relevant project context are sent to Ziki’s AI provider. Suggestions need your review; nothing is published automatically.</p>
+    </section> : null}
     {draft ? <>
+      <section className="space-y-4" aria-labelledby="ai-proposal-heading">
+        <h2 id="ai-proposal-heading" className="text-xl font-semibold">Review your proposed plan</h2>
+        <p className="text-sm text-zk-text2">AI suggestions can be wrong. Check the scope and linked work; edit only what you need.</p>
+        <div className="rounded-2xl border border-zk-border bg-zk-surface p-5 space-y-3">
+          <h3 className="font-semibold">The outcome</h3><p>{draft.outcome}</p>
+          <h3 className="font-semibold">Definition of done</h3><ul className="list-disc pl-5 text-sm space-y-1">{draft.definitionOfDone.map((line, i) => <li key={i}>{line}</li>)}</ul>
+        </div>
+        {(["first", "later"] as const).map((scope) => <div key={scope} className="space-y-3">
+          <h3 className="font-semibold">{scope === "first" ? "First usable version" : "Later improvements"}</h3>
+          {draft.tasks.filter((task) => task.scope === scope).map((task, i) => <article key={i} className="space-y-2 rounded-2xl border border-zk-border bg-zk-surface p-5">
+            <h4 className="font-semibold">{task.title}</h4><p className="text-sm">{task.description}</p>
+            <ul className="list-disc pl-5 text-sm">{task.acceptanceCriteria.map((line, j) => <li key={j}>{line}</li>)}</ul>
+            <p className="text-sm text-zk-text2">{task.existing ? "Builds on existing work" : "Proposed new idea"}</p>
+            {work.filter((item) => item.ref === task.existing).map((item) => <Link key={item.ref} target="_blank" rel="noopener noreferrer" className="block text-sm text-zk-accent underline" href={`${basePath.replace(/\/features$/, "")}/${item.ref.startsWith("idea:") ? "ideas/" : ""}${item.number}`}>{item.ref.startsWith("idea:") ? "Idea" : "Issue"} #{item.number}: {item.title}</Link>)}
+          </article>)}
+          {!draft.tasks.some((task) => task.scope === scope) ? <p className="text-sm text-zk-text2">No optional improvements proposed.</p> : null}
+        </div>)}
+      </section>
+      <details className="rounded-2xl border border-zk-border p-4">
+        <summary className="cursor-pointer font-semibold">Edit proposal (optional)</summary>
+        <div className="mt-4 space-y-6">
+          <label className="block text-sm font-semibold">Feature name<input className={field} value={request.title} required minLength={3} maxLength={120} onChange={(event) => setRequest({ ...request, title: event.target.value })} /></label>
       <fieldset disabled={pending} className="space-y-4 rounded-2xl border border-zk-border bg-zk-surface p-5">
-        <legend className="px-1 font-semibold">2. Define success for the whole feature</legend>
+        <legend className="px-1 font-semibold">Success criteria</legend>
         <label className="block text-sm font-semibold">The user outcome<textarea className={field} rows={2} value={draft.outcome} required minLength={10} maxLength={600} onChange={(event) => setDraft({ ...draft, outcome: event.target.value })} /></label>
         <Criteria label="Definition of done" value={draft.definitionOfDone} disabled={pending} onChange={(definitionOfDone) => setDraft({ ...draft, definitionOfDone })} />
         <p className="text-sm text-zk-text2">Describe an observable end-to-end result. This is the feature’s success criteria; linked work statuses do not automatically verify it.</p>
@@ -90,7 +120,7 @@ export function FeaturePlanEditor({ projectId, basePath, initial }: {
         {work.length ? <ul className="space-y-2">{work.map((item) => <li key={item.ref} className="text-sm"><Link target="_blank" rel="noopener noreferrer" className="font-semibold text-zk-accent underline" href={`${basePath.replace(/\/features$/, "")}/${item.ref.startsWith("idea:") ? "ideas/" : ""}${item.number}`}>{item.ref.startsWith("idea:") ? "Idea" : "Issue"} #{item.number}: {item.title}</Link><span className="ml-2 text-zk-text2">{item.state}</span></li>)}</ul> : null}
       </section>
       <section className="space-y-4" aria-labelledby="plan-work-heading">
-        <h2 id="plan-work-heading" className="font-semibold">3. Choose the first usable version</h2>
+        <h2 id="plan-work-heading" className="font-semibold">Work items</h2>
         <p className="text-sm text-zk-text2">First version should deliver the core outcome. Later improvements stay unpublished until you choose to publish them. Linking existing work does not change it or stop work already underway.</p>
         {draft.tasks.map((task, index) => <fieldset disabled={pending} key={index} className="space-y-4 rounded-2xl border border-zk-border bg-zk-surface p-5">
           <legend className="px-1 font-semibold">Work item {index + 1}</legend>
@@ -108,6 +138,8 @@ export function FeaturePlanEditor({ projectId, basePath, initial }: {
         </fieldset>)}
         {draft.tasks.length < 8 ? <button className={button} disabled={pending} type="button" onClick={() => setDraft({ ...draft, tasks: [...draft.tasks, blankTask()] })}>Add work item</button> : null}
       </section>
+        </div>
+      </details>
       <div className="space-y-2"><button className={primary} disabled={pending} type="submit">{pending ? "Saving…" : "Save draft and review"}</button><p className="text-sm text-zk-text2">Saving creates no ideas or issues. You’ll review the saved plan before publishing.</p></div>
     </> : null}
     {error ? <p role="alert" className="rounded-lg border border-red-400 p-3 text-sm text-red-600">{error}</p> : null}
