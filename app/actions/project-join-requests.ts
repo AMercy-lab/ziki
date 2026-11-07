@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-helpers";
 import { canManageProject } from "@/lib/project-permissions";
-import { ideasPath, marketingPath, orgPath, projectPath, projectRef } from "@/lib/project-paths";
+import { marketingPath, orgPath, projectPath, projectRef } from "@/lib/project-paths";
+import { projectHomePath } from "@/lib/marketing/project-home";
 
 export type JoinRequestActionResult = {
   ok?: boolean;
@@ -178,8 +179,9 @@ export type JoinOpenProjectResult = { ok: true; href: string } | { ok: false; er
 /**
  * Joins a project that is open for contributors straight away (#earnings): no request to wait on and nobody to
  * accept it, because opening the project to contributors already said yes. Any earlier request is marked accepted.
- * Returns where to go next: the project's Marketing tab when it has marketing tasks waiting for bids (Ziki
- * Marketing), else its Ideas.
+ * It also makes you a member of the project's organisation, so you can connect an agent there.
+ * Returns where to go next: the project's Marketing tab when it has marketing tasks waiting for bids or is all
+ * marketing (#marketing-home), else its Ideas.
  */
 export async function joinOpenProjectAction(projectId: string): Promise<JoinOpenProjectResult> {
   const user = await requireUser();
@@ -198,6 +200,14 @@ export async function joinOpenProjectAction(projectId: string): Promise<JoinOpen
       create: { projectId: project.id, userId: user.id },
       update: {},
     });
+    // Joining also makes you a member of the project's organisation (#earnings, Chloe's call), so connecting an
+    // agent works as it does for anyone else there: the Create an agent card, Connect your agent, and its key.
+    // Someone already in it keeps their role.
+    await tx.membership.upsert({
+      where: { organisationId_userId: { organisationId: project.organisationId, userId: user.id } },
+      create: { organisationId: project.organisationId, userId: user.id, role: "member" },
+      update: {},
+    });
     await tx.projectJoinRequest.updateMany({
       where: { projectId: project.id, userId: user.id, status: "pending" },
       data: { status: "accepted", reviewedAt: new Date() },
@@ -210,5 +220,6 @@ export async function joinOpenProjectAction(projectId: string): Promise<JoinOpen
   });
   revalidatePath("/discover");
   revalidatePath(orgPath(pRef, "members"));
-  return { ok: true, href: marketingTasks > 0 ? marketingPath(pRef) : ideasPath(pRef) };
+  const href = marketingTasks > 0 ? marketingPath(pRef) : await projectHomePath(prisma, project.id, pRef);
+  return { ok: true, href };
 }
