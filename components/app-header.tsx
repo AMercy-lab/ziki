@@ -335,7 +335,7 @@ export function AppHeader({
     // Sticky only from lg: on phones and tablets the toolbar wraps onto rows,
     // and a header that tall pinned to the top covers the page under it.
     <header className="relative z-40 border-b border-zk-border bg-zk-surface shadow-[0_1px_3px_rgba(0,0,0,0.04)] lg:sticky lg:top-0">
-      <div className={`${PAGE_CONTAINER_CLASS} flex flex-wrap items-center gap-x-3 gap-y-2 py-3 max-sm:py-2 sm:px-6`}>
+      <div className={`${PAGE_CONTAINER_CLASS} flex flex-wrap items-center gap-x-3 gap-y-2 py-3 max-sm:flex-nowrap max-sm:gap-x-2 max-sm:py-2 sm:px-6`}>
         {/* Below lg the nav lives in the bottom strip, leaving one row here.
             The logo (the mark alone) is the way to the Dashboard. */}
         <div className="flex min-w-0 items-center gap-2">
@@ -349,17 +349,17 @@ export function AppHeader({
             externalProjects={externalProjects}
             activeOrganisationId={activeOrganisationId}
             tone="bar"
-            className="min-w-0 max-sm:max-w-44"
+            className="min-w-0"
           />
         </div>
 
         <TopNav pathname={pathname} projectSlug={projectSlug} />
 
-        {/* Phones and tablets: min-w-0 lets the group narrow so its flex-wrap
-            breaks the chips onto rows (no sideways scroll at 360px or 768px).
-            From lg up it keeps shrink-0 so the account controls are never
-            squeezed. */}
-        <div className={`ml-auto flex min-w-0 items-center justify-end gap-2 max-sm:gap-1 lg:shrink-0 flex-wrap`}>
+        {/* Phones: one row. These controls never wrap or shrink; the workspace
+            name on the left narrows (down to its badge) instead. Tablets: min-w-0
+            lets the group narrow and its flex-wrap break the chips onto rows (no
+            sideways scroll at 768px). From lg up it keeps shrink-0. */}
+        <div className={`ml-auto flex min-w-0 items-center justify-end gap-2 max-sm:shrink-0 max-sm:flex-nowrap max-sm:gap-1.5 lg:shrink-0 flex-wrap`}>
           {earned !== null ? (
             // Earnings (#earnings), on every page: the amount opens Your earnings; Withdraw opens a window over the page.
             <div className="inline-flex h-10 shrink-0 items-center gap-1 rounded-full border border-zk-border bg-zk-surface p-1">
@@ -371,8 +371,14 @@ export function AppHeader({
                 {formatZ(earned)}
                 <span className="sr-only"> earned: Your earnings</span>
               </Link>
-              <WithdrawWindow earned={earned} organisationId={earningsOrganisationId} className={`rounded-full bg-electric-blue-strong px-3 py-1.5 text-xs font-bold text-white hover:bg-[#2552af] max-sm:px-2.5 max-sm:py-1 ${linkFocus}`}>
-                Withdraw
+              <WithdrawWindow earned={earned} organisationId={earningsOrganisationId} className={`inline-flex items-center justify-center rounded-full bg-electric-blue-strong px-3 py-1.5 text-xs font-bold text-white hover:bg-[#2552af] max-sm:h-8 max-sm:w-8 max-sm:p-0 ${linkFocus}`}>
+                {/* Phones: a wallet icon; tablets and up: the word. Either way it is called Withdraw. */}
+                <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] sm:hidden" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v3" />
+                  <path d="M3 5v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3" />
+                  <path d="M21 12h-4a2 2 0 0 0 0 4h4z" />
+                </svg>
+                <span className="max-sm:sr-only">Withdraw</span>
               </WithdrawWindow>
             </div>
           ) : null}
@@ -385,7 +391,7 @@ export function AppHeader({
               aria-expanded={accountOpen}
               aria-controls="account-menu"
               onClick={() => setAccountOpen((open) => !open)}
-              className={`inline-flex h-11 max-w-full items-center gap-2 rounded-full border border-zk-border bg-zk-surface py-[5px] pl-[5px] pr-3 text-zk-text hover:bg-zk-chip ${linkFocus}`}
+              className={`inline-flex h-11 max-w-full items-center gap-2 rounded-full border border-zk-border bg-zk-surface py-[5px] pl-[5px] pr-3 text-zk-text hover:bg-zk-chip max-sm:h-auto max-sm:border-0 max-sm:p-0 ${linkFocus}`}
             >
               <span className="sr-only">Account menu for </span>
               <Avatar name={userName} image={userImage} size="md" variant="solid" />
