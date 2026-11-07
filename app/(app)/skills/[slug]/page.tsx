@@ -4,6 +4,7 @@ import { JsonLd } from "@/components/json-ld";
 import { optionalUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { getSkillBySlug, SkillUnavailableError, type SkillItem } from "../skills-data";
+import { SkillIcon } from "../skills-directory";
 import {
   SkillDetailInteractive,
   SkillPromptSection,
@@ -146,7 +147,7 @@ export default async function SkillDetailPage({
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                🤖
+                <SkillIcon icon={skill.icon} />
               </div>
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-zk-muted">
@@ -219,7 +220,7 @@ export default async function SkillDetailPage({
                     className="flex items-start gap-2.5 text-xs text-zk-text leading-relaxed"
                   >
                     <span
-                      className="flex h-2 w-2 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px] font-bold"
+                      className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px] font-bold"
                       aria-hidden="true"
                     >
                       ✓
@@ -276,12 +277,12 @@ export default async function SkillDetailPage({
                   {skill.author.name}
                 </span>
               </div>
-              <div className="pt-2 flex justify-between">
-                <span className="text-zk-muted">Verification</span>
-                <span className="font-semibold text-zk-text">
-                  CLI &amp; Test Suite
-                </span>
-              </div>
+              {skill.spec.sampleCommand && (
+                <div className="pt-2 flex justify-between">
+                  <span className="text-zk-muted">Verification</span>
+                  <span className="font-semibold text-zk-text">CLI command</span>
+                </div>
+              )}
               {skill.spec.documentationUrl && (
                 <div className="pt-2 flex justify-between">
                   <span className="text-zk-muted">Documentation</span>
@@ -306,13 +307,13 @@ export default async function SkillDetailPage({
               </h3>
               <div className="flex flex-wrap gap-1.5">
                 {skill.tags.map((tag) => (
-                  <a
+                  <Link
                     key={tag}
                     href={`/skills?search=${encodeURIComponent(tag)}`}
                     className="rounded-md bg-zk-chip px-2 py-1 text-[10px] font-mono text-zk-text2 hover:bg-zk-border transition"
                   >
                     #{tag}
-                  </a>
+                  </Link>
                 ))}
               </div>
             </div>
