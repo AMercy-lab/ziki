@@ -59,7 +59,6 @@ function mapSubmissionToSkill(sub: {
   slug: string;
   title: string;
   category: string;
-  categoryLabel?: string;
   categoryLabel: string;
   summary: string;
   tags: string[];
@@ -80,9 +79,7 @@ function mapSubmissionToSkill(sub: {
     title: sub.title,
     icon: resolveIcon(sub.title, sub.category),
     category,
-    categoryLabel: getCategoryLabel(category),
-    category: (sub.category as SkillCategory) || "general",
-    categoryLabel: sub.categoryLabel || "General",
+    categoryLabel: sub.categoryLabel || getCategoryLabel(category),
     description: sub.summary,
     tags: Array.isArray(sub.tags) ? sub.tags : [],
     prompt: sub.prompt,
@@ -358,34 +355,25 @@ export async function getSkills(): Promise<GetSkillsResult> {
     });
 
     const communitySkills = approved.map(mapSubmissionToSkill);
-    // Return approved community skills first, followed by official core starter templates
+    // Approved community skills first, then the official core starter templates.
     return { skills: [...communitySkills, ...CORE_SKILL_TEMPLATES] };
   } catch (error) {
     console.error("[skills] failed to load approved skills from db:", error);
-    // When DB is cold or unreachable, safely return core starter templates without crashing
-    return {
-      skills: CORE_SKILL_TEMPLATES,
-      error: null,
-    return { skills: approved.map(mapSubmissionToSkill) };
-  } catch (error) {
-    console.error("[skills] failed to load approved skills from db:", error);
-    return {
-      skills: [],
-      error: "Unable to load approved skills from the database. Please try again later.",
-    };
+    // A cold or unreachable database must not blank the library.
+    return { skills: CORE_SKILL_TEMPLATES, error: null };
   }
 }
 
 export async function getSkillBySlug(slug: string): Promise<SkillItem | undefined> {
   const normalized = slug.trim().toLowerCase();
 
-  // 1. Check core starter templates
+  // 1. Core starter templates always resolve, even without a database.
   const coreMatch = CORE_SKILL_TEMPLATES.find(
-    (s) => s.slug.toLowerCase() === normalized || s.id === slug
+    (s) => s.slug.toLowerCase() === normalized || s.id === normalized,
   );
   if (coreMatch) return coreMatch;
 
-  // 2. Query database for approved community submissions
+  // 2. Approved community submissions.
   try {
     const sub = await prisma.skillSubmission.findFirst({
       where: {
@@ -401,7 +389,6 @@ export async function getSkillBySlug(slug: string): Promise<SkillItem | undefine
     return mapSubmissionToSkill(sub);
   } catch (error) {
     console.error("[skills] failed to load skill by slug", error);
-    throw new Error("Unable to load skill from the database. Please try again later.");
     return undefined;
   }
 }
