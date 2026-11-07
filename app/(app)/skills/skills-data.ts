@@ -56,12 +56,14 @@ function resolveIcon(title: string, category: string): SkillItem["icon"] {
 
 function mapSubmissionToSkill(sub: {
   id: string;
+  slug: string;
   title: string;
   category: string;
   categoryLabel?: string;
   summary: string;
   tags: string[];
   prompt: string;
+  checklist?: string[];
   sampleCommand?: string | null;
   documentationUrl?: string | null;
   createdAt: Date;
@@ -70,21 +72,20 @@ function mapSubmissionToSkill(sub: {
   const authorName = sub.submittedBy?.name || "Contributor";
   const handle = "@" + authorName.toLowerCase().replace(/[^a-z0-9]/g, "");
   const category = (sub.category as SkillCategory) || "general";
-  const slug = sub.id;
 
   return {
     id: sub.id,
-    slug,
+    slug: sub.slug || sub.id,
     title: sub.title,
     icon: resolveIcon(sub.title, sub.category),
     category,
-    categoryLabel: sub.categoryLabel ? (getCategoryLabel(sub.categoryLabel) as string) : getCategoryLabel(category),
+    categoryLabel: getCategoryLabel(category),
     description: sub.summary,
     tags: Array.isArray(sub.tags) ? sub.tags : [],
     prompt: sub.prompt,
     spec: {
       overview: sub.summary,
-      checklist: [],
+      checklist: Array.isArray(sub.checklist) ? sub.checklist : [],
       sampleCommand: sub.sampleCommand || null,
       documentationUrl: sub.documentationUrl || null,
     },
@@ -379,7 +380,7 @@ export async function getSkillBySlug(slug: string): Promise<SkillItem | undefine
   try {
     const sub = await prisma.skillSubmission.findFirst({
       where: {
-        id: slug,
+        OR: [{ slug: normalized }, { id: slug }],
         status: "approved",
       },
       include: {
