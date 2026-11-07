@@ -429,6 +429,10 @@ export function AppHeader({
                 <MenuLink href="/docs" active={isNavItemActive(pathname, "/docs")}>
                   Documentation
                 </MenuLink>
+                {/* The skills library is public, but signed-in people look for it here (GAP 1). */}
+                <MenuLink href="/skills" active={isNavItemActive(pathname, "/skills")}>
+                  Skills library
+                </MenuLink>
                 <div className="mx-2 h-px bg-zk-divider" />
                 <SignOutButton
                   userId={userId}
