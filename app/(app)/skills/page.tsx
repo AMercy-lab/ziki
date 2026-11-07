@@ -34,6 +34,15 @@ export default async function SkillsPage() {
         agents={userAgents}
         isGuest={!user}
       />
+    "Discover agent prompts, scripts, and security guardrails published by the community and approved by a reviewer.",
+};
+
+export default async function SkillsPage() {
+  const { skills, error } = await getSkills();
+
+  return (
+    <div className="mx-auto max-w-7xl">
+      <SkillsDirectory skills={skills} loadError={error ?? undefined} />
     </div>
   );
 }

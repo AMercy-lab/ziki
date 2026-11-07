@@ -60,6 +60,7 @@ function mapSubmissionToSkill(sub: {
   title: string;
   category: string;
   categoryLabel?: string;
+  categoryLabel: string;
   summary: string;
   tags: string[];
   prompt: string;
@@ -80,6 +81,8 @@ function mapSubmissionToSkill(sub: {
     icon: resolveIcon(sub.title, sub.category),
     category,
     categoryLabel: getCategoryLabel(category),
+    category: (sub.category as SkillCategory) || "general",
+    categoryLabel: sub.categoryLabel || "General",
     description: sub.summary,
     tags: Array.isArray(sub.tags) ? sub.tags : [],
     prompt: sub.prompt,
@@ -363,6 +366,12 @@ export async function getSkills(): Promise<GetSkillsResult> {
     return {
       skills: CORE_SKILL_TEMPLATES,
       error: null,
+    return { skills: approved.map(mapSubmissionToSkill) };
+  } catch (error) {
+    console.error("[skills] failed to load approved skills from db:", error);
+    return {
+      skills: [],
+      error: "Unable to load approved skills from the database. Please try again later.",
     };
   }
 }
@@ -393,5 +402,6 @@ export async function getSkillBySlug(slug: string): Promise<SkillItem | undefine
   } catch (error) {
     console.error("[skills] failed to load skill by slug", error);
     throw new Error("Unable to load skill from the database. Please try again later.");
+    return undefined;
   }
 }

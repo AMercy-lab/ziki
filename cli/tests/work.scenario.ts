@@ -4,12 +4,15 @@ import { confirm, fileIdea, fileIssue, offeredTo, ok, refused, ziki, type Agent 
 
 type Item = { kind: string; key: string; minimumRole: string; canAct: boolean; blockedReason?: string; points?: number; issue?: { id: string }; idea?: { id: string }; actions: { name: string; cli: string }[] };
 
-/** The one work list every agent watches: `/<project-slug>/work`, or `pnpm ziki work`. */
+/** The one work list every agent watches: `/<org>/<project>/work`, or `pnpm ziki work`. */
 describe("the work feed", () => {
   let slug: string;
+  let org: string;
 
   beforeAll(async () => {
-    slug = (await ok("ada", "whoami")).project_slug;
+    const me = await ok("ada", "whoami");
+    slug = me.projects[0].slug;
+    org = me.org_slug;
   });
 
   const work = async (agent: Agent) => (await ok(agent, "work")) as { items: Item[]; ask: string[]; workUrl: string; pollAfterSeconds: number; agent: { level: string } };
@@ -40,16 +43,18 @@ describe("the work feed", () => {
 
   it("is what a connecting agent is told to watch", async () => {
     const me = await ok("bob", "whoami");
-    expect(me.work_url).toMatch(new RegExp(`/${slug}/work$`));
-    expect(me.next_step).toMatch(/work_url/);
+    // #user-agents: the key works in every project of its organisation, each with its own work URL.
+    const project = (me.projects as { slug: string; workUrl: string }[]).find((row) => row.slug === slug);
+    expect(project?.workUrl).toMatch(new RegExp(`/${org}/${slug}/work$`));
+    expect(me.next_step).toMatch(/workUrl/);
     const feed = await work("bob");
-    expect(feed.workUrl).toBe(me.work_url);
+    expect(feed.workUrl).toBe(project?.workUrl);
     expect(feed.pollAfterSeconds).toBe(30);
   });
 
   it("answers at the short URL, and 304 when nothing changed", async () => {
     const { serverUrl, agents } = readKeyring();
-    const url = `${serverUrl}/${slug}/work`;
+    const url = `${serverUrl}/${org}/${slug}/work`;
     const headers = { Authorization: `Bearer ${agents.bob.key}` };
     const first = await fetch(url, { headers });
     expect(first.status).toBe(200);
@@ -93,7 +98,7 @@ describe("the work feed", () => {
     const forDana = itemFor((await work("dana")).items, "convert_idea", idea);
     expect(forDana).toMatchObject({ canAct: true });
     expect((await work("bob")).ask.join(" ")).toMatch(/convert/);
-    const { issueId } = await ok("bob", "convert-idea", { id: idea });
+    const { issueId } = await ok("bob", "convert-idea", { id: idea, difficulty: "medium" });
     const confirmItem = itemFor((await work("cara")).items, "confirm_issue", issueId);
     expect(confirmItem?.actions.map((action) => action.name)).toEqual(["confirm_issue"]);
     expect(itemFor((await work("cara")).items, "idea", idea)).toBeUndefined();

@@ -1,5 +1,7 @@
+import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import { prisma } from "@/lib/prisma";
 import { absoluteUrl } from "@/lib/site-url";
+import { projectPath, projectRef } from "@/lib/project-paths";
 import { IssueApiError } from "@/lib/agent-api/errors";
 import {
   getPlatformRewardConfig,
@@ -24,34 +26,42 @@ const projectSelect = {
   workflow: true,
 } satisfies Prisma.ProjectSelect;
 
-export async function listAgentProjectSummaries(tenantId: string) {
+/** The organisation's slug, the first segment of its projects' addresses (#project-urls). */
+export async function organisationSlugOf(organisationId: string): Promise<string> {
+  const organisation = await prisma.organisation.findUnique({ where: { id: organisationId }, select: { slug: true } });
+  if (!organisation) throw new IssueApiError(404, "Organisation not found.");
+  return organisation.slug;
+}
+
+export async function listAgentProjectSummaries(organisationId: string) {
   return prisma.project.findMany({
-    where: { tenantId },
+    where: { organisationId },
     orderBy: { slug: "asc" },
     select: { id: true, slug: true, name: true },
   });
 }
 
-/** Every project in the agent's tenant, with each project's goal and open-issue count. */
-export async function listAgentProjects(tenantId: string) {
+/** Every project in the agent's organisation, with each project's goal and open-issue count. */
+export async function listAgentProjects(organisationId: string) {
   const [projects, platform] = await Promise.all([
     prisma.project.findMany({
-      where: { tenantId },
+      where: { organisationId },
       orderBy: { slug: "asc" },
       select: projectSelect,
     }),
     getPlatformRewardConfig(prisma),
   ]);
+  const orgSlug = await organisationSlugOf(organisationId);
   const base = projectDefaultsFromPlatform(platform);
   const openCounts = await prisma.bug.groupBy({
     by: ["projectId"],
-    where: { tenantId, projectId: { in: projects.map((project) => project.id) }, isDeleted: false, substatus: "open" },
+    where: { organisationId, projectId: { in: projects.map((project) => project.id) }, ...PRODUCT_TRACK, isDeleted: false, substatus: "open" },
     _count: { _all: true },
   });
   const openByProject = new Map(openCounts.map((row) => [row.projectId, row._count._all]));
   return projects.map((project) => ({
     ...project,
-    workUrl: absoluteUrl(`/${project.slug}/work`),
+    workUrl: absoluteUrl(projectPath(projectRef(orgSlug, project.slug), "/work")),
     notesUrl: `/api/v1/projects/${project.id}/notes`,
     notesCommentsUrl: `/api/v1/projects/${project.id}/notes/comments`,
     rewardRules: parseProjectRewardConfig(project.rewardConfig, base),
@@ -60,22 +70,23 @@ export async function listAgentProjects(tenantId: string) {
   }));
 }
 
-/** One project in the agent's tenant; foreign project ids are a 404, not a leak. */
-export async function getAgentProject(tenantId: string, projectId: string) {
+/** One project in the agent's organisation; foreign project ids are a 404, not a leak. */
+export async function getAgentProject(organisationId: string, projectId: string) {
   const [project, platform] = await Promise.all([
     prisma.project.findFirst({
-      where: { id: projectId, tenantId },
+      where: { id: projectId, organisationId },
       select: projectSelect,
     }),
     getPlatformRewardConfig(prisma),
   ]);
   if (!project) throw new IssueApiError(404, "Project not found.");
+  const orgSlug = await organisationSlugOf(organisationId);
   const openIssueCount = await prisma.bug.count({
-    where: { tenantId, projectId: project.id, isDeleted: false, substatus: "open" },
+    where: { organisationId, projectId: project.id, ...PRODUCT_TRACK, isDeleted: false, substatus: "open" },
   });
   return {
     ...project,
-    workUrl: absoluteUrl(`/${project.slug}/work`),
+    workUrl: absoluteUrl(projectPath(projectRef(orgSlug, project.slug), "/work")),
     notesUrl: `/api/v1/projects/${project.id}/notes`,
     notesCommentsUrl: `/api/v1/projects/${project.id}/notes/comments`,
     rewardRules: parseProjectRewardConfig(project.rewardConfig, projectDefaultsFromPlatform(platform)),

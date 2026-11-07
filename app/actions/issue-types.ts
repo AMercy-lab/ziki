@@ -47,7 +47,7 @@ export async function createIssueTypeAction(
 
   const existing = await prisma.issueType.findFirst({
     where: {
-      tenantId: scope.tenantId,
+      organisationId: scope.organisationId,
       name: {
         equals: normalizedName,
         mode: "insensitive",
@@ -62,7 +62,7 @@ export async function createIssueTypeAction(
   try {
     await prisma.issueType.create({
       data: {
-        tenantId: scope.tenantId,
+        organisationId: scope.organisationId,
         name: normalizedName,
         description: parsed.data.description,
         template: normalizeTemplate(parsed.data.template),
@@ -82,8 +82,8 @@ export async function createIssueTypeAction(
   }
 
   expireTag(TAGS.issueTypes);
-  revalidatePath("/[project]/org", "layout");
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]/org", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   revalidatePath("/bugs/new");
   return { ok: true };
 }
@@ -121,7 +121,7 @@ export async function updateIssueTypeAction(
   const normalizedName = parsed.data.name.trim();
 
   const currentType = await prisma.issueType.findFirst({
-    where: { id, tenantId: scope.tenantId },
+    where: { id, organisationId: scope.organisationId },
   });
 
   if (!currentType) {
@@ -130,7 +130,7 @@ export async function updateIssueTypeAction(
 
   const existing = await prisma.issueType.findFirst({
     where: {
-      tenantId: scope.tenantId,
+      organisationId: scope.organisationId,
       name: {
         equals: normalizedName,
         mode: "insensitive",
@@ -148,7 +148,7 @@ export async function updateIssueTypeAction(
   try {
     await prisma.$transaction(async (tx) => {
       const current = await tx.issueType.findFirst({
-        where: { id, tenantId: scope.tenantId },
+        where: { id, organisationId: scope.organisationId },
       });
       if (!current) {
         return;
@@ -168,7 +168,7 @@ export async function updateIssueTypeAction(
 
       if (current.name !== normalizedName) {
         const linkedBugs = await tx.bug.findMany({
-          where: { typeId: id, tenantId: scope.tenantId },
+          where: { typeId: id, organisationId: scope.organisationId },
           select: { id: true },
         });
 
@@ -206,8 +206,8 @@ export async function updateIssueTypeAction(
   }
 
   expireTag(TAGS.issueTypes);
-  revalidatePath("/[project]/org", "layout");
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]/org", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   revalidatePath("/bugs/new");
   revalidatePath("/bugs");
   for (const bugId of linkedBugIds) {
@@ -227,7 +227,7 @@ export async function toggleIssueTypeActiveAction(
   }
 
   const existing = await prisma.issueType.findFirst({
-    where: { id, tenantId: scope.tenantId },
+    where: { id, organisationId: scope.organisationId },
     select: { isActive: true },
   });
 
@@ -241,8 +241,8 @@ export async function toggleIssueTypeActiveAction(
   });
 
   expireTag(TAGS.issueTypes);
-  revalidatePath("/[project]/org", "layout");
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]/org", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   revalidatePath("/bugs/new");
   return { ok: true };
 }
@@ -258,7 +258,7 @@ export async function deleteIssueTypeAction(
   }
 
   const existing = await prisma.issueType.findFirst({
-    where: { id, tenantId: scope.tenantId },
+    where: { id, organisationId: scope.organisationId },
     select: { id: true },
   });
 
@@ -267,7 +267,7 @@ export async function deleteIssueTypeAction(
   }
 
   const count = await prisma.bug.count({
-    where: { typeId: id, tenantId: scope.tenantId },
+    where: { typeId: id, organisationId: scope.organisationId },
   });
 
   const check = canDeleteIssueType(count);
@@ -287,8 +287,8 @@ export async function deleteIssueTypeAction(
   }
 
   expireTag(TAGS.issueTypes);
-  revalidatePath("/[project]/org", "layout");
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]/org", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   revalidatePath("/bugs/new");
   return { ok: true };
 }

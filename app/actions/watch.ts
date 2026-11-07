@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { revalidateIssue } from "@/lib/revalidate-issue";
 import { prisma } from "@/lib/prisma";
-import { bugInTenant, currentTenantIdFor } from "@/lib/tenant-context";
+import { bugInOrganisation, currentOrganisationIdFor } from "@/lib/organisation-context";
 import { requireUser } from "@/lib/auth-helpers";
 import { finishedWatchedWhere } from "@/lib/watching";
 
@@ -14,10 +14,25 @@ export async function setWatchingAction(
 ): Promise<{ ok?: boolean; error?: string }> {
   const user = await requireUser();
   const bug = await prisma.bug.findUnique({
-    where: { id: bugId, ...bugInTenant(await currentTenantIdFor(user.id)) },
-    select: { id: true, isDeleted: true },
+    where: { id: bugId },
+    select: { id: true, isDeleted: true, organisationId: true, projectId: true, project: { select: { visibility: true } } },
   });
   if (!bug || bug.isDeleted) return { error: "Issue not found" };
+
+  const canAccess =
+    user.role === "super_admin" ||
+    bug.project.visibility === "public" ||
+    Boolean(
+      await prisma.projectMembership.findFirst({
+        where: { projectId: bug.projectId, userId: user.id },
+        select: { id: true },
+      }) ||
+      await prisma.membership.findFirst({
+        where: { organisationId: bug.organisationId, userId: user.id },
+        select: { id: true },
+      })
+    );
+  if (!canAccess) return { error: "Issue not found" };
 
   await prisma.issueWatch.upsert({
     where: { userId_bugId: { userId: user.id, bugId } },
@@ -25,7 +40,7 @@ export async function setWatchingAction(
     update: { watching: Boolean(watching) },
   });
   revalidateIssue();
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   revalidatePath(`/bugs/${bugId}`);
   // The "Issues I'm watching" list (#312).
   revalidatePath("/bugs");
@@ -47,12 +62,19 @@ export async function unwatchFinishedAction(): Promise<{
 }> {
   const user = await requireUser();
   const bugs = await prisma.bug.findMany({
-    where: { ...finishedWatchedWhere(user.id), ...bugInTenant(await currentTenantIdFor(user.id)) },
+    where: {
+      ...finishedWatchedWhere(user.id),
+      OR: [
+        { organisation: { memberships: { some: { userId: user.id } } } },
+        { project: { memberships: { some: { userId: user.id } } } },
+        { project: { visibility: "public" } },
+      ],
+    },
     select: { id: true },
   });
   const ids = bugs.map((b) => b.id);
   if (ids.length === 0) {
-    revalidatePath("/[project]", "layout");
+    revalidatePath("/[org]/[project]", "layout");
     revalidatePath("/bugs");
     return { ok: true, count: 0 };
   }
@@ -66,7 +88,7 @@ export async function unwatchFinishedAction(): Promise<{
       skipDuplicates: true,
     }),
   ]);
-  revalidatePath("/[project]", "layout");
+  revalidatePath("/[org]/[project]", "layout");
   revalidatePath("/bugs");
   return { ok: true, count: ids.length };
 }
