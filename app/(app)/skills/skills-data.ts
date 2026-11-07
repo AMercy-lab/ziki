@@ -16,6 +16,19 @@ export function getCategoryLabel(category: string): string {
   return CATEGORY_LABELS[category as SkillCategory] || "General";
 }
 
+/**
+ * The skills database is unreachable or erroring, as opposed to a slug that
+ * genuinely does not exist. Callers show an "unavailable" banner for this and
+ * keep `notFound()` for the missing-skill case (GAP 3).
+ */
+export class SkillUnavailableError extends Error {
+  constructor(cause?: unknown) {
+    super("The skills library is temporarily unavailable.");
+    this.name = "SkillUnavailableError";
+    this.cause = cause;
+  }
+}
+
 export interface SkillItem {
   id: string;
   slug: string;
@@ -56,10 +69,10 @@ function resolveIcon(title: string, category: string): SkillItem["icon"] {
 
 function mapSubmissionToSkill(sub: {
   id: string;
-  slug?: string;
+  slug: string;
   title: string;
   category: string;
-  categoryLabel?: string;
+  categoryLabel: string;
   summary: string;
   tags: string[];
   prompt: string;
@@ -79,7 +92,7 @@ function mapSubmissionToSkill(sub: {
     title: sub.title,
     icon: resolveIcon(sub.title, sub.category),
     category,
-    categoryLabel: getCategoryLabel(category),
+    categoryLabel: sub.categoryLabel || getCategoryLabel(category),
     description: sub.summary,
     tags: Array.isArray(sub.tags) ? sub.tags : [],
     prompt: sub.prompt,
@@ -355,31 +368,31 @@ export async function getSkills(): Promise<GetSkillsResult> {
     });
 
     const communitySkills = approved.map(mapSubmissionToSkill);
-    // Return approved community skills first, followed by official core starter templates
+    // Approved community skills first, then the official core starter templates.
     return { skills: [...communitySkills, ...CORE_SKILL_TEMPLATES] };
   } catch (error) {
     console.error("[skills] failed to load approved skills from db:", error);
-    // When DB is cold or unreachable, safely return core starter templates without crashing
-    return {
-      skills: CORE_SKILL_TEMPLATES,
-      error: null,
-    };
+    // A cold or unreachable database must not blank the library.
+    return { skills: CORE_SKILL_TEMPLATES, error: null };
   }
 }
 
 export async function getSkillBySlug(slug: string): Promise<SkillItem | undefined> {
   const normalized = slug.trim().toLowerCase();
 
-  // 1. Check core starter templates
+  // 1. Core starter templates always resolve, even without a database.
   const coreMatch = CORE_SKILL_TEMPLATES.find(
-    (s) => s.slug.toLowerCase() === normalized || s.id === slug
+    (s) => s.slug.toLowerCase() === normalized || s.id === normalized,
   );
   if (coreMatch) return coreMatch;
 
-  // 2. Query database for approved community submissions
+  // 2. Approved community submissions.
   try {
     const sub = await prisma.skillSubmission.findFirst({
-      where: { id: slug, status: "approved" },
+      where: {
+        OR: [{ slug: normalized }, { id: slug }],
+        status: "approved",
+      },
       include: {
         submittedBy: { select: { name: true } },
       },
@@ -389,6 +402,9 @@ export async function getSkillBySlug(slug: string): Promise<SkillItem | undefine
     return mapSubmissionToSkill(sub);
   } catch (error) {
     console.error("[skills] failed to load skill by slug", error);
-    throw new Error("Unable to load skill from the database. Please try again later.");
+    // A broken database is not a missing skill: the page shows a banner instead
+    // of a misleading 404 (GAP 3).
+    throw new SkillUnavailableError(error);
   }
 }
+

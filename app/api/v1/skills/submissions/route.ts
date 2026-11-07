@@ -1,71 +1,36 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
 import { resolveSessionUserId } from "@/lib/session-user";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { requireSuperAdmin } from "@/lib/auth-helpers";
-
-const createSubmissionSchema = z.object({
-  title: z.string().min(1, "Title is required").max(160),
-  category: z.string().min(1, "Category is required").max(40),
-  categoryLabel: z.string().min(1, "Category label is required").max(80).optional(),
-  summary: z.string().min(1, "Summary is required").max(500),
-  tags: z.array(z.string().min(1)).max(20),
-  prompt: z.string().min(1, "Prompt is required"),
-  sampleCommand: z.string().max(200).optional().nullable(),
-  documentationUrl: z.string().url().optional().nullable(),
-  bounty: z.number().int().min(0).max(10000).optional(),
-  revisionOfId: z.string().optional(),
-  checklist: z.array(z.string()).optional().nullable(),
-});
-
-export async function GET() {
-  await requireSuperAdmin();
-
-  const submissions = await prisma.skillSubmission.findMany({
-    orderBy: [{ createdAt: "desc" }],
-    select: {
-      id: true,
-      title: true,
-      category: true,
-      categoryLabel: true,
-      summary: true,
-      tags: true,
-      prompt: true,
-      sampleCommand: true,
-      documentationUrl: true,
-      bounty: true,
-      status: true,
-      submittedById: true,
-      reviewedById: true,
-      reviewedAt: true,
-      rejectionReason: true,
-      createdAt: true,
-      updatedAt: true,
-      submittedBy: { select: { id: true, name: true, email: true, image: true } },
-      reviewedBy: { select: { id: true, name: true, email: true } },
-    },
-  });
-
-  return NextResponse.json({ submissions });
-}
+import {
+  SKILL_CATEGORY_LABELS,
+  createSubmissionSchema,
+  slugify,
+} from "@/lib/validations/skill";
 
 export async function POST(req: NextRequest) {
+  // GAP 4: an API route answers with a JSON 401 instead of redirecting to /login.
   const session = await resolveSessionUserId();
   if ("error" in session) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
   const userId = session.userId;
 
-  const rateLimit = checkRateLimit(`skill-submission:${userId}`, {
-    max: 10,
+  // Rate limit: at most 5 submissions per 60 seconds per user
+  const rateCheck = checkRateLimit(`skill-submission:${userId}`, {
+    max: 5,
     windowMs: 60 * 1000,
   });
-  if (!rateLimit.allowed) {
+
+  if (!rateCheck.allowed) {
     return NextResponse.json(
-      { error: "You're doing that too fast. Please wait a moment." },
-      { status: 429 },
+      { error: "You're submitting skills too quickly. Please wait a moment." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": Math.ceil(rateCheck.retryAfterMs / 1000).toString(),
+        },
+      }
     );
   }
 
@@ -81,10 +46,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  const categoryLabel =
-    parsed.data.categoryLabel || parsed.data.category.charAt(0).toUpperCase() + parsed.data.category.slice(1);
+  // Derive human-readable category label server-side (preventing arbitrary client text)
+  const categoryLabel = SKILL_CATEGORY_LABELS[parsed.data.category];
 
-  // If revising an existing rejected submission, update it back to pending
+  // If revising an existing rejected submission, update it back to pending rather than creating an orphan
   if (parsed.data.revisionOfId) {
     const existingSubmission = await prisma.skillSubmission.findFirst({
       where: { id: parsed.data.revisionOfId, submittedById: userId },
@@ -106,53 +71,69 @@ export async function POST(req: NextRequest) {
           rejectionReason: null,
           reviewedById: null,
           reviewedAt: null,
-        } as unknown as Prisma.SkillSubmissionUpdateInput,
+        },
         select: {
           id: true,
+          slug: true,
           title: true,
           category: true,
           categoryLabel: true,
           summary: true,
           tags: true,
           prompt: true,
+          checklist: true,
           sampleCommand: true,
           documentationUrl: true,
-          bounty: true,
           status: true,
           submittedById: true,
           createdAt: true,
         },
       });
-      return NextResponse.json(updated, { status: 200 });
+      return NextResponse.json({ submission: updated }, { status: 200 });
     }
   }
 
-  // Otherwise create a new submission
+  // Derive unique slug from title
+  let baseSlug = slugify(parsed.data.title);
+  if (!baseSlug) baseSlug = `skill-${Date.now().toString(36)}`;
+  let uniqueSlug = baseSlug;
+
+  const existing = await prisma.skillSubmission.findUnique({
+    where: { slug: uniqueSlug },
+    select: { id: true },
+  });
+
+  if (existing) {
+    uniqueSlug = `${baseSlug}-${Math.random().toString(36).substring(2, 6)}`;
+  }
+
   const submission = await prisma.skillSubmission.create({
     data: {
+      slug: uniqueSlug,
       title: parsed.data.title,
       category: parsed.data.category,
       categoryLabel,
       summary: parsed.data.summary,
       tags: parsed.data.tags,
       prompt: parsed.data.prompt,
-      sampleCommand: parsed.data.sampleCommand ?? null,
-      documentationUrl: parsed.data.documentationUrl ?? null,
-      bounty: parsed.data.bounty ?? 0,
+      checklist: parsed.data.checklist ?? [],
+      sampleCommand: parsed.data.sampleCommand || null,
+      documentationUrl: parsed.data.documentationUrl || null,
       status: "pending",
       submittedById: userId,
     },
     select: {
       id: true,
+      slug: true,
       title: true,
       category: true,
       categoryLabel: true,
       summary: true,
       tags: true,
       prompt: true,
+      checklist: true,
       sampleCommand: true,
       documentationUrl: true,
-      bounty: true,
       status: true,
       submittedById: true,
       createdAt: true,
@@ -162,6 +143,3 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ submission }, { status: 201 });
 }
 
-const notAllowed = NextResponse.json({ error: "Method not allowed" }, { status: 405 });
-export const PUT = notAllowed;
-export const DELETE = notAllowed;
