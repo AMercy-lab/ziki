@@ -3,8 +3,7 @@ import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { formatZ } from "@/lib/points/rules";
 import { LocalTime } from "@/components/local-time";
-import { earningsSummary, taskScopeFor, weeklyGoalState } from "@/lib/earnings";
-import { currentOrganisationIdFor } from "@/lib/organisation-context";
+import { earningsSummary, weeklyGoalState } from "@/lib/earnings";
 import { ChangeGoal } from "./goal-form";
 
 export const metadata = { title: "Your earnings" };
@@ -24,11 +23,10 @@ const CHECKING = "bg-[repeating-linear-gradient(45deg,#f2c14e_0,#f2c14e_6px,#f7d
  * "being checked" is money won on live work, paid once enough people report it deployed. Taking money out is its
  * own page, Withdraw.
  */
-export default async function EarningsPage({ searchParams }: { searchParams: Promise<{ in?: string | string[] }> }) {
+export default async function EarningsPage() {
   const user = await requireUser();
-  const { in: selected } = await searchParams;
-  const scope = await taskScopeFor(prisma, user.id, typeof selected === "string" ? selected : null, await currentOrganisationIdFor(user.id));
-  const { total, checking, earnedThisWeek, weeklyGoal, solvedCount, sources, tasks, activity } = await earningsSummary(prisma, user.id, scope);
+  // Everything, in every workspace and project you're in (Chloe's call); Withdraw shows one workspace.
+  const { checking, earnedThisWeek, weeklyGoal, solvedCount, sources, tasks, tasksAreYours, activity } = await earningsSummary(prisma, user.id);
   const week = Math.max(0, earnedThisWeek);
   const goal = weeklyGoalState(week, weeklyGoal);
   const pct = (value: number) => `${Math.min(100, (Math.max(0, value) / weeklyGoal) * 100)}%`;
@@ -45,9 +43,6 @@ export default async function EarningsPage({ searchParams }: { searchParams: Pro
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-zk-text">Your earnings</h1>
-          <p className="mt-1 text-sm text-zk-text2">
-            What you and your agents earned on every project you work on: <b className="text-zk-text">{formatZ(total)}</b> in all.
-          </p>
         </div>
         <Link href="/leaderboard" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-zk-border bg-zk-surface px-5 text-sm font-bold text-zk-text hover:bg-zk-chip">
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4ZM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3" /></svg>
@@ -121,11 +116,11 @@ export default async function EarningsPage({ searchParams }: { searchParams: Pro
         </section>
       </div>
 
-      {/* The fastest way there: the open tasks that pay the most in the workspace or project selected in the switcher. */}
+      {/* The fastest way there: the open tasks that pay the most wherever you work, else in projects open to join. */}
       <section aria-labelledby="fastest" className={card}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="fastest" className="text-lg font-extrabold text-zk-text">Fastest way to your goal</h2>
-          <p className="text-sm text-zk-text2">{scope ? `Open tasks in ${scope.name}, highest reward first` : "The best-paying tasks in projects open to join"}</p>
+          <p className="text-sm text-zk-text2">{tasksAreYours ? "Open tasks in projects you're in, highest reward first" : "The best-paying tasks in projects open to join"}</p>
         </div>
         {tasks.length === 0 ? (
           <p className="mt-4 rounded-2xl bg-zk-chip px-4 py-3 text-sm text-zk-text2">
@@ -148,7 +143,7 @@ export default async function EarningsPage({ searchParams }: { searchParams: Pro
                     href={task.href}
                     className={`inline-flex min-h-10 items-center rounded-full px-4 text-sm font-bold ${index === 0 ? "bg-electric-blue-strong text-white hover:bg-[#2552af]" : "border border-zk-border bg-zk-surface text-zk-text hover:bg-zk-chip"}`}
                   >
-                    {scope ? "Place bid" : "See task"}
+                    {tasksAreYours ? "Place bid" : "See task"}
                   </Link>
                 </li>
               ))}

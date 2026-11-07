@@ -1,3 +1,4 @@
+import { SavedIssueViews } from "@/components/saved-issue-views";
 import { PRODUCT_TRACK } from "@/lib/marketing/track";
 import { IdeasWelcome } from "@/components/ideas-welcome";
 import { IdeaChat } from "@/components/idea-chat";
@@ -91,7 +92,7 @@ import { cookies } from "next/headers";
 import { parseDismissed } from "@/lib/onboarding";
 import { liveCheck, liveConfirmLabel, liveFactLabel, type LiveCheck } from "@/lib/live-check";
 import { latestPullRequestReports } from "@/lib/agent-api/pull-request-report";
-import { parseGitHubRepoUrl } from "@/lib/github/pull-request-url";
+import { PROJECT_REPOSITORIES_SELECT, repoForPullRequest } from "@/lib/github/project-repositories";
 import { IssueRowStatus } from "@/components/issue-row-status";
 import { BidsVoteBadge, ImportanceVoteBadge } from "@/components/vote-badge";
 import { RewardBadge } from "@/components/reward-badge";
@@ -205,10 +206,11 @@ async function loadLiveChecks(bugs: ReadonlyArray<{ id: string; pullRequestUrl: 
   const [reports, confirmers, projects] = await Promise.all([
     latestPullRequestReports(bugs),
     loadProdConfirmers(bugs.map((bug) => bug.id)),
-    prisma.project.findMany({ where: { id: { in: [...new Set(bugs.map((bug) => bug.projectId))] } }, select: { id: true, repoUrl: true } }),
+    prisma.project.findMany({ where: { id: { in: [...new Set(bugs.map((bug) => bug.projectId))] } }, select: { id: true, repoUrl: true, ...PROJECT_REPOSITORIES_SELECT } }),
   ]);
-  const repos = new Map(projects.map((project) => [project.id, parseGitHubRepoUrl(project.repoUrl)]));
-  for (const bug of bugs) checks.set(bug.id, liveCheck(bug.pullRequestUrl, reports.get(bug.id), repos.get(bug.projectId) ?? null, confirmers.get(bug.id) ?? []));
+  const projectsById = new Map(projects.map((project) => [project.id, project]));
+  // The repository each pull request is in: the main one or one the project lists (#2).
+  for (const bug of bugs) checks.set(bug.id, liveCheck(bug.pullRequestUrl, reports.get(bug.id), repoForPullRequest(projectsById.get(bug.projectId), bug.pullRequestUrl), confirmers.get(bug.id) ?? []));
   return checks;
 }
 
@@ -1071,6 +1073,22 @@ export async function IssuesList({
     value === YOUR_WORK_STATUS ? yourWorkCount : value === IDEAS_STATUS ? ideasCount : value === REJECTED_IDEAS_STATUS ? rejectedIdeasCount : value === ERROR_STATUS ? errorCount : value === POSSIBLY_DELIVERED ? possiblyDeliveredCount : countForStatus(value);
   const statusLink = (value: string) => (value === IDEAS_STATUS ? statusHref(null) : statusHref(value));
 
+  let savedViews: { id: string; name: string; status: string; query: string }[] = [];
+  let savedViewsFailed = false;
+  if (!isIdeasView) {
+    try {
+      savedViews = await prisma.savedIssueView.findMany({
+        where: { userId: user.id, projectId: project.id },
+        select: { id: true, name: true, status: true, query: true },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+      });
+    } catch {
+      savedViewsFailed = true;
+    }
+  }
+  const savedViewQuery = new URLSearchParams(currentQuery);
+  savedViewQuery.set("sort", currentSort);
+
   const headerContent = (
     <>
       {activeProject?.goal ? (
@@ -1118,8 +1136,22 @@ export async function IssuesList({
           {!isDeletedView ? <IdeaChat projectId={project.id} className={isFirstRun ? "" : "md:hidden"} /> : null}
         </div>
       </div>
+      {!isIdeasView ? (
+        <SavedIssueViews org={project.orgSlug} slug={project.slug} status={statusParam}
+          query={savedViewQuery.toString()} views={savedViews} loadFailed={savedViewsFailed} />
+      ) : null}
     </>
   );
+
+  // Earnings (#earnings): once someone has joined a project from Discover, they've found the way in; the notice goes.
+  let hasJoinedProject = false;
+  if (isIdeasView && userId) {
+    try {
+      hasJoinedProject = Boolean(await prisma.projectMembership.findFirst({ where: { userId }, select: { id: true } }));
+    } catch {
+      // Unknown: show the notice; Dismiss still hides it.
+    }
+  }
 
   const listContent = (
     <div className="space-y-4">
@@ -1129,7 +1161,7 @@ export async function IssuesList({
         <div id={PROJECT_LINKS_SLOT_ID} className="empty:hidden" />
 
         {/* Earnings (#earnings): the way to earn, on the page everyone lands on, closed with × like the panel above. */}
-        {isIdeasView && !isDeletedView ? <EarnPanel /> : null}
+        {isIdeasView && !isDeletedView && !hasJoinedProject ? <EarnPanel /> : null}
 
         <AgentSetupNotice agents={unconfiguredAgents} />
         {nextStep && organisationId ? <OrganisationNextStepCard step={nextStep} organisationId={organisationId} /> : null}

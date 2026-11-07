@@ -81,6 +81,8 @@ import {
 import { IssueConfirmationsPanel, type ConfirmationBlock, type ConfirmationsData } from "@/components/issue-confirmations";
 import { CONFIRMATION_SUMMARY_MAX_CHARS, listConfirmations, takesConfirmations } from "@/lib/agent-api/confirmations";
 import { DisputeAwardDialog, type DisputeRole } from "@/components/dispute-award-dialog";
+import { TakeItBackPanel } from "@/components/take-it-back";
+import { takeItBackViewFor } from "@/lib/take-it-back-server";
 import { AttachmentList, type AttachmentView } from "@/components/attachment-list";
 import { ChooseRedesignButton } from "@/components/choose-redesign-button";
 import { isOrganisationAdminRole } from "@/lib/agents/membership";
@@ -113,8 +115,10 @@ import { liveCheck, liveConfirmLabel, liveFactLabel, liveNextStep, liveStepState
 import { loadProdConfirmers } from "@/lib/live-confirm-data";
 import { PROD_CONFIRMATIONS_NEEDED } from "@/lib/live-confirm";
 import { LiveFlow } from "@/components/live-flow";
-import { latestPullRequestReport } from "@/lib/agent-api/pull-request-report";
+import { latestPullRequestReport, gateReport, pullRequestStateView, type PullRequestStateView } from "@/lib/agent-api/pull-request-report";
+import { prGate, reportWanted } from "@/lib/agent-api/pr-gate";
 import { parseGitHubRepoUrl } from "@/lib/github/pull-request-url";
+import { PROJECT_REPOSITORIES_SELECT, repoForPullRequest } from "@/lib/github/project-repositories";
 import { DecisionCard } from "@/components/decision-card";
 import { decisionFor } from "@/lib/your-decision";
 import { agentInstructionsFor } from "@/lib/agent-instructions";
@@ -138,6 +142,7 @@ import { organisationMemberWhere } from "@/lib/organisation-mentions";
 import { readAgentResolution } from "@/lib/agent-resolution";
 import { AgentResolvedNotice } from "@/components/agent-resolved-notice";
 import { SubmissionEvidence } from "@/components/submission-evidence";
+import { PullRequestChecks } from "@/components/pull-request-checks";
 import { GitHubStatusPanel, type GitHubStatusPanelProps } from "@/components/github-status-panel";
 import { storedGitHubStatus } from "@/lib/github/sync";
 import { githubStatusPowers } from "@/lib/github/status-access";
@@ -470,6 +475,10 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     ),
   ]) : [[], null] as const;
   const canChooseRedesign = isOrganisationAdminRole(membership?.role, user.role);
+  // "Take it back" (#851): only an owner or admin sees it, only on a merged issue.
+  const takeItBack = await loadOptional("take it back", null, () =>
+    takeItBackViewFor({ issue: bug, membershipRole: membership?.role, appRole: user.role }),
+  );
   // Once an issue is past Requires confirmation, the Conversation opens on who
   // has it (its claims), then every bid it took (#issue-bids).
   const pastConfirmation = bug.substatus !== "requires_confirmation";
@@ -1089,6 +1098,26 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     ? await loadOptional("merge review votes", null, () => mergeReviewVotes(prisma, reviewBug, workflow.managerVoteWeight))
     : null;
   const stale = bug.isDeleted ? null : (await loadOptional("stale hold", null, () => staleHold(bug.id)))?.kind ?? null;
+  // #pr-checks: the checks on the linked pull request, from the latest
+  // independent report, and why an agent should look again when it is stale.
+  // A load that fails says so rather than reading as a pass.
+  type IssuePrChecks = { report: PullRequestStateView | null; refreshHint: string | null; failed: boolean };
+  const prChecks: IssuePrChecks | null = bug.isDeleted || !bug.pullRequestUrl
+    ? null
+    : await loadOptional<IssuePrChecks>(
+        "pull request checks",
+        { report: null, refreshHint: null, failed: true },
+        async () => {
+          const report = await latestPullRequestReport(bug.id, bug.pullRequestUrl);
+          const project = await prisma.project.findUnique({ where: { id: bug.projectId }, select: { repoUrl: true } });
+          const gate = prGate(gateReport(report), {
+            pullRequestUrl: bug.pullRequestUrl,
+            pullRequestHeadSha: bug.pullRequestHeadSha ?? null,
+            repo: parseGitHubRepoUrl(project?.repoUrl),
+          });
+          return { report: pullRequestStateView(report), refreshHint: reportWanted(gate, report), failed: false };
+        },
+      );
   const abandonCheck = bug.isDeleted || bug.status !== "in_progress" ? null : await loadOptional("sense check", null, () => senseCheck(bug.id));
   const closeSuggestions = await loadOptional<CloseSuggestionsData | null>("close suggestions", null, () => closeSuggestionsFor(bug.id));
   // A decision other members made about the viewer's own issue (#your-decisions).
@@ -1112,11 +1141,11 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     ? await loadOptional("live check", null, async () => {
         const [report, project, confirmers, moves] = await Promise.all([
           latestPullRequestReport(bug.id, bug.pullRequestUrl),
-          prisma.project.findUnique({ where: { id: bug.projectId }, select: { repoUrl: true } }),
+          prisma.project.findUnique({ where: { id: bug.projectId }, select: { repoUrl: true, ...PROJECT_REPOSITORIES_SELECT } }),
           loadProdConfirmers([bug.id]),
           prisma.bugActivity.findMany({ where: { bugId: bug.id, type: "status_changed" }, orderBy: { createdAt: "asc" }, select: { createdAt: true, metadata: true } }),
         ]);
-        const repo = parseGitHubRepoUrl(project?.repoUrl);
+        const repo = repoForPullRequest(project, bug.pullRequestUrl);
         // #live-confirm: when it last moved to each Live status, for the flow in the Status box.
         const reachedAt: Partial<Record<"on_dev" | "on_staging" | "on_prod", Date>> = {};
         for (const move of moves) {
@@ -1665,6 +1694,7 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
                   </ConfirmSubmitButton>
                 </form>
               ) : null}
+              {takeItBack ? <TakeItBackPanel view={takeItBack} /> : null}
             </section>
 
             {rewardRow ? (
@@ -2327,6 +2357,16 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
             bugId={bug.id}
             canEditPullRequest={canEditPullRequest}
           />
+
+          {prChecks && bug.pullRequestUrl && (prChecks.failed || prChecks.report?.reportedBy) ? (
+            <PullRequestChecks
+              report={prChecks.report}
+              pullRequestUrl={bug.pullRequestUrl}
+              refreshHint={prChecks.refreshHint}
+              refreshInstructions={prChecks.refreshHint ? agentInstructions : undefined}
+              failed={prChecks.failed}
+            />
+          ) : null}
 
           <SubmissionEvidence
             screenshots={submissionScreenshots}
