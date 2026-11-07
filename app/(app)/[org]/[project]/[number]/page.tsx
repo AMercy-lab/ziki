@@ -157,6 +157,8 @@ import "./issue-detail.css";
 import { stateLabel } from "@/lib/labels";
 import { IssueRewardPanel } from "@/components/issue-reward-panel";
 import { rewardEstimatesFor } from "@/lib/agent-api/reward-estimates";
+import { IssueBlockersPanel } from "@/components/issue-blockers-panel";
+import type { IssueBlockerCandidate } from "@/app/actions/issue-blockers";
 import { activeIn, activeLevels, levelIn } from "@/lib/agents/active-in";
 
 type BugPageProps = {
@@ -448,6 +450,19 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
     notFound();
   }
 
+  const blockerRows = organisationId ? await loadOptional("issue blockers", [], () =>
+    prisma.issueBlocker.findMany({
+      where: { OR: [{ blockedBugId: bug.id }, { blockerBugId: bug.id }] },
+      select: {
+        blockedBugId: true,
+        blockerBugId: true,
+        blockedBug: { select: { id: true, number: true, title: true, status: true, substatus: true } },
+        blockerBug: { select: { id: true, number: true, title: true, status: true, substatus: true } },
+      },
+    }),
+  ) : [];
+  const blockedBy = blockerRows.filter((row) => row.blockedBugId === bug.id).map((row) => row.blockerBug) satisfies IssueBlockerCandidate[];
+  const blocking = blockerRows.filter((row) => row.blockerBugId === bug.id).map((row) => row.blockedBug) satisfies IssueBlockerCandidate[];
   // These tables arrived after the issue row. A missing one must not blank the page.
   const [redesignProposals, membership] = organisationId ? await Promise.all([
     loadOptional("redesigns", [], () =>
@@ -2043,6 +2058,14 @@ export default async function BugDetailPage({ params, searchParams }: BugPagePro
 
           <NextStepBar step={liveFix ? liveNextStep(liveFix.check, liveFix.repo) : nextStep} agentInstructions={agentInstructions} />
           {yourDecision ? <DecisionCard issueId={bug.id} decision={yourDecision} /> : null}
+
+          <IssueBlockersPanel
+            projectSlug={refOf(bug.project)}
+            issueId={bug.id}
+            blockedBy={blockedBy}
+            blocking={blocking}
+            canEdit={canTriage && !bug.isDeleted}
+          />
 
           {deliveredBanner ? <DeliveredBanner {...deliveredBanner} /> : null}
 
