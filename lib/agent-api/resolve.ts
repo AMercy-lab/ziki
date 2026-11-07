@@ -13,6 +13,7 @@ import { PROJECT_REPOSITORIES_SELECT, repoForPullRequest } from "@/lib/github/pr
 import { prGate } from "@/lib/agent-api/pr-gate";
 import { gateReport, latestPullRequestReport } from "@/lib/agent-api/pull-request-report";
 import { moveTo } from "@/lib/issue-substatus";
+import { reopenOriginalAfterRevert } from "@/lib/take-it-back-server";
 import { closeSupportThreadsForIssue } from "@/lib/support-threads";
 
 /**
@@ -155,6 +156,8 @@ export async function resolveMergedFix(
         source: "agent", agentId: agent.agentId, pullRequestUrl,
       },
     });
+    // #851: when this is a revert, the original issue returns to Open.
+    await reopenOriginalAfterRevert(tx, bug.id);
     return true;
   });
   if (!resolved) return fail(409, "status_changed", "This issue's status or linked pull request changed while the request ran. Read it again and retry.");
